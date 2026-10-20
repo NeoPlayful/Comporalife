@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-surface: oklch(0.18 0.012 265);
+  --color-surface-raised: oklch(0.23 0.014 265);
+  --color-border-subtle: oklch(0.32 0.015 265);
+  --color-content: oklch(0.95 0.005 265);
+  --color-content-muted: oklch(0.7 0.012 265);
+  --color-positive: oklch(0.75 0.16 155);
+  --color-negative: oklch(0.68 0.19 25);
+  --color-accent: oklch(0.7 0.15 255);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+:root:not(.dark) {
+  color-scheme: light;
+  --color-surface: oklch(0.99 0.002 265);
+  --color-surface-raised: oklch(1 0 0);
+  --color-border-subtle: oklch(0.9 0.005 265);
+  --color-content: oklch(0.22 0.015 265);
+  --color-content-muted: oklch(0.5 0.012 265);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-surface);
+  color: var(--color-content);
+  font-family:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .card {
+    background-color: var(--color-surface-raised);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 0.75rem;
+  }
+
+  .input {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border-subtle);
+    background-color: transparent;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    outline: none;
+  }
+
+  .input:focus {
+    border-color: var(--color-accent);
+  }
+
+  .input option {
+    background-color: var(--color-surface-raised);
+    color: var(--color-content);
+  }
+}

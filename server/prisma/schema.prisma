@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  super_admin
+  admin
+  user
+}
+
+enum UserStatus {
+  active
+  disabled
+  pending_verification
+}
+
+enum Theme {
+  dark
+  light
+  system
+}
+
+enum AccountType {
+  cash
+  bank
+  credit_card
+  brokerage
+  loan
+  other
+}
+
+enum AccountStatus {
+  active
+  archived
+}
+
+enum CategoryKind {
+  income
+  expense
+}
+
+enum TransactionType {
+  income
+  expense
+  transfer
+  adjustment
+}
+
+enum TransactionStatus {
+  posted
+  voided
+}
+
+enum ContributionFrequency {
+  none
+  monthly
+  annual
+}
+
+enum ContributionTiming {
+  begin
+  end
+}
+
+enum RateSource {
+  manual
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
+  passwordHash    String     @map("password_hash")
+  nickname        String
+  role            UserRole   @default(user)
+  status          UserStatus @default(active)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  lastLoginIp     String?    @map("last_login_ip")
+  sessionVersion  Int        @default(1) @map("session_version")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  settings       UserSettings?
+  sessions       UserSession[]
+  accounts       Account[]
+  categories     Category[]
+  tags           Tag[]
+  transactions   Transaction[]
+  entries        TransactionEntry[]
+  scenarios      SimulationScenario[]
+  exchangeRates  ExchangeRate[]
+  reconciliations AccountReconciliation[]
+  auditLogs      AuditLog[]
+
+  @@map("users")
+}
+
+model UserSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  userAgent        String?   @map("user_agent")
+  ip               String?
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("user_sessions")
+}
+
+model UserSettings {
+  userId            String   @id @map("user_id") @db.Uuid
+  baseCurrency      String   @default("CNY") @map("base_currency")
+  timezone          String   @default("Asia/Shanghai")
+  dateFormat        String   @default("YYYY-MM-DD") @map("date_format")
+  theme             Theme    @default(dark)
+  simulationDefaults Json?   @map("simulation_defaults")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
+
+model Account {
+  id                 String        @id @default(uuid()) @db.Uuid
+  userId             String        @map("user_id") @db.Uuid
+  name               String
+  type               AccountType
+  institution        String?
+  currency           String
+  openingBalance     Decimal       @map("opening_balance") @db.Decimal(20, 6)
+  openingBalanceDate DateTime      @map("opening_balance_date") @db.Date
+  status             AccountStatus @default(active)
+  note               String?
+  version            Int           @default(1)
+  archivedAt         DateTime?     @map("archived_at") @db.Timestamptz(6)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries         TransactionEntry[]
+  reconciliations AccountReconciliation[]
+
+  @@index([userId, status])
+  @@map("accounts")
+}
+
+model AccountReconciliation {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  accountId        String   @map("account_id") @db.Uuid
+  statementBalance Decimal  @map("statement_balance") @db.Decimal(20, 6)
+  computedBalance  Decimal  @map("computed_balance") @db.Decimal(20, 6)
+  difference       Decimal  @db.Decimal(20, 6)
+  reconciledAt     DateTime @map("reconciled_at") @db.Date
+  note             String?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, accountId, reconciledAt])
+  @@map("account_reconciliations")
+}
+
+model Category {
+  id        String       @id @default(uuid()) @db.Uuid
+  userId    String       @map("user_id") @db.Uuid
+  kind      CategoryKind
+  name      String
+  parentId  String?      @map("parent_id") @db.Uuid
+  sortOrder Int          @default(0) @map("sort_order")
+  archived  Boolean      @default(false)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent         Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children       Category[]    @relation("CategoryTree")
+  transactions   Transaction[]
+
+  @@index([userId, kind, archived])
+  @@index([userId, parentId])
+  @@map("categories")
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions TransactionTag[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+model Transaction {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  type        TransactionType
+  occurredAt  DateTime          @map("occurred_at") @db.Timestamptz(6)
+  description String
+  merchant    String?
+  note        String?
+  categoryId  String?           @map("category_id") @db.Uuid
+  status      TransactionStatus @default(posted)
+  version     Int               @default(1)
+  voidedAt    DateTime?         @map("voided_at") @db.Timestamptz(6)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category?          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  entries  TransactionEntry[]
+  tags     TransactionTag[]
+
+  @@index([userId, occurredAt(sort: Desc)])
+  @@index([userId, type, occurredAt(sort: Desc)])
+  @@index([userId, categoryId])
+  @@index([userId, status])
+  @@map("transactions")
+}
+
+model TransactionEntry {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  transactionId String   @map("transaction_id") @db.Uuid
+  accountId     String?  @map("account_id") @db.Uuid
+  amount        Decimal  @db.Decimal(20, 6)
+  currency      String
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  account     Account?    @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([accountId, createdAt])
+  @@index([userId, accountId])
+  @@map("transaction_entries")
+}
+
+model TransactionTag {
+  transactionId String @map("transaction_id") @db.Uuid
+  tagId         String @map("tag_id") @db.Uuid
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([transactionId, tagId])
+  @@index([tagId])
+  @@map("transaction_tags")
+}
+
+model SimulationScenario {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  userId                 String                  @map("user_id") @db.Uuid
+  name                   String
+  principal              Decimal                 @db.Decimal(20, 6)
+  contributionAmount     Decimal                 @map("contribution_amount") @db.Decimal(20, 6)
+  contributionFrequency  ContributionFrequency   @map("contribution_frequency")
+  contributionTiming     ContributionTiming      @default(end) @map("contribution_timing")
+  annualReturnRate       Decimal                 @map("annual_return_rate") @db.Decimal(10, 6)
+  years                  Int
+  inflationRate          Decimal                 @default(0) @map("inflation_rate") @db.Decimal(10, 6)
+  feeRate                Decimal                 @default(0) @map("fee_rate") @db.Decimal(10, 6)
+  modelVersion           String                  @default("compound-v1") @map("model_version")
+  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("simulation_scenarios")
+}
+
+model ExchangeRate {
+  id            String     @id @default(uuid()) @db.Uuid
+  userId        String     @map("user_id") @db.Uuid
+  baseCurrency  String     @map("base_currency")
+  quoteCurrency String     @map("quote_currency")
+  rate          Decimal    @db.Decimal(20, 10)
+  rateDate      DateTime   @map("rate_date") @db.Date
+  source        RateSource @default(manual)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, baseCurrency, quoteCurrency, rateDate])
+  @@index([userId, baseCurrency, quoteCurrency, rateDate(sort: Desc)])
+  @@map("exchange_rates")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
