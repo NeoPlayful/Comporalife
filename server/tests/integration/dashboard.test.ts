@@ -209,6 +209,20 @@ describe('现金流', () => {
   });
 
   it('区间内月份完整填充', async () => {
+    // 用户时区为 Asia/Shanghai，区间终点必须落在该时区的 3 月内，
+    // 否则 2026-03-31T23:59:59Z 已属于 4 月 1 日
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/cashflow?from=2026-01-01T00:00:00Z&to=2026-03-30T15:59:59Z',
+      headers: auth(token),
+    });
+
+    const periods = (res.json().data.points as Array<{ period: string }>).map((p) => p.period);
+    expect(periods).toEqual(['2026-01', '2026-02', '2026-03']);
+  });
+
+  it('区间跨越时区换月时包含新月份', async () => {
+    // 2026-03-31T23:59:59Z 在 Asia/Shanghai 是 4 月 1 日 07:59，必须计入 4 月
     const res = await app.inject({
       method: 'GET',
       url: '/api/dashboard/cashflow?from=2026-01-01T00:00:00Z&to=2026-03-31T23:59:59Z',
@@ -216,7 +230,7 @@ describe('现金流', () => {
     });
 
     const periods = (res.json().data.points as Array<{ period: string }>).map((p) => p.period);
-    expect(periods).toEqual(['2026-01', '2026-02', '2026-03']);
+    expect(periods).toEqual(['2026-01', '2026-02', '2026-03', '2026-04']);
   });
 });
 

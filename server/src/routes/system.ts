@@ -55,10 +55,29 @@ export default async function systemRoutes(app: FastifyInstance) {
     return ok(
       {
         phase: PHASE,
-        available: ['auth', 'accounts', 'categories', 'tags', 'transactions', 'transfers', 'dashboard', 'exchange-rates', 'compound-simulations'],
-        planned: ['imports', 'budgets', 'portfolios', 'monte-carlo', 'goals', 'reports', 'admin'],
+        available: [
+          'auth',
+          'accounts',
+          'categories',
+          'tags',
+          'transactions',
+          'transfers',
+          'dashboard',
+          'exchange-rates',
+          'compound-simulations',
+          'imports',
+          'import-templates',
+          'classification-rules',
+          'transfer-matching',
+        ],
+        planned: ['budgets', 'portfolios', 'monte-carlo', 'goals', 'reports', 'admin'],
         baseCurrencyDefault: env.DEFAULT_CURRENCY,
         maxSimulationYears: 100,
+        importLimits: {
+          maxFileMb: env.IMPORT_MAX_FILE_MB,
+          maxRows: env.IMPORT_MAX_ROWS,
+          formats: ['csv', 'xlsx'],
+        },
       },
       request.id,
     );

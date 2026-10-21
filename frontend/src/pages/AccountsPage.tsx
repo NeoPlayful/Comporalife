@@ -4,8 +4,8 @@ import {
   accountsApi,
   type Account,
   type AccountType,
-} from '@/api/accounts';
-import { ApiError } from '@/api/client';
+} from '@/lib/accounts';
+import { ApiError } from '@/lib/client';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';

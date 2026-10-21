@@ -1,6 +1,6 @@
 {
   "name": "comporalife-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -24,9 +24,11 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.0.1",
     "@fastify/helmet": "^13.0.1",
+    "@fastify/multipart": "^10.1.4",
     "@fastify/rate-limit": "^10.2.2",
     "@prisma/client": "^6.3.1",
     "argon2": "^0.41.1",
+    "csv-parse": "^7.0.3",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
     "decimal.js": "^10.4.3",
@@ -35,6 +37,7 @@
     "jose": "^5.9.6",
     "nodemailer": "^6.10.0",
     "pino": "^9.6.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.24.1"
   },
   "devDependencies": {

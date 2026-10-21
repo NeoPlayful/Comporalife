@@ -1,14 +1,14 @@
-import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/api/accounts';
+import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/lib/accounts';
 import '@/components/charts/echarts';
 import ReactECharts from 'echarts-for-react';
-import { dashboardApi } from '@/api/dashboard';
+import { dashboardApi } from '@/lib/dashboard';
 import CashflowChart from '@/components/charts/CashflowChart';
 import NetWorthChart from '@/components/charts/NetWorthChart';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
-import { TRANSACTION_TYPE_LABELS } from '@/api/transactions';
+import { TRANSACTION_TYPE_LABELS } from '@/lib/transactions';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';

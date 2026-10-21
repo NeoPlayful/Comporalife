@@ -1,5 +1,5 @@
-import { ApiError } from '@/api/client';
-import { authApi } from '@/api/auth';
+import { ApiError } from '@/lib/client';
+import { authApi } from '@/lib/auth';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useAuthStore } from '@/stores/auth-store';
 import { useState } from 'react';

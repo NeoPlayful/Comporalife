@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import { ZodError } from 'zod';
+import { env } from '../config/env.js';
 import { AppError, ErrorCode } from '../lib/errors.js';
 
 async function errorHandlerPlugin(app: FastifyInstance) {
@@ -52,6 +53,18 @@ async function errorHandlerPlugin(app: FastifyInstance) {
       return reply.status(429).send({
         success: false,
         error: { code: ErrorCode.RATE_LIMITED, message: '请求过于频繁，请稍后重试' },
+        meta: { requestId },
+      });
+    }
+
+    // multipart 超过 fileSize 限制时插件抛出 413，统一转换成本项目的错误码
+    if (fastifyError.statusCode === 413) {
+      return reply.status(413).send({
+        success: false,
+        error: {
+          code: ErrorCode.IMPORT_FILE_TOO_LARGE,
+          message: `文件超过 ${env.IMPORT_MAX_FILE_MB} MB 上限`,
+        },
         meta: { requestId },
       });
     }

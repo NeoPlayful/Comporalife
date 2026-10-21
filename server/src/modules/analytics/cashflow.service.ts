@@ -129,53 +129,21 @@ export async function computeCashflow(
 function enumerateMonths(from: Date, to: Date, timezone: string): string[] {
   const months: string[] = [];
   const startKey = formatInTimeZone(from, timezone, 'yyyy-MM');
+  const endKey = formatInTimeZone(to, timezone, 'yyyy-MM');
   let cursor = startKey;
 
-  // 直接比较时刻而不是月份字符串：区间上限的瞬时刻晚于该月起点才计入
+  // 逐月推进到区间终点所在月份；区间可以落在月中，不要求对齐自然月
   while (true) {
-    const periodStart = new Date(`${cursor}-01T00:00:00Z`);
-    const shouldInclude = formatInTimeZone(periodStart, timezone, 'yyyy-MM') === cursor;
-
-    if (!shouldInclude) break;
-    if (monthStartAfter(cursor, to, timezone)) break;
-
     months.push(cursor);
-    cursor = nextMonth(cursor);
+    if (cursor === endKey) break;
+
+    const next = nextMonth(cursor);
+    // 防御：区间终点早于起点或月份推进异常时终止
+    if (next > endKey) break;
+    cursor = next;
   }
 
   return months;
-}
-
-/** 该月起始时刻是否已晚于区间上限（按用户时区判定） */
-function monthStartAfter(period: string, to: Date, timezone: string): boolean {
-  const nextPeriod = nextMonth(period);
-  // 下个月按用户时区的第一天 00:00 对应的 UTC 时刻
-  const nextMonthStartUtc = zonedMonthStartUtc(nextPeriod, timezone);
-  return nextMonthStartUtc > to;
-}
-
-/** 把 "yyyy-MM" 在该时区的月初转换为 UTC 时刻 */
-function zonedMonthStartUtc(period: string, timezone: string): Date {
-  const [yearPart, monthPart] = period.split('-');
-  const year = Number(yearPart);
-  const month = Number(monthPart);
-
-  // 用迭代校正时区偏移，避免引入额外依赖
-  let guess = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
-  for (let i = 0; i < 2; i += 1) {
-    const actual = formatInTimeZone(guess, timezone, "yyyy-MM-dd'T'HH:mm:ssXXX");
-    const actualMonthKey = actual.slice(0, 7);
-    if (actualMonthKey === period) {
-      // 修正到该时区的月初
-      const offset = actual.slice(-6);
-      const sign = offset.startsWith('-') ? -1 : 1;
-      const [hh, mm] = offset.slice(1).split(':').map(Number);
-      const offsetMinutes = sign * (hh! * 60 + mm!);
-      guess = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0) - offsetMinutes * 60_000);
-    }
-  }
-
-  return guess;
 }
 
 function nextMonth(period: string): string {

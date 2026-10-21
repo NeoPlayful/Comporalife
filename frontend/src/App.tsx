@@ -17,6 +17,11 @@ const CompoundPage = lazy(() => import('./pages/CompoundPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
+const ImportsPage = lazy(() => import('./pages/ImportsPage'));
+const ImportNewPage = lazy(() => import('./pages/ImportNewPage'));
+const ImportWorkbenchPage = lazy(() => import('./pages/ImportWorkbenchPage'));
+const RulesPage = lazy(() => import('./pages/RulesPage'));
+const UnmatchedPage = lazy(() => import('./pages/UnmatchedPage'));
 
 export default function App() {
   return (
@@ -39,6 +44,11 @@ export default function App() {
           <Route path="accounts" element={<AccountsPage />} />
           <Route path="accounts/:id" element={<AccountDetailPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="imports" element={<ImportsPage />} />
+          <Route path="imports/new" element={<ImportNewPage />} />
+          <Route path="imports/rules" element={<RulesPage />} />
+          <Route path="imports/unmatched" element={<UnmatchedPage />} />
+          <Route path="imports/:id" element={<ImportWorkbenchPage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="compound" element={<CompoundPage />} />
           <Route path="settings" element={<SettingsPage />} />

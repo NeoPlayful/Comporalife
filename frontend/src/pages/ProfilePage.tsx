@@ -1,5 +1,5 @@
-import { authApi } from '@/api/auth';
-import { ApiError } from '@/api/client';
+import { authApi } from '@/lib/auth';
+import { ApiError } from '@/lib/client';
 import LoadingState from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/stores/auth-store';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

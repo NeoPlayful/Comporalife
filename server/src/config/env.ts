@@ -26,6 +26,20 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  // ===== 账单导入 =====
+  FILE_STORAGE_DIR: z.string().default('./data/imports'),
+  // AES-256-GCM 密钥，base64 编码后必须为 32 字节；长度在此处校验，绝不打印值
+  FILE_ENCRYPTION_KEY: z.string().refine((value) => {
+    try {
+      return Buffer.from(value, 'base64').length === 32;
+    } catch {
+      return false;
+    }
+  }, 'FILE_ENCRYPTION_KEY 必须是 base64 编码的 32 字节密钥'),
+  IMPORT_MAX_FILE_MB: z.coerce.number().int().positive().default(10),
+  IMPORT_MAX_ROWS: z.coerce.number().int().positive().default(20_000),
+  IMPORT_FILE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  IMPORT_ROW_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
 });
 
 export type Env = z.infer<typeof envSchema>;

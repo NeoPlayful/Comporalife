@@ -71,6 +71,44 @@ enum RateSource {
   manual
 }
 
+enum ImportStatus {
+  uploaded
+  parsed
+  mapped
+  validated
+  committing
+  completed
+  failed
+  cancelled
+  rolled_back
+}
+
+enum ImportFormat {
+  csv
+  xlsx
+}
+
+enum ImportRowStatus {
+  pending
+  valid
+  invalid
+  duplicate
+  suspected
+  skipped
+  imported
+  failed
+}
+
+enum DuplicateKind {
+  exact
+  suspected
+}
+
+enum TransactionSource {
+  manual
+  import
+}
+
 model User {
   id              String     @id @default(uuid()) @db.Uuid
   email           String     @unique
@@ -85,17 +123,20 @@ model User {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  settings       UserSettings?
-  sessions       UserSession[]
-  accounts       Account[]
-  categories     Category[]
-  tags           Tag[]
-  transactions   Transaction[]
-  entries        TransactionEntry[]
-  scenarios      SimulationScenario[]
-  exchangeRates  ExchangeRate[]
-  reconciliations AccountReconciliation[]
-  auditLogs      AuditLog[]
+  settings            UserSettings?
+  sessions            UserSession[]
+  accounts            Account[]
+  categories          Category[]
+  tags                Tag[]
+  transactions        Transaction[]
+  entries             TransactionEntry[]
+  scenarios           SimulationScenario[]
+  exchangeRates       ExchangeRate[]
+  reconciliations     AccountReconciliation[]
+  auditLogs           AuditLog[]
+  importBatches       ImportBatch[]
+  importTemplates     ImportTemplate[]
+  classificationRules ClassificationRule[]
 
   @@map("users")
 }
@@ -118,14 +159,14 @@ model UserSession {
 }
 
 model UserSettings {
-  userId            String   @id @map("user_id") @db.Uuid
-  baseCurrency      String   @default("CNY") @map("base_currency")
-  timezone          String   @default("Asia/Shanghai")
-  dateFormat        String   @default("YYYY-MM-DD") @map("date_format")
-  theme             Theme    @default(dark)
-  simulationDefaults Json?   @map("simulation_defaults")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId             String   @id @map("user_id") @db.Uuid
+  baseCurrency       String   @default("CNY") @map("base_currency")
+  timezone           String   @default("Asia/Shanghai")
+  dateFormat         String   @default("YYYY-MM-DD") @map("date_format")
+  theme              Theme    @default(dark)
+  simulationDefaults Json?    @map("simulation_defaults")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -151,6 +192,7 @@ model Account {
   user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   entries         TransactionEntry[]
   reconciliations AccountReconciliation[]
+  importBatches   ImportBatch[]
 
   @@index([userId, status])
   @@map("accounts")
@@ -185,10 +227,10 @@ model Category {
   createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent         Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children       Category[]    @relation("CategoryTree")
-  transactions   Transaction[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent       Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children     Category[]    @relation("CategoryTree")
+  transactions Transaction[]
 
   @@index([userId, kind, archived])
   @@index([userId, parentId])
@@ -209,29 +251,39 @@ model Tag {
 }
 
 model Transaction {
-  id          String            @id @default(uuid()) @db.Uuid
-  userId      String            @map("user_id") @db.Uuid
-  type        TransactionType
-  occurredAt  DateTime          @map("occurred_at") @db.Timestamptz(6)
-  description String
-  merchant    String?
-  note        String?
-  categoryId  String?           @map("category_id") @db.Uuid
-  status      TransactionStatus @default(posted)
-  version     Int               @default(1)
-  voidedAt    DateTime?         @map("voided_at") @db.Timestamptz(6)
-  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String            @id @default(uuid()) @db.Uuid
+  userId            String            @map("user_id") @db.Uuid
+  type              TransactionType
+  occurredAt        DateTime          @map("occurred_at") @db.Timestamptz(6)
+  description       String
+  merchant          String?
+  note              String?
+  categoryId        String?           @map("category_id") @db.Uuid
+  status            TransactionStatus @default(posted)
+  version           Int               @default(1)
+  voidedAt          DateTime?         @map("voided_at") @db.Timestamptz(6)
+  // 导入溯源：手工交易 source=manual 且其余字段为空
+  source            TransactionSource @default(manual)
+  importBatchId     String?           @map("import_batch_id") @db.Uuid
+  importFingerprint String?           @map("import_fingerprint") @db.Char(64)
+  externalId        String?           @map("external_id")
+  balanceAfter      Decimal?          @map("balance_after") @db.Decimal(20, 6)
+  createdAt         DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category?          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  entries  TransactionEntry[]
-  tags     TransactionTag[]
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    Category?          @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  importBatch ImportBatch?       @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  entries     TransactionEntry[]
+  tags        TransactionTag[]
+  importRows  ImportRow[]
 
+  @@unique([userId, importFingerprint])
   @@index([userId, occurredAt(sort: Desc)])
   @@index([userId, type, occurredAt(sort: Desc)])
   @@index([userId, categoryId])
   @@index([userId, status])
+  @@index([importBatchId])
   @@map("transactions")
 }
 
@@ -267,20 +319,20 @@ model TransactionTag {
 }
 
 model SimulationScenario {
-  id                     String                  @id @default(uuid()) @db.Uuid
-  userId                 String                  @map("user_id") @db.Uuid
-  name                   String
-  principal              Decimal                 @db.Decimal(20, 6)
-  contributionAmount     Decimal                 @map("contribution_amount") @db.Decimal(20, 6)
-  contributionFrequency  ContributionFrequency   @map("contribution_frequency")
-  contributionTiming     ContributionTiming      @default(end) @map("contribution_timing")
-  annualReturnRate       Decimal                 @map("annual_return_rate") @db.Decimal(10, 6)
-  years                  Int
-  inflationRate          Decimal                 @default(0) @map("inflation_rate") @db.Decimal(10, 6)
-  feeRate                Decimal                 @default(0) @map("fee_rate") @db.Decimal(10, 6)
-  modelVersion           String                  @default("compound-v1") @map("model_version")
-  createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                    String                @id @default(uuid()) @db.Uuid
+  userId                String                @map("user_id") @db.Uuid
+  name                  String
+  principal             Decimal               @db.Decimal(20, 6)
+  contributionAmount    Decimal               @map("contribution_amount") @db.Decimal(20, 6)
+  contributionFrequency ContributionFrequency @map("contribution_frequency")
+  contributionTiming    ContributionTiming    @default(end) @map("contribution_timing")
+  annualReturnRate      Decimal               @map("annual_return_rate") @db.Decimal(10, 6)
+  years                 Int
+  inflationRate         Decimal               @default(0) @map("inflation_rate") @db.Decimal(10, 6)
+  feeRate               Decimal               @default(0) @map("fee_rate") @db.Decimal(10, 6)
+  modelVersion          String                @default("compound-v1") @map("model_version")
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -322,4 +374,124 @@ model AuditLog {
   @@index([userId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+model ImportBatch {
+  id               String       @id @default(uuid()) @db.Uuid
+  userId           String       @map("user_id") @db.Uuid
+  accountId        String       @map("account_id") @db.Uuid
+  status           ImportStatus @default(uploaded)
+  originalFilename String       @map("original_filename")
+  fileSize         Int          @map("file_size")
+  fileSha256       String       @map("file_sha256") @db.Char(64)
+  storageKey       String       @map("storage_key")
+  encryptionIv     String       @map("encryption_iv")
+  encryptionTag    String       @map("encryption_tag")
+  format           ImportFormat
+  encoding         String
+  delimiter        String?
+  sheetName        String?      @map("sheet_name")
+  headerRow        Int?         @map("header_row")
+  // 去重后的表头键列表，与 import_rows.raw 的键一一对应，重新映射时按位置取值
+  headers          Json?
+  templateId       String?      @map("template_id") @db.Uuid
+  mapping          Json?
+  totalRows        Int          @default(0) @map("total_rows")
+  validRows        Int          @default(0) @map("valid_rows")
+  invalidRows      Int          @default(0) @map("invalid_rows")
+  duplicateRows    Int          @default(0) @map("duplicate_rows")
+  suspectedRows    Int          @default(0) @map("suspected_rows")
+  skippedRows      Int          @default(0) @map("skipped_rows")
+  importedRows     Int          @default(0) @map("imported_rows")
+  failureReason    String?      @map("failure_reason")
+  committedAt      DateTime?    @map("committed_at") @db.Timestamptz(6)
+  rolledBackAt     DateTime?    @map("rolled_back_at") @db.Timestamptz(6)
+  cancelledAt      DateTime?    @map("cancelled_at") @db.Timestamptz(6)
+  version          Int          @default(1)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  template     ImportTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  rows         ImportRow[]
+  transactions Transaction[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@index([userId, fileSha256])
+  @@map("import_batches")
+}
+
+model ImportRow {
+  id            String          @id @default(uuid()) @db.Uuid
+  batchId       String          @map("batch_id") @db.Uuid
+  userId        String          @map("user_id") @db.Uuid
+  rowNumber     Int             @map("row_number")
+  // 原始单元格数组，与批次 headers 按位置对应；重新映射时以此为准，避免重名表头丢失
+  cells         Json
+  // 表头 → 原始值，便于按列名阅读与导出
+  raw           Json
+  occurredAt    DateTime?       @map("occurred_at") @db.Timestamptz(6)
+  amount        Decimal?        @db.Decimal(20, 6)
+  currency      String?
+  description   String?
+  merchant      String?
+  externalId    String?         @map("external_id")
+  balanceAfter  Decimal?        @map("balance_after") @db.Decimal(20, 6)
+  direction     String?
+  fingerprint   String?         @db.Char(64)
+  status        ImportRowStatus @default(pending)
+  errors        Json?
+  transactionId String?         @map("transaction_id") @db.Uuid
+  duplicateKind DuplicateKind?  @map("duplicate_kind")
+  duplicateOfId String?         @map("duplicate_of_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  batch       ImportBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+  @@index([userId, fingerprint])
+  @@map("import_rows")
+}
+
+model ImportTemplate {
+  id              String       @id @default(uuid()) @db.Uuid
+  userId          String       @map("user_id") @db.Uuid
+  name            String
+  bankName        String?      @map("bank_name")
+  format          ImportFormat
+  headerSignature String       @map("header_signature") @db.Char(64)
+  mapping         Json
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batches ImportBatch[]
+
+  @@unique([userId, name])
+  @@index([userId, format, headerSignature])
+  @@map("import_templates")
+}
+
+model ClassificationRule {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  name          String
+  priority      Int       @default(100)
+  enabled       Boolean   @default(true)
+  conditions    Json
+  actions       Json
+  matchCount    Int       @default(0) @map("match_count")
+  lastAppliedAt DateTime? @map("last_applied_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, priority])
+  @@map("classification_rules")
 }

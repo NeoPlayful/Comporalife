@@ -1,4 +1,4 @@
-import { authApi } from '@/api/auth';
+import { authApi } from '@/lib/auth';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';

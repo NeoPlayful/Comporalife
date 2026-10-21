@@ -1,13 +1,13 @@
-import { accountsApi } from '@/api/accounts';
-import { categoriesApi } from '@/api/categories';
-import { ApiError } from '@/api/client';
+import { accountsApi } from '@/lib/accounts';
+import { categoriesApi } from '@/lib/categories';
+import { ApiError } from '@/lib/client';
 import {
   TRANSACTION_TYPE_LABELS,
   transactionsApi,
   type Transaction,
   type TransactionListParams,
   type TransactionType,
-} from '@/api/transactions';
+} from '@/lib/transactions';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import TransactionForm from '@/components/finance/TransactionForm';
 import EmptyState from '@/components/ui/EmptyState';
@@ -16,6 +16,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, RotateCcw, Search } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
@@ -260,6 +261,7 @@ export default function TransactionsPage() {
                   </th>
                   <th className="px-3 py-2">日期</th>
                   <th className="px-3 py-2">摘要</th>
+                  <th className="px-3 py-2">来源</th>
                   <th className="px-3 py-2">分类</th>
                   <th className="px-3 py-2">账户</th>
                   <th className="px-3 py-2 text-right">金额</th>
@@ -291,6 +293,19 @@ export default function TransactionsPage() {
                       <span className="ml-2 text-xs text-[var(--color-content-muted)]">
                         {TRANSACTION_TYPE_LABELS[tx.type]}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      {tx.source === 'import' ? (
+                        <Link
+                          to={`/imports/${tx.importBatchId}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-500"
+                        >
+                          导入
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-[var(--color-content-muted)]">手工</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-[var(--color-content-muted)]">
                       {tx.category?.name ?? '未分类'}

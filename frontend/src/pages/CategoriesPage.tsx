@@ -4,8 +4,8 @@ import {
   tagsApi,
   type CategoryKind,
   type CategoryNode,
-} from '@/api/categories';
-import { ApiError } from '@/api/client';
+} from '@/lib/categories';
+import { ApiError } from '@/lib/client';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';

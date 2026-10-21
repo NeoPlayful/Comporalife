@@ -19,6 +19,8 @@ export interface Transaction {
   status: 'posted' | 'voided';
   version: number;
   voidedAt: string | null;
+  source: 'manual' | 'import';
+  importBatchId: string | null;
   category: { id: string; name: string; kind: string } | null;
   tags: Array<{ id: string; name: string }>;
   amount: string;

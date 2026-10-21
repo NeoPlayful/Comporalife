@@ -1,4 +1,4 @@
-import { authApi } from '@/api/auth';
+import { authApi } from '@/lib/auth';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Sun, User } from 'lucide-react';

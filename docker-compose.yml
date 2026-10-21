@@ -56,6 +56,14 @@ services:
       DEFAULT_CURRENCY: ${DEFAULT_CURRENCY:-CNY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_PRETTY: 'false'
+      FILE_STORAGE_DIR: /app/data/imports
+      FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY:?FILE_ENCRYPTION_KEY 必须设置}
+      IMPORT_MAX_FILE_MB: ${IMPORT_MAX_FILE_MB:-10}
+      IMPORT_MAX_ROWS: ${IMPORT_MAX_ROWS:-20000}
+      IMPORT_FILE_RETENTION_DAYS: ${IMPORT_FILE_RETENTION_DAYS:-30}
+      IMPORT_ROW_RETENTION_DAYS: ${IMPORT_ROW_RETENTION_DAYS:-365}
+    volumes:
+      - imports-data:/app/data/imports
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/api/system/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
@@ -83,6 +91,8 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  # 原始账单加密文件；不映射到 Nginx，不对宿主机暴露
+  imports-data:
 
 networks:
   internal:

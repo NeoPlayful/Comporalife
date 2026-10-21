@@ -1,7 +1,7 @@
-import { accountsApi, type Account } from '@/api/accounts';
-import { categoriesApi, type FlatCategory } from '@/api/categories';
-import { ApiError } from '@/api/client';
-import { transactionsApi, transfersApi } from '@/api/transactions';
+import { accountsApi, type Account } from '@/lib/accounts';
+import { categoriesApi, type FlatCategory } from '@/lib/categories';
+import { ApiError } from '@/lib/client';
+import { transactionsApi, transfersApi } from '@/lib/transactions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 

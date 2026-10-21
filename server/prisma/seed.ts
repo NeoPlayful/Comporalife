@@ -5,8 +5,8 @@ import { CATEGORY_TEMPLATE } from '../src/modules/categories/category-template.j
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL ?? 'admin@comporalife.local';
-  const password = process.env.ADMIN_PASSWORD ?? 'ChangeMe!2026';
+  const email = process.env.ADMIN_EMAIL ?? 'admin@comporalife.com';
+  const password = process.env.ADMIN_PASSWORD ?? 'admin123';
   const nickname = '超级管理员';
 
   const existing = await prisma.user.findUnique({ where: { email } });

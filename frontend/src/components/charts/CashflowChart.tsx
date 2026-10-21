@@ -1,4 +1,4 @@
-import type { CashflowPoint } from '@/api/dashboard';
+import type { CashflowPoint } from '@/lib/dashboard';
 import './echarts';
 import ReactECharts from 'echarts-for-react';
 import EmptyState from '../ui/EmptyState';

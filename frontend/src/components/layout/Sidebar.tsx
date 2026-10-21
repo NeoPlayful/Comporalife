@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Settings,
   Tags,
+  Upload,
   Wallet,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
@@ -13,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', label: '财务总览', icon: LayoutDashboard },
   { to: '/accounts', label: '财务账户', icon: Wallet },
   { to: '/transactions', label: '交易流水', icon: ArrowLeftRight },
+  { to: '/imports', label: '账单导入', icon: Upload },
   { to: '/categories', label: '分类管理', icon: Tags },
   { to: '/compound', label: '复利模拟', icon: Calculator },
   { to: '/settings', label: '设置', icon: Settings },
@@ -31,12 +33,7 @@ export default function Sidebar() {
         <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-accent)] font-bold text-white">
           复
         </div>
-        {!collapsed && (
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">Comporalife</p>
-            <p className="truncate text-xs text-[var(--color-content-muted)]">复利人生</p>
-          </div>
-        )}
+        {!collapsed && <p className="min-w-0 truncate text-sm font-semibold">Comporalife</p>}
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
