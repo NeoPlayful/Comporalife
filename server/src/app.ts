@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { API_PREFIX, SESSION_COOKIE_NAME } from './config/constants.js';
 import { env } from './config/env.js';
@@ -13,7 +14,12 @@ import authRoutes from './modules/auth/auth.routes.js';
 import dashboardRoutes from './modules/analytics/dashboard.routes.js';
 import categoriesRoutes from './modules/categories/categories.routes.js';
 import currenciesRoutes from './modules/currencies/currencies.routes.js';
+import importsRoutes from './modules/imports/imports.routes.js';
+import importsCommitRoutes from './modules/imports/imports.commit.routes.js';
+import templatesRoutes from './modules/imports/templates.routes.js';
+import rulesRoutes from './modules/rules/rules.routes.js';
 import ledgerRoutes from './modules/ledger/ledger.routes.js';
+import matchRoutes from './modules/ledger/match.routes.js';
 import profileRoutes from './modules/profile/profile.routes.js';
 import settingsRoutes from './modules/settings/settings.routes.js';
 import simulationsRoutes from './modules/simulations/simulations.routes.js';
@@ -46,6 +52,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     },
   });
 
+  await app.register(multipart, {
+    limits: {
+      // 只允许单文件，大小上限与导入配置保持一致
+      files: 1,
+      fileSize: env.IMPORT_MAX_FILE_MB * 1024 * 1024,
+      fields: 10,
+    },
+  });
+
   await app.register(securityPlugin);
   await app.register(errorHandlerPlugin);
 
@@ -70,9 +85,15 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(categoriesRoutes, { prefix: API_PREFIX });
     await app.register(tagsRoutes, { prefix: API_PREFIX });
     await app.register(ledgerRoutes, { prefix: API_PREFIX });
+    await app.register(matchRoutes, { prefix: API_PREFIX });
     await app.register(currenciesRoutes, { prefix: API_PREFIX });
     await app.register(dashboardRoutes, { prefix: API_PREFIX });
     await app.register(simulationsRoutes, { prefix: API_PREFIX });
+    // 模板路由必须先于 /imports/:id 注册，否则会被参数路由吞掉
+    await app.register(templatesRoutes, { prefix: API_PREFIX });
+    await app.register(importsRoutes, { prefix: API_PREFIX });
+    await app.register(importsCommitRoutes, { prefix: API_PREFIX });
+    await app.register(rulesRoutes, { prefix: API_PREFIX });
   }
 
   Object.defineProperty(app, 'sessionCookieName', { value: SESSION_COOKIE_NAME });

@@ -16,6 +16,9 @@ export default defineConfig({
       REDIS_URL: process.env.REDIS_URL ?? 'redis://localhost:6379',
       JWT_SECRET: process.env.JWT_SECRET ?? 'test-secret-at-least-32-characters-long',
       LOG_LEVEL: 'fatal',
+      // 测试用固定密钥，仅用于本地与 CI，不是生产凭据
+      FILE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+      FILE_STORAGE_DIR: './data/test-imports',
     },
   },
 });

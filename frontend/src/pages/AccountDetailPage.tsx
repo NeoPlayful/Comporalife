@@ -3,8 +3,8 @@ import {
   LIABILITY_TYPES,
   accountsApi,
   type Reconciliation,
-} from '@/api/accounts';
-import { ApiError } from '@/api/client';
+} from '@/lib/accounts';
+import { ApiError } from '@/lib/client';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';

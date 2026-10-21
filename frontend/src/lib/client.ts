@@ -118,6 +118,47 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return payload.data as T;
 }
 
+/**
+ * multipart 上传：不设置 Content-Type，交给浏览器生成 boundary。
+ * 错误与令牌刷新逻辑与 JSON 请求保持一致。
+ */
+async function requestMultipart<T>(path: string, form: FormData, options: RequestOptions = {}): Promise<T> {
+  const { skipRefresh = false, headers, ...rest } = options;
+  const token = accessTokenGetter();
+
+  const response = await fetch(path, {
+    ...rest,
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
+    body: form,
+  });
+
+  if (response.status === 401 && !skipRefresh) {
+    const refreshed = await refreshOnce();
+    if (refreshed) return requestMultipart<T>(path, form, { ...options, skipRefresh: true });
+    onAuthLost();
+    throw new ApiError(401, 'UNAUTHORIZED', '会话已失效，请重新登录');
+  }
+
+  const payload = (await response.json()) as ApiEnvelope<T>;
+
+  if (!response.ok || payload.success === false) {
+    throw new ApiError(
+      response.status,
+      payload.error?.code ?? 'SYSTEM_ERROR',
+      payload.error?.message ?? '请求失败',
+      payload.error?.details,
+      payload.meta?.requestId,
+    );
+  }
+
+  return payload.data as T;
+}
+
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
@@ -125,4 +166,5 @@ export const api = {
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'PATCH', body }),
   delete: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: 'DELETE' }),
+  upload: <T>(path: string, form: FormData, options?: RequestOptions) => requestMultipart<T>(path, form, options),
 };

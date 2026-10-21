@@ -1,4 +1,4 @@
-import { authApi } from '@/api/auth';
+import { authApi } from '@/lib/auth';
 import LoadingState from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEffect, useState } from 'react';

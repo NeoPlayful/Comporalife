@@ -1,6 +1,6 @@
-import type { Preferences } from '@/api/auth';
-import { ApiError, api } from '@/api/client';
-import { exchangeRatesApi } from '@/api/dashboard';
+import type { Preferences } from '@/lib/auth';
+import { ApiError, api } from '@/lib/client';
+import { exchangeRatesApi } from '@/lib/dashboard';
 import LoadingState from '@/components/ui/LoadingState';
 import { useUiStore } from '@/stores/ui-store';
 import { CURRENCY_DECIMALS } from '@/utils/constants';

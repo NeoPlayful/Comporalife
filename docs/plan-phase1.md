@@ -1296,7 +1296,7 @@ server/
 └── prisma/                  → S1 建全量模型，随阶段补 seed
 
 frontend/
-├── src/api/                 → 与后端同步
+├── src/lib/                 → 与后端同步
 ├── src/components/ui/       → S1
 ├── src/components/layout/   → S1
 ├── src/pages/auth|profile   → S2

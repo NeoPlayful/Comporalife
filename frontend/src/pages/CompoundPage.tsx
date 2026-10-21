@@ -1,11 +1,11 @@
-import { ApiError } from '@/api/client';
+import { ApiError } from '@/lib/client';
 import {
   DEFAULT_PARAMS,
   simulationsApi,
   type CompoundParams,
   type Comparison,
   type Scenario,
-} from '@/api/simulations';
+} from '@/lib/simulations';
 import CompoundChart from '@/components/charts/CompoundChart';
 import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

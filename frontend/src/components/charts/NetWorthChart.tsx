@@ -1,4 +1,4 @@
-import type { NetWorthTrend } from '@/api/dashboard';
+import type { NetWorthTrend } from '@/lib/dashboard';
 import './echarts';
 import ReactECharts from 'echarts-for-react';
 import EmptyState from '../ui/EmptyState';

@@ -77,6 +77,8 @@ export default async function ledgerRoutes(app: FastifyInstance) {
           status: true,
           version: true,
           voidedAt: true,
+          source: true,
+          importBatchId: true,
           category: { select: { id: true, name: true, kind: true } },
           tags: { select: { tag: { select: { id: true, name: true } } } },
           entries: { select: { accountId: true, amount: true, currency: true } },
@@ -519,6 +521,8 @@ const transactionSelect = {
   status: true,
   version: true,
   voidedAt: true,
+  source: true,
+  importBatchId: true,
   category: { select: { id: true, name: true, kind: true } },
   tags: { select: { tag: { select: { id: true, name: true } } } },
   entries: {
@@ -541,6 +545,8 @@ type TransactionRow = {
   status: string;
   version: number;
   voidedAt: Date | null;
+  source: string;
+  importBatchId: string | null;
   category: { id: string; name: string; kind: string } | null;
   tags: Array<{ tag: { id: string; name: string } }>;
   entries: Array<{
@@ -572,6 +578,8 @@ function toTransactionDto(transaction: TransactionRow) {
     status: transaction.status,
     version: transaction.version,
     voidedAt: transaction.voidedAt,
+    source: transaction.source,
+    importBatchId: transaction.importBatchId,
     category: transaction.category,
     tags: transaction.tags.map((item) => item.tag),
     amount: moneyToString(roundMoney(signedAmount)),
