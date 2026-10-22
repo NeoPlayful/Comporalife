@@ -42,6 +42,29 @@ export const ErrorCode = {
   BUDGET_ROLLOVER_UNSUPPORTED: 'BUDGET_ROLLOVER_UNSUPPORTED',
   BUDGET_ARCHIVED: 'BUDGET_ARCHIVED',
   BUDGET_NOT_FOUND: 'BUDGET_NOT_FOUND',
+  // ===== 投资 =====
+  PORTFOLIO_NOT_FOUND: 'PORTFOLIO_NOT_FOUND',
+  PORTFOLIO_ACCOUNT_INVALID: 'PORTFOLIO_ACCOUNT_INVALID',
+  PORTFOLIO_HAS_TRADES: 'PORTFOLIO_HAS_TRADES',
+  PORTFOLIO_ARCHIVED: 'PORTFOLIO_ARCHIVED',
+  INSTRUMENT_NOT_FOUND: 'INSTRUMENT_NOT_FOUND',
+  INSTRUMENT_SYMBOL_EXISTS: 'INSTRUMENT_SYMBOL_EXISTS',
+  INSTRUMENT_IN_USE: 'INSTRUMENT_IN_USE',
+  INSTRUMENT_CURRENCY_MISMATCH: 'INSTRUMENT_CURRENCY_MISMATCH',
+  PRICE_DATE_INVALID: 'PRICE_DATE_INVALID',
+  PRICE_NOT_FOUND: 'PRICE_NOT_FOUND',
+  TRADE_NOT_FOUND: 'TRADE_NOT_FOUND',
+  TRADE_INVALID: 'TRADE_INVALID',
+  TRADE_SELL_EXCEEDS_HOLDING: 'TRADE_SELL_EXCEEDS_HOLDING',
+  TRADE_CATEGORY_REQUIRED: 'TRADE_CATEGORY_REQUIRED',
+  CASHFLOW_NOT_FOUND: 'CASHFLOW_NOT_FOUND',
+  CASHFLOW_AMOUNT_INVALID: 'CASHFLOW_AMOUNT_INVALID',
+  VALUATION_DATE_EXISTS: 'VALUATION_DATE_EXISTS',
+  PORTFOLIO_VALUATION_NOT_FOUND: 'PORTFOLIO_VALUATION_NOT_FOUND',
+  ALLOCATION_TARGETS_INVALID: 'ALLOCATION_TARGETS_INVALID',
+  ALLOCATION_TARGETS_MISMATCH: 'ALLOCATION_TARGETS_MISMATCH',
+  PORTFOLIO_RANGE_INVALID: 'PORTFOLIO_RANGE_INVALID',
+  PORTFOLIO_TOO_MANY_CASHFLOWS: 'PORTFOLIO_TOO_MANY_CASHFLOWS',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -88,6 +111,28 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   BUDGET_ROLLOVER_UNSUPPORTED: 422,
   BUDGET_ARCHIVED: 409,
   BUDGET_NOT_FOUND: 404,
+  PORTFOLIO_NOT_FOUND: 404,
+  PORTFOLIO_ACCOUNT_INVALID: 422,
+  PORTFOLIO_HAS_TRADES: 409,
+  PORTFOLIO_ARCHIVED: 409,
+  INSTRUMENT_NOT_FOUND: 404,
+  INSTRUMENT_SYMBOL_EXISTS: 409,
+  INSTRUMENT_IN_USE: 409,
+  INSTRUMENT_CURRENCY_MISMATCH: 422,
+  PRICE_DATE_INVALID: 422,
+  PRICE_NOT_FOUND: 404,
+  TRADE_NOT_FOUND: 404,
+  TRADE_INVALID: 422,
+  TRADE_SELL_EXCEEDS_HOLDING: 422,
+  TRADE_CATEGORY_REQUIRED: 422,
+  CASHFLOW_NOT_FOUND: 404,
+  CASHFLOW_AMOUNT_INVALID: 422,
+  VALUATION_DATE_EXISTS: 409,
+  PORTFOLIO_VALUATION_NOT_FOUND: 404,
+  ALLOCATION_TARGETS_INVALID: 422,
+  ALLOCATION_TARGETS_MISMATCH: 422,
+  PORTFOLIO_RANGE_INVALID: 400,
+  PORTFOLIO_TOO_MANY_CASHFLOWS: 400,
 };
 
 export class AppError extends Error {
@@ -201,4 +246,49 @@ export const errors = {
     new AppError(ErrorCode.BUDGET_ROLLOVER_UNSUPPORTED, '年度预算不支持结转'),
   budgetArchived: () => new AppError(ErrorCode.BUDGET_ARCHIVED, '预算已归档，无法修改'),
   budgetNotFound: () => new AppError(ErrorCode.BUDGET_NOT_FOUND, '预算不存在'),
+
+  portfolioNotFound: () => new AppError(ErrorCode.PORTFOLIO_NOT_FOUND, '投资组合不存在'),
+  portfolioAccountInvalid: (message = '绑定的资金账户不合法') =>
+    new AppError(ErrorCode.PORTFOLIO_ACCOUNT_INVALID, message),
+  portfolioHasTrades: () =>
+    new AppError(ErrorCode.PORTFOLIO_HAS_TRADES, '组合已有交易，无法修改账户或成本方法'),
+  portfolioArchived: () => new AppError(ErrorCode.PORTFOLIO_ARCHIVED, '组合已归档，无法修改'),
+  instrumentNotFound: () => new AppError(ErrorCode.INSTRUMENT_NOT_FOUND, '投资标的不存在'),
+  instrumentSymbolExists: () => new AppError(ErrorCode.INSTRUMENT_SYMBOL_EXISTS, '该标的代码已存在'),
+  instrumentInUse: () => new AppError(ErrorCode.INSTRUMENT_IN_USE, '标的已有交易记录，无法删除'),
+  instrumentCurrencyMismatch: (message = '标的币种与资金账户币种不一致') =>
+    new AppError(ErrorCode.INSTRUMENT_CURRENCY_MISMATCH, message),
+  priceDateInvalid: (message: string) => new AppError(ErrorCode.PRICE_DATE_INVALID, message),
+  priceNotFound: () => new AppError(ErrorCode.PRICE_NOT_FOUND, '价格记录不存在'),
+  tradeNotFound: () => new AppError(ErrorCode.TRADE_NOT_FOUND, '投资交易不存在'),
+  tradeInvalid: (message: string) => new AppError(ErrorCode.TRADE_INVALID, message),
+  tradeSellExceedsHolding: (requested: string, available: string) =>
+    new AppError(
+      ErrorCode.TRADE_SELL_EXCEEDS_HOLDING,
+      '卖出数量超过该时点持仓',
+      { requested, available },
+    ),
+  tradeCategoryRequired: () =>
+    new AppError(ErrorCode.TRADE_CATEGORY_REQUIRED, '股息、利息、费用与税费需要指定分类'),
+  cashflowNotFound: () => new AppError(ErrorCode.CASHFLOW_NOT_FOUND, '资金流记录不存在'),
+  cashflowAmountInvalid: () => new AppError(ErrorCode.CASHFLOW_AMOUNT_INVALID, '现金流金额必须为正数'),
+  valuationDateExists: (valuationId?: string) =>
+    new AppError(
+      ErrorCode.VALUATION_DATE_EXISTS,
+      '该日期的估值快照已存在',
+      valuationId ? { valuationId } : undefined,
+    ),
+  portfolioValuationNotFound: () => new AppError(ErrorCode.PORTFOLIO_VALUATION_NOT_FOUND, '估值快照不存在'),
+  allocationTargetsInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.ALLOCATION_TARGETS_INVALID, message, details),
+  allocationTargetsMismatch: (total: string) =>
+    new AppError(ErrorCode.ALLOCATION_TARGETS_MISMATCH, '同一维度的目标权重合计必须为 1', { total }),
+  portfolioRangeInvalid: (message: string) => new AppError(ErrorCode.PORTFOLIO_RANGE_INVALID, message),
+  portfolioTooManyCashflows: (max: number) =>
+    new AppError(
+      ErrorCode.PORTFOLIO_TOO_MANY_CASHFLOWS,
+      `区间内现金流超过 ${max} 条，请缩小区间`,
+      undefined,
+      { max },
+    ),
 };

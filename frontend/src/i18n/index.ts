@@ -18,6 +18,7 @@ const NAMESPACES = [
   'dashboard',
   'analytics',
   'budgets',
+  'portfolios',
   'accounts',
   'transactions',
   'categories',

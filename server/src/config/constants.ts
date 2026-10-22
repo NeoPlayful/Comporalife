@@ -154,3 +154,30 @@ export const BUDGET_MAX_ITEMS = 50;
 export const BUDGET_PERIOD_TYPES = ['monthly', 'yearly'] as const;
 export const BUDGET_STATUSES = ['active', 'archived'] as const;
 export const ANALYTICS_GRANULARITIES = ['day', 'week', 'month'] as const;
+
+// ===== 投资 =====
+
+/** 价格超过该天数视为过期，净值与净资产会标注 stale */
+export const INVESTMENT_PRICE_STALE_DAYS = Number(process.env.INVESTMENT_PRICE_STALE_DAYS ?? 7);
+
+/** 收益曲线最大采样点，超出自动降级粒度 */
+export const INVESTMENT_MAX_SERIES_POINTS = 400;
+
+/** 单次收益计算允许的外部现金流上限，防止求根迭代爆炸 */
+export const INVESTMENT_MAX_CASHFLOWS = 200;
+
+/** 再平衡建议的最小偏离阈值，|drift| 不超过该值不提示交易 */
+export const INVESTMENT_REBALANCE_DRIFT_THRESHOLD = 0.05;
+
+/** 单一资产类别占比超过该值视为集中度过高 */
+export const INVESTMENT_CONCENTRATION_WARNING_RATIO = 0.6;
+
+/** 再平衡建议数量保留的小数位 */
+export const INVESTMENT_REBALANCE_QUANTITY_DECIMALS = 4;
+
+export const ASSET_CLASSES = ['stock', 'etf', 'fund', 'bond', 'cash', 'other'] as const;
+export const TRADE_KINDS = ['buy', 'sell', 'dividend', 'interest', 'fee', 'tax'] as const;
+export const CASHFLOW_KINDS = ['deposit', 'withdraw'] as const;
+export const COST_BASIS_METHODS = ['average'] as const;
+export const PORTFOLIO_STATUSES = ['active', 'archived'] as const;
+export const ALLOCATION_DIMENSIONS = ['asset_class', 'instrument', 'currency'] as const;

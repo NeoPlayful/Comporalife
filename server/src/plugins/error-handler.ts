@@ -74,6 +74,19 @@ async function errorHandlerPlugin(app: FastifyInstance) {
       });
     }
 
+    // Fastify 自身的客户端错误（空 JSON body、不支持的 content-type 等）
+    // 属于调用方问题，不能被包装成 500，否则前端会把参数错误当成服务故障
+    if (fastifyError.statusCode && fastifyError.statusCode >= 400 && fastifyError.statusCode < 500) {
+      return reply.status(fastifyError.statusCode).send({
+        success: false,
+        error: {
+          code: ErrorCode.VALIDATION_ERROR,
+          message: (error as Error).message || '请求格式不合法',
+        },
+        meta: { requestId },
+      });
+    }
+
     request.log.error({ err: error }, '未处理的服务端异常');
 
     return reply.status(500).send({

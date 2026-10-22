@@ -58,7 +58,7 @@ export function buildBasis(params: {
     timezone: params.timezone,
     baseCurrency: params.baseCurrency,
     period: params.range,
-    excludes: ['transfer', 'adjustment', 'voided'],
+    excludes: ['transfer', 'adjustment', 'investment', 'voided'],
     rateDateMode: 'transaction_date',
     ...params.extra,
   };

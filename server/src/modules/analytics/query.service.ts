@@ -7,7 +7,9 @@ import { roundMoney, toDecimal } from '../../lib/money.js';
 import { resolveRate } from '../currencies/currency.service.js';
 import { dayKeyOf, periodKeyOf, resolveRange } from './period.js';
 
-export type AnalyticsTransactionType = 'income' | 'expense' | 'transfer' | 'adjustment';
+// investment 保留在联合类型中仅为兼容完整枚举；
+// 取数层在 SQL 层已排除该类型，下游不会收到相关行
+export type AnalyticsTransactionType = 'income' | 'expense' | 'transfer' | 'adjustment' | 'investment';
 
 export interface AnalyticsRow {
   transactionId: string;
@@ -84,6 +86,9 @@ export async function loadAnalyticsRows(
     where: {
       userId: query.userId,
       status: 'posted',
+      // 买入/卖出只是资产转换，不是消费；在取数层就排除，
+      // 避免下游任何分析函数漏掉一条类型判断就把市值变动算成支出
+      type: { not: 'investment' },
       occurredAt: { gte: from, lte: to },
       ...(query.accountIds && query.accountIds.length > 0
         ? { entries: { some: { accountId: { in: query.accountIds } } } }

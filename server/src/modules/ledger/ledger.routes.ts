@@ -608,9 +608,14 @@ function toTransactionDto(transaction: TransactionRow) {
 async function resolveCategory(
   app: FastifyInstance,
   userId: string,
-  type: 'income' | 'expense' | 'adjustment' | 'transfer',
+  type: 'income' | 'expense' | 'adjustment' | 'transfer' | 'investment',
   categoryId: string | null | undefined,
 ) {
+  if (type === 'investment') {
+    // 买卖是资产转换，不挂分类；通用记账接口也不允许创建该类型
+    throw errors.validation('投资交易请通过投资模块录入');
+  }
+
   if (type === 'transfer') {
     // 转账不是收支，不能挂分类
     if (categoryId) throw errors.validation('转账不能指定分类');

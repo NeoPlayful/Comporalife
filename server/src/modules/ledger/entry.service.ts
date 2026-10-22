@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import { errors } from '../../lib/errors.js';
 import { roundMoney, toDecimal } from '../../lib/money.js';
 
-export type TransactionType = 'income' | 'expense' | 'transfer' | 'adjustment';
+export type TransactionType = 'income' | 'expense' | 'transfer' | 'adjustment' | 'investment';
 
 export interface EntryDraft {
   accountId: string | null;
@@ -17,6 +17,8 @@ export interface BuildEntriesInput {
   toAccountId?: string;
   currency: string;
   toCurrency?: string;
+  /** 仅 investment：买入时现金流出，卖出时现金流入 */
+  cashDirection?: 'in' | 'out';
 }
 
 /**
@@ -49,8 +51,10 @@ export function buildEntries(input: BuildEntriesInput): EntryDraft[] {
     ];
   }
 
-  // 收入使账户增加，支出与负向调整使账户减少
-  const accountSign = input.type === 'income' ? 1 : -1;
+  // 收入使账户增加，支出与负向调整使账户减少；
+  // 买入/卖出是资产转换，方向由调用方显式给出，不按交易类型推断
+  const accountSign =
+    input.type === 'income' || (input.type === 'investment' && input.cashDirection === 'in') ? 1 : -1;
 
   return [
     { accountId: input.accountId, amount: magnitude.mul(accountSign), currency: input.currency },
@@ -95,7 +99,7 @@ export function assertBalanced(entries: EntryDraft[], type: TransactionType): vo
   const externalLegs = entries.filter((entry) => entry.accountId === null);
 
   if (realLegs.length !== 1 || externalLegs.length !== 1) {
-    throw errors.ledgerUnbalanced('收入或支出必须有且仅有一条账户分录与一条外部分录');
+    throw errors.ledgerUnbalanced('交易必须有且仅有一条账户分录与一条外部分录');
   }
 }
 

@@ -253,59 +253,66 @@
 | POST | `/api/budgets/:id/copy` | 复制预算到下一周期 |
 
 
-## 12、投资组合与持仓 (Portfolios & Holdings)
+## 12、投资标的与价格 (Instruments & Prices) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/portfolios` | 投资组合列表 |
-| POST | `/api/portfolios` | 创建投资组合 |
-| GET | `/api/portfolios/:id` | 组合详情 |
-| PATCH | `/api/portfolios/:id` | 修改组合 |
-| DELETE | `/api/portfolios/:id` | 归档组合 |
-| GET | `/api/portfolios/:id/holdings` | 组合持仓及成本 |
-| GET | `/api/portfolios/:id/allocation` | 资产类别/标的配置 |
-| GET | `/api/portfolios/:id/performance` | 组合历史收益与风险 |
-| GET | `/api/portfolios/:id/valuation-history` | 组合估值历史 |
-| GET | `/api/instruments` | 搜索证券与自定义标的 |
-| POST | `/api/instruments` | 登记自定义投资标的 |
-| GET | `/api/instruments/:id` | 标的详情 |
-| PATCH | `/api/instruments/:id` | 修改自定义标的 |
-| GET | `/api/instruments/:id/prices` | 标的历史价格 |
-| POST | `/api/instruments/:id/prices` | 录入手动价格 |
-| DELETE | `/api/instruments/:id/prices/:priceId` | 删除错误价格记录 |
+| GET | `/api/instruments` | 标的列表，支持 `assetClass` / `q` 搜索，附带最新价格 |
+| POST | `/api/instruments` | 新建标的 |
+| GET | `/api/instruments/:id` | 标的详情（含最新价格与来源） |
+| PATCH | `/api/instruments/:id` | 修改名称、类别、备注；有交易时不可改币种 |
+| DELETE | `/api/instruments/:id` | 删除标的（已有交易返回 409） |
+| GET | `/api/instruments/:id/prices` | 价格历史，支持区间 |
+| POST | `/api/instruments/:id/prices` | 录入手工价格（同日覆盖，返回 `created`） |
+| DELETE | `/api/instruments/:id/prices/:priceId` | 删除价格，并使依赖它的历史收益失效 |
 
-
-## 13、投资交易与收益 (Investment Trades)
+## 13、投资组合与持仓 (Portfolios & Holdings) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/investment-trades` | 投资交易记录 |
-| POST | `/api/investment-trades` | 新增买卖/股息/费用等交易 |
-| GET | `/api/investment-trades/:id` | 交易详情 |
-| PATCH | `/api/investment-trades/:id` | 修改交易并重算成本 |
-| DELETE | `/api/investment-trades/:id` | 撤销交易并回滚关联分录 |
-| GET | `/api/portfolios/:id/realized-gains` | 已实现损益 |
-| GET | `/api/portfolios/:id/unrealized-gains` | 未实现损益 |
-| GET | `/api/portfolios/:id/income` | 股息与利息收入 |
-| GET | `/api/portfolios/:id/cashflows` | 组合现金流 |
-| GET | `/api/portfolios/:id/returns` | 时间加权/资金加权收益 |
-| POST | `/api/portfolios/:id/recalculate` | 重建组合成本和估值缓存 |
+| GET | `/api/portfolios` | 组合列表；默认只返回活跃组合，`status=all` 含归档 |
+| POST | `/api/portfolios` | 创建组合，绑定证券账户（一账户一组合） |
+| GET | `/api/portfolios/:id` | 组合详情与总览 |
+| PATCH | `/api/portfolios/:id` | 修改名称、备注（乐观锁 `version`） |
+| POST | `/api/portfolios/:id/archive` | 归档，保留全部历史 |
+| GET | `/api/portfolios/:id/holdings` | 持仓、成本、市值、未实现损益、权重 |
+| GET | `/api/portfolios/:id/summary` | 市值、现金、总价值、损益汇总 |
+| GET | `/api/portfolios/:id/unrealized-gains` | 未实现损益明细 |
+| GET | `/api/portfolios/:id/income` | 股息与利息汇总 |
+| GET | `/api/portfolios/:id/realized-gains` | 已实现损益（按卖出时点成本） |
 
-**投资约束：** 买入证券是现金与证券资产之间的转换；股息、手续费、税费分别记账；持仓成本计算方法必须配置且前后一致；历史行情缺失需标记而非静默补零。
-
-
-## 14、资产配置与再平衡 (Allocation)
+## 14、投资交易与现金流 (Trades & Cashflows) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/portfolios/:id/targets` | 目标配置比例 |
-| PUT | `/api/portfolios/:id/targets` | 设置资产配置目标（合计100%） |
-| GET | `/api/portfolios/:id/drift` | 当前配置偏离 |
-| POST | `/api/portfolios/:id/rebalance-preview` | 模拟再平衡建议，不直接交易 |
-| GET | `/api/portfolios/:id/risk-summary` | 组合集中度与风险摘要 |
+| GET | `/api/portfolio-trades` | 交易列表，支持组合/标的/类型/区间过滤 |
+| POST | `/api/portfolio-trades` | 新增交易，同事务写账本 |
+| GET | `/api/portfolio-trades/:id` | 交易详情 |
+| PATCH | `/api/portfolio-trades/:id` | 修改交易（冲正旧账本交易并重建） |
+| DELETE | `/api/portfolio-trades/:id` | 撤销交易（软删 + 冲正账本） |
+| GET | `/api/portfolios/:id/cashflows` | 外部现金流列表 |
+| POST | `/api/portfolios/:id/cashflows` | 登记入金/出金（同时写账本） |
+| DELETE | `/api/portfolios/:id/cashflows/:cashflowId` | 删除现金流并冲正账本 |
+| GET | `/api/portfolios/:id/returns` | TWR 与 XIRR，含分段明细与不可计算原因 |
+| GET | `/api/portfolios/:id/performance` | 收益曲线（价值、指数、完整性、粒度） |
 
+**投资约束**：买入卖出是资产转换（`investment`），不计入收支；股息利息计收入，手续费税费计支出；成本法固定为加权平均；卖出按成交日校验持仓；估值缺失必须显式标注，不按成本价填充。
 
-## 15、复利与定投模拟 (Compound Simulations)
+## 15、资产配置与再平衡 (Allocation) — 已实现
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/portfolios/:id/allocation` | 资产类别 / 标的 / 币种三个维度的权重 |
+| GET | `/api/portfolios/:id/targets` | 目标权重 |
+| PUT | `/api/portfolios/:id/targets` | 设置目标权重（同维度合计必须为 1） |
+| GET | `/api/portfolios/:id/drift` | 当前权重与目标的偏离 |
+| POST | `/api/portfolios/:id/rebalance-preview` | 再平衡建议（只算不写） |
+| GET | `/api/portfolios/:id/risk-summary` | 集中度与风险摘要 |
+| GET | `/api/portfolios/:id/valuations` | 手工估值快照列表 |
+| POST | `/api/portfolios/:id/valuations` | 录入手工估值快照 |
+| DELETE | `/api/portfolios/:id/valuations/:valuationId` | 删除估值快照 |
+
+## 16、复利与定投模拟 (Compound Simulations)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -323,7 +330,7 @@
 **模拟参数：** 初始本金、周期投入、收益率、复利频率、期限、通胀率、费用率、税费假设、提款方式；返回名义/实际购买力、累计投入、累计收益、逐期明细；模拟结果不得被误认为实际账户余额。
 
 
-## 16、蒙特卡罗模拟 (Monte Carlo)
+## 17、蒙特卡罗模拟 (Monte Carlo)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -344,7 +351,7 @@
 **模拟参数：** 资产权重、预期收益、波动率、相关矩阵、分布假设、模拟路径数、随机种子、投入/提款与再平衡策略；输出中位数、P5/P25/P75/P95、亏损概率、目标达成概率、最大回撤及尾部风险。结果附模型版本与假设快照，避免将模拟当作收益承诺。
 
 
-## 17、财富目标与财务自由 (Financial Goals)
+## 18、财富目标与财务自由 (Financial Goals)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -360,7 +367,7 @@
 | POST | `/api/financial-independence/calculate` | 退休支出、提取率、通胀敏感性计算 |
 
 
-## 18、财务报告 (Reports)
+## 19、财务报告 (Reports)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -376,7 +383,7 @@
 | POST | `/api/reports/simulation` | 生成模拟分析报告 |
 
 
-## 19、汇率与行情 (Exchange Rates & Prices)
+## 20、汇率与行情 (Exchange Rates & Prices)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -389,7 +396,7 @@
 | GET | `/api/market-data/status` | 行情与汇率更新状态 |
 
 
-## 20、数据导出、备份与恢复 (Data Management)
+## 21、数据导出、备份与恢复 (Data Management)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -409,7 +416,7 @@
 | POST | `/api/data-quality/recheck` | 异步重跑数据质量检查 |
 
 
-## 21、后台任务 (Jobs)
+## 22、后台任务 (Jobs)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -419,7 +426,7 @@
 | POST | `/api/jobs/:id/retry` | 重试失败的本人任务 |
 
 
-## 22、通知与审计 (Notifications & Audit)
+## 23、通知与审计 (Notifications & Audit)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -430,7 +437,7 @@
 | GET | `/api/audit-logs/:id` | 审计事件详情 |
 
 
-## 23、系统设置 (Settings)
+## 24、系统设置 (Settings)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -446,7 +453,7 @@
 | PATCH | `/api/settings/privacy` | 修改隐私偏好 |
 
 
-## 24、平台管理后台 (Admin Console)
+## 25、平台管理后台 (Admin Console)
 
 > 统一账户系统：`super_admin` / `admin` / `user`。所有 `/api/admin/*` 必须验证平台管理员角色；管理员默认无权查看用户财务流水、余额、持仓和模拟数据。除特别说明，`admin` 和 `super_admin` 均可访问；角色授予、撤销仅限 `super_admin`。
 
@@ -511,7 +518,7 @@
 - 用户删除应遵守既有备份与数据保留规则，不承诺立即清除历史备份中的数据。
 
 
-## 25、系统维护 (System)
+## 26、系统维护 (System)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -650,8 +657,10 @@ GET /api/analytics/income-expense?from=2026-01-01&to=2026-12-31&currency=USD
 | 自动分类规则 (Classification Rules) | 8 |
 | 收支分析 (Analytics) | 10 |
 | 预算管理 (Budgets) | 9 |
-| 投资组合与持仓 (Portfolios & Holdings) | 16 |
-| 投资交易与收益 (Investment Trades) | 11 |
+| 投资标的与价格 (Instruments & Prices) | 8 |
+| 投资组合与持仓 (Portfolios & Holdings) | 10 |
+| 投资交易与现金流 (Trades & Cashflows) | 9 |
+| 资产配置与再平衡 (Allocation) | 9 |
 | 资产配置与再平衡 (Allocation) | 5 |
 | 复利与定投模拟 (Compound Simulations) | 10 |
 | 蒙特卡罗模拟 (Monte Carlo) | 13 |

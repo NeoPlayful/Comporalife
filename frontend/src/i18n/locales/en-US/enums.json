@@ -66,5 +66,53 @@
   "contribution_timing": {
     "begin": "Beginning",
     "end": "End"
+  },
+  "asset_class": {
+    "stock": "Stock",
+    "etf": "ETF",
+    "fund": "Fund",
+    "bond": "Bond",
+    "cash": "Cash",
+    "other": "Other"
+  },
+  "trade_kind": {
+    "buy": "Buy",
+    "sell": "Sell",
+    "dividend": "Dividend",
+    "interest": "Interest",
+    "fee": "Fee",
+    "tax": "Tax"
+  },
+  "cost_basis_method": {
+    "average": "Weighted average cost"
+  },
+  "cashflow_kind": {
+    "deposit": "Deposit",
+    "withdraw": "Withdrawal"
+  },
+  "allocation_dimension": {
+    "asset_class": "Asset class",
+    "instrument": "Instrument",
+    "currency": "Currency"
+  },
+  "portfolio_status": {
+    "active": "Active",
+    "archived": "Archived"
+  },
+  "price_source": {
+    "manual": "Manual",
+    "imported": "Imported",
+    "provider": "Provider"
+  },
+  "valuation_source": {
+    "computed": "Computed",
+    "manual": "Manual"
+  },
+  "performance_reason": {
+    "insufficient_data": "Insufficient data",
+    "missing_valuation": "Missing valuation",
+    "zero_start_value": "Zero start value",
+    "no_cashflow_sign_change": "No cashflow sign change",
+    "not_converged": "Not converged"
   }
 }
