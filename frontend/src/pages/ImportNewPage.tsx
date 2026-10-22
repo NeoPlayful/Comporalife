@@ -1,15 +1,18 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import UploadDropzone from '@/components/imports/UploadDropzone';
 import ErrorState from '@/components/ui/ErrorState';
 import { accountsApi, type Account } from '@/lib/accounts';
 import { ApiError } from '@/lib/client';
+import { translateError } from '@/lib/error-message';
 import { importsApi } from '@/lib/imports';
 
 export default function ImportNewPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation('imports');
   const [accountId, setAccountId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +31,7 @@ export default function ImportNewPage() {
 
   async function handleFile(file: File, encoding?: 'utf-8' | 'gb18030') {
     if (!accountId) {
-      setError('请先选择目标账户');
+      setError(t('new.select_account_first'));
       return;
     }
 
@@ -44,45 +47,47 @@ export default function ImportNewPage() {
       if (err instanceof ApiError && err.code === 'IMPORT_ALREADY_UPLOADED') {
         const details = err.details as { batchId?: string } | undefined;
         setDuplicateBatchId(details?.batchId ?? null);
-        setError('该文件之前已完成导入，如需重新导入请先撤销原批次。');
+        setError(translateError(err, t));
       } else {
-        setError(err instanceof ApiError ? err.message : '上传失败，请重试');
+        setError(translateError(err, t));
       }
     } finally {
       setUploading(false);
     }
   }
 
-  if (accountsQuery.isPending) return <p className="text-sm text-[var(--color-content-muted)]">加载账户…</p>;
+  if (accountsQuery.isPending) {
+    return <p className="text-sm text-[var(--color-content-muted)]">{t('new.loading_accounts')}</p>;
+  }
   if (accountsQuery.error) {
-    return <ErrorState message="账户列表加载失败" onRetry={() => void accountsQuery.refetch()} />;
+    return (
+      <ErrorState message={t('new.accounts_failed')} onRetry={() => void accountsQuery.refetch()} />
+    );
   }
 
   return (
     <div className="max-w-3xl space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">导入账单</h1>
-        <p className="mt-1 text-sm text-[var(--color-content-muted)]">
-          选择目标账户并上传银行导出的 CSV 或 XLSX 文件。文件会先进入暂存区，确认映射与预览后才会写入账本。
-        </p>
+        <h1 className="text-xl font-semibold">{t('new.title')}</h1>
+        <p className="mt-1 text-sm text-[var(--color-content-muted)]">{t('new.subtitle')}</p>
       </div>
 
       {accounts.length === 0 ? (
         <div className="card p-4 text-sm">
-          还没有可用账户。
+          {t('new.no_accounts')}
           <button
             type="button"
             onClick={() => navigate('/accounts')}
             className="ml-2 text-[var(--color-accent)]"
           >
-            先去创建账户
+            {t('new.create_account')}
           </button>
         </div>
       ) : (
         <>
           <div className="space-y-1">
             <label htmlFor="target-account" className="block text-sm">
-              目标账户
+              {t('new.target_account')}
             </label>
             <select
               id="target-account"
@@ -100,7 +105,9 @@ export default function ImportNewPage() {
 
           <UploadDropzone onFile={handleFile} disabled={uploading} />
 
-          {uploading && <p className="text-sm text-[var(--color-content-muted)]">正在上传并解析文件…</p>}
+          {uploading && (
+            <p className="text-sm text-[var(--color-content-muted)]">{t('new.uploading')}</p>
+          )}
 
           {error && (
             <div role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
@@ -111,7 +118,7 @@ export default function ImportNewPage() {
                   onClick={() => navigate(`/imports/${duplicateBatchId}`)}
                   className="ml-2 underline"
                 >
-                  查看原批次
+                  {t('new.view_original')}
                 </button>
               )}
             </div>

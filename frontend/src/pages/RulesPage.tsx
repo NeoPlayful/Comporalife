@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import type { TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { accountsApi } from '@/lib/accounts';
-import { ApiError } from '@/lib/client';
+import { useEnumLabels } from '@/lib/enum-labels';
+import { translateError } from '@/lib/error-message';
 import { categoriesApi } from '@/lib/categories';
 import {
   classificationRulesApi,
@@ -16,6 +19,7 @@ import {
 
 export default function RulesPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation('imports');
   const [editing, setEditing] = useState<ClassificationRule | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ rule: ClassificationRule; matched: number } | null>(null);
@@ -37,7 +41,7 @@ export default function RulesPage() {
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['rules'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '保存规则失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const toggleRule = useMutation({
@@ -53,7 +57,7 @@ export default function RulesPage() {
   const testRule = useMutation({
     mutationFn: (rule: ClassificationRule) => classificationRulesApi.test(rule.id),
     onSuccess: (result, rule) => setTestResult({ rule, matched: result.matched }),
-    onError: (err) => setError(err instanceof ApiError ? err.message : '试运行失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const applyRules = useMutation({
@@ -62,13 +66,15 @@ export default function RulesPage() {
       setError(null);
       setTestResult(null);
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      alert(`已对 ${result.matched} 笔交易执行规则，其中 ${result.categorized} 笔完成分类`);
+      alert(t('rules.applied', { matched: result.matched, categorized: result.categorized }));
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '执行失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
-  if (rulesQuery.isPending) return <LoadingState label="加载规则…" />;
-  if (rulesQuery.error) return <ErrorState message="规则加载失败" onRetry={() => void rulesQuery.refetch()} />;
+  if (rulesQuery.isPending) return <LoadingState label={t('rules.loading')} />;
+  if (rulesQuery.error) {
+    return <ErrorState message={t('rules.load_failed')} onRetry={() => void rulesQuery.refetch()} />;
+  }
 
   const rules = rulesQuery.data.rules;
   const flatCategories = categoriesQuery.data?.flat ?? [];
@@ -78,14 +84,12 @@ export default function RulesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">分类规则</h1>
-          <p className="mt-1 text-sm text-[var(--color-content-muted)]">
-            规则按优先级从高到低执行：分类由首个命中且设置了分类的规则决定，标签取全部命中的并集。
-          </p>
+          <h1 className="text-xl font-semibold">{t('rules.title')}</h1>
+          <p className="mt-1 text-sm text-[var(--color-content-muted)]">{t('rules.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Link to="/imports" className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm">
-            返回导入
+            {t('rules.back')}
           </Link>
           <button
             type="button"
@@ -93,14 +97,14 @@ export default function RulesPage() {
             onClick={() => applyRules.mutate()}
             className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm disabled:opacity-50"
           >
-            应用到未分类流水
+            {t('rules.apply_uncategorized')}
           </button>
           <button
             type="button"
             onClick={() => setEditing('new')}
             className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"
           >
-            新建规则
+            {t('rules.new')}
           </button>
         </div>
       </div>
@@ -124,15 +128,12 @@ export default function RulesPage() {
 
       {testResult && (
         <p className="rounded-lg bg-sky-500/10 px-3 py-2 text-sm text-sky-500">
-          「{testResult.rule.name}」试运行命中 {testResult.matched} 笔交易（未写入账本）。
+          {t('rules.test_result', { name: testResult.rule.name, count: testResult.matched })}
         </p>
       )}
 
       {rules.length === 0 ? (
-        <EmptyState
-          title="还没有分类规则"
-          description="创建规则后，导入的交易会按商户、摘要、金额等条件自动归类并打标签。"
-        />
+        <EmptyState title={t('rules.empty_title')} description={t('rules.empty_description')} />
       ) : (
         <div className="space-y-2">
           {rules.map((rule) => (
@@ -141,34 +142,36 @@ export default function RulesPage() {
                 <div className="flex items-center gap-2">
                   <span className="truncate text-sm font-medium">{rule.name}</span>
                   <span className="rounded bg-black/10 px-1.5 py-0.5 text-xs dark:bg-white/10">
-                    优先级 {rule.priority}
+                    {t('rules.priority_badge', { priority: rule.priority })}
                   </span>
                   {!rule.enabled && (
-                    <span className="text-xs text-[var(--color-content-muted)]">已停用</span>
+                    <span className="text-xs text-[var(--color-content-muted)]">{t('rules.disabled')}</span>
                   )}
                 </div>
-                <p className="text-xs text-[var(--color-content-muted)]">{describeRule(rule)}</p>
-                <p className="text-xs text-[var(--color-content-muted)]">累计命中 {rule.matchCount} 次</p>
+                <p className="text-xs text-[var(--color-content-muted)]">{describeRule(rule, t)}</p>
+                <p className="text-xs text-[var(--color-content-muted)]">
+                  {t('rules.match_count', { count: rule.matchCount })}
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-2 text-sm">
                 <button type="button" onClick={() => toggleRule.mutate(rule)} className="text-[var(--color-accent)]">
-                  {rule.enabled ? '停用' : '启用'}
+                  {rule.enabled ? t('rules.toggle_disable') : t('rules.toggle_enable')}
                 </button>
                 <button type="button" onClick={() => testRule.mutate(rule)} className="text-[var(--color-accent)]">
-                  试运行
+                  {t('rules.test')}
                 </button>
                 <button type="button" onClick={() => setEditing(rule)} className="text-[var(--color-accent)]">
-                  编辑
+                  {t('rules.edit_action')}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm('删除规则不会回退已分类的交易，确定删除？')) removeRule.mutate(rule.id);
+                    if (window.confirm(t('rules.delete_confirm'))) removeRule.mutate(rule.id);
                   }}
                   className="text-[var(--color-negative)]"
                 >
-                  删除
+                  {t('rules.delete')}
                 </button>
               </div>
             </div>
@@ -202,6 +205,8 @@ function RuleEditor({
   onCancel: () => void;
   onSave: (payload: RulePayload) => void;
 }) {
+  const { t } = useTranslation('imports');
+  const { categoryKind } = useEnumLabels();
   const [name, setName] = useState(rule?.name ?? '');
   const [priority, setPriority] = useState(rule?.priority ?? 100);
   const [merchant, setMerchant] = useState(rule?.conditions.merchant?.value ?? '');
@@ -233,10 +238,12 @@ function RuleEditor({
 
   return (
     <form onSubmit={submit} className="card space-y-3 p-4">
-      <h2 className="text-sm font-medium">{rule ? '编辑规则' : '新建规则'}</h2>
+      <h2 className="text-sm font-medium">
+        {rule ? t('rules.editor.title_edit') : t('rules.editor.title_new')}
+      </h2>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="规则名称">
+        <Field label={t('rules.editor.name')}>
           <input
             required
             value={name}
@@ -245,7 +252,7 @@ function RuleEditor({
           />
         </Field>
 
-        <Field label="优先级（越小越优先）">
+        <Field label={t('rules.editor.priority')}>
           <input
             type="number"
             min={0}
@@ -256,31 +263,31 @@ function RuleEditor({
           />
         </Field>
 
-        <Field label="商户包含">
+        <Field label={t('rules.editor.merchant')}>
           <input
             value={merchant}
             onChange={(event) => setMerchant(event.target.value)}
-            placeholder="例如：示例餐厅"
+            placeholder={t('rules.editor.merchant_placeholder')}
             className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5 text-sm"
           />
         </Field>
 
-        <Field label="摘要包含">
+        <Field label={t('rules.editor.description')}>
           <input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="例如：午餐"
+            placeholder={t('rules.editor.description_placeholder')}
             className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5 text-sm"
           />
         </Field>
 
-        <Field label="限定账户">
+        <Field label={t('rules.editor.account')}>
           <select
             value={accountId}
             onChange={(event) => setAccountId(event.target.value)}
             className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5 text-sm"
           >
-            <option value="">全部账户</option>
+            <option value="">{t('rules.editor.all_accounts')}</option>
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name}
@@ -289,22 +296,22 @@ function RuleEditor({
           </select>
         </Field>
 
-        <Field label="分类">
+        <Field label={t('rules.editor.category')}>
           <select
             value={categoryId}
             onChange={(event) => setCategoryId(event.target.value)}
             className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5 text-sm"
           >
-            <option value="">不设置分类</option>
+            <option value="">{t('rules.editor.no_category')}</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
-                {category.kind === 'income' ? '收入' : '支出'} · {category.name}
+                {categoryKind(category.kind)} · {category.name}
               </option>
             ))}
           </select>
         </Field>
 
-        <Field label="金额下限">
+        <Field label={t('rules.editor.min_amount')}>
           <input
             value={minAmount}
             onChange={(event) => setMinAmount(event.target.value)}
@@ -314,20 +321,18 @@ function RuleEditor({
           />
         </Field>
 
-        <Field label="金额上限">
+        <Field label={t('rules.editor.max_amount')}>
           <input
             value={maxAmount}
             onChange={(event) => setMaxAmount(event.target.value)}
-            placeholder="不限"
+            placeholder={t('rules.editor.unlimited')}
             inputMode="decimal"
             className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5 text-sm"
           />
         </Field>
       </div>
 
-      <p className="text-xs text-[var(--color-content-muted)]">
-        至少填写一个条件与一个动作。规则不支持正则表达式。
-      </p>
+      <p className="text-xs text-[var(--color-content-muted)]">{t('rules.editor.hint')}</p>
 
       <div className="flex gap-2">
         <button
@@ -335,14 +340,14 @@ function RuleEditor({
           disabled={saving}
           className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {saving ? '保存中…' : '保存'}
+          {saving ? t('rules.editor.saving') : t('rules.editor.save')}
         </button>
         <button
           type="button"
           onClick={onCancel}
           className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
         >
-          取消
+          {t('rules.editor.cancel')}
         </button>
       </div>
     </form>
@@ -358,20 +363,33 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function describeRule(rule: ClassificationRule): string {
+function describeRule(rule: ClassificationRule, t: TFunction): string {
   const parts: string[] = [];
+  const td = (key: string, options?: Record<string, unknown>) => t(`rules.describe.${key}`, options);
+
   if (rule.conditions.directions?.length) parts.push(rule.conditions.directions.join('/'));
-  if (rule.conditions.merchant) parts.push(`商户包含「${rule.conditions.merchant.value}」`);
-  if (rule.conditions.description) parts.push(`摘要包含「${rule.conditions.description.value}」`);
-  if (rule.conditions.amount) {
-    parts.push(`金额 ${rule.conditions.amount.min ?? '0'}–${rule.conditions.amount.max ?? '∞'}`);
+  if (rule.conditions.merchant) parts.push(td('merchant', { value: rule.conditions.merchant.value }));
+  if (rule.conditions.description) {
+    parts.push(td('description', { value: rule.conditions.description.value }));
   }
-  if (rule.conditions.onlyUncategorized) parts.push('仅未分类');
-  if (rule.conditions.accountIds?.length) parts.push(`限定 ${rule.conditions.accountIds.length} 个账户`);
+  if (rule.conditions.amount) {
+    parts.push(
+      td('amount', {
+        min: rule.conditions.amount.min ?? '0',
+        max: rule.conditions.amount.max ?? '∞',
+      }),
+    );
+  }
+  if (rule.conditions.onlyUncategorized) parts.push(td('only_uncategorized'));
+  if (rule.conditions.accountIds?.length) {
+    parts.push(td('accounts', { count: rule.conditions.accountIds.length }));
+  }
 
   const actions: string[] = [];
-  if (rule.actions.categoryId) actions.push('设置分类');
-  if (rule.actions.addTagIds?.length) actions.push(`加 ${rule.actions.addTagIds.length} 个标签`);
+  if (rule.actions.categoryId) actions.push(td('set_category'));
+  if (rule.actions.addTagIds?.length) {
+    actions.push(td('add_tags', { count: rule.actions.addTagIds.length }));
+  }
 
-  return `${parts.join(' · ') || '无条件'} → ${actions.join(' + ') || '无动作'}`;
+  return `${parts.join(' · ') || td('no_conditions')} → ${actions.join(' + ') || td('no_actions')}`;
 }

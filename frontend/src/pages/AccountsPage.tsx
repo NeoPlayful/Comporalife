@@ -1,11 +1,11 @@
 import {
-  ACCOUNT_TYPE_LABELS,
   LIABILITY_TYPES,
   accountsApi,
   type Account,
   type AccountType,
 } from '@/lib/accounts';
-import { ApiError } from '@/lib/client';
+import { ACCOUNT_TYPES, useEnumLabels } from '@/lib/enum-labels';
+import { translateError } from '@/lib/error-message';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
@@ -14,12 +14,12 @@ import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Plus, RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-
-const ACCOUNT_TYPES: AccountType[] = ['cash', 'bank', 'credit_card', 'brokerage', 'loan', 'other'];
 
 export default function AccountsPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +32,13 @@ export default function AccountsPage() {
   const archiveMutation = useMutation({
     mutationFn: (id: string) => accountsApi.archive(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
-    onError: (err) => setError(err instanceof ApiError ? err.message : '归档失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const unarchiveMutation = useMutation({
     mutationFn: (id: string) => accountsApi.unarchive(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
-    onError: (err) => setError(err instanceof ApiError ? err.message : '恢复失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const { assets, liabilities } = useMemo(() => {
@@ -68,7 +68,7 @@ export default function AccountsPage() {
 
   if (accountsQuery.isLoading) return <LoadingState />;
   if (accountsQuery.isError) {
-    return <ErrorState message="账户加载失败" onRetry={() => accountsQuery.refetch()} />;
+    return <ErrorState message={t('accounts:load_failed')} onRetry={() => accountsQuery.refetch()} />;
   }
 
   const accounts = accountsQuery.data?.accounts ?? [];
@@ -78,7 +78,7 @@ export default function AccountsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">财务账户</h1>
+        <h1 className="text-xl font-semibold">{t('accounts:title')}</h1>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--color-content-muted)]">
             <input
@@ -87,7 +87,7 @@ export default function AccountsPage() {
               onChange={(e) => setShowArchived(e.target.checked)}
               className="size-4 rounded border-[var(--color-border-subtle)]"
             />
-            显示已归档
+            {t('accounts:show_archived')}
           </label>
           <button
             type="button"
@@ -98,7 +98,7 @@ export default function AccountsPage() {
             className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
           >
             <Plus className="size-4" />
-            新建账户
+            {t('accounts:new')}
           </button>
         </div>
       </div>
@@ -112,7 +112,7 @@ export default function AccountsPage() {
       {(assets.length > 0 || liabilities.length > 0) && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="card p-4">
-            <p className="text-xs text-[var(--color-content-muted)]">总资产</p>
+            <p className="text-xs text-[var(--color-content-muted)]">{t('accounts:total_assets')}</p>
             <div className="mt-1 space-y-1">
               {assets.map((item) => (
                 <MoneyDisplay
@@ -125,7 +125,9 @@ export default function AccountsPage() {
             </div>
           </div>
           <div className="card p-4">
-            <p className="text-xs text-[var(--color-content-muted)]">总负债</p>
+            <p className="text-xs text-[var(--color-content-muted)]">
+              {t('accounts:total_liabilities')}
+            </p>
             <div className="mt-1 space-y-1">
               {liabilities.map((item) => (
                 <MoneyDisplay
@@ -143,15 +145,15 @@ export default function AccountsPage() {
       {activeAccounts.length === 0 && !showArchived ? (
         <div className="card">
           <EmptyState
-            title="还没有账户"
-            description="先创建一个现金或银行账户，之后就能开始记账。"
+            title={t('accounts:empty_title')}
+            description={t('accounts:empty_description')}
             action={
               <button
                 type="button"
                 onClick={() => setDialogOpen(true)}
                 className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
               >
-                创建第一个账户
+                {t('accounts:empty_action')}
               </button>
             }
           />
@@ -165,9 +167,7 @@ export default function AccountsPage() {
       )}
 
       {showArchived && archivedAccounts.length > 0 && (
-        <p className="text-xs text-[var(--color-content-muted)]">
-          已归档账户仍保留历史流水与余额，但不能再用于新交易。
-        </p>
+        <p className="text-xs text-[var(--color-content-muted)]">{t('accounts:archived_hint')}</p>
       )}
 
       {dialogOpen && (
@@ -192,6 +192,9 @@ function AccountList({
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
 }) {
+  const { t } = useTranslation();
+  const { accountType } = useEnumLabels();
+
   return (
     <div className="card divide-y divide-[var(--color-border-subtle)]">
       {accounts.map((account) => (
@@ -200,16 +203,16 @@ function AccountList({
             <div className="flex items-center gap-2">
               <p className="truncate text-sm font-medium">{account.name}</p>
               <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-xs text-[var(--color-content-muted)] dark:bg-white/5">
-                {ACCOUNT_TYPE_LABELS[account.type]}
+                {accountType(account.type)}
               </span>
               {account.status === 'archived' && (
                 <span className="shrink-0 rounded bg-black/5 px-1.5 py-0.5 text-xs text-[var(--color-content-muted)] dark:bg-white/5">
-                  已归档
+                  {t('accounts:archived_badge')}
                 </span>
               )}
             </div>
             <p className="mt-0.5 truncate text-xs text-[var(--color-content-muted)]">
-              {account.institution ?? '未填写机构'}
+              {account.institution ?? t('accounts:no_institution')}
             </p>
           </Link>
 
@@ -224,8 +227,8 @@ function AccountList({
               type="button"
               onClick={() => (account.status === 'active' ? onArchive(account.id) : onUnarchive(account.id))}
               className="grid size-8 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5"
-              aria-label={account.status === 'active' ? '归档账户' : '恢复账户'}
-              title={account.status === 'active' ? '归档账户' : '恢复账户'}
+              aria-label={account.status === 'active' ? t('accounts:archive') : t('accounts:unarchive')}
+              title={account.status === 'active' ? t('accounts:archive') : t('accounts:unarchive')}
             >
               {account.status === 'active' ? (
                 <Archive className="size-4" />
@@ -241,6 +244,8 @@ function AccountList({
 }
 
 function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { t } = useTranslation();
+  const { accountType } = useEnumLabels();
   const [form, setForm] = useState({
     name: '',
     type: 'bank' as AccountType,
@@ -255,7 +260,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
   const createMutation = useMutation({
     mutationFn: () => accountsApi.create(form),
     onSuccess: onCreated,
-    onError: (err) => setError(err instanceof ApiError ? err.message : '创建失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   return (
@@ -264,10 +269,10 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
         type="button"
         className="absolute inset-0 bg-black/50"
         onClick={onClose}
-        aria-label="关闭"
+        aria-label={t('common:actions.close')}
       />
       <div className="card relative w-full max-w-md p-5">
-        <h2 className="mb-4 text-base font-medium">新建账户</h2>
+        <h2 className="mb-4 text-base font-medium">{t('accounts:dialog.title')}</h2>
 
         <form
           onSubmit={(e) => {
@@ -276,7 +281,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
           }}
           className="space-y-3"
         >
-          <Field label="账户名称">
+          <Field label={t('accounts:dialog.name')}>
             <input
               required
               maxLength={60}
@@ -287,7 +292,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="账户类型">
+            <Field label={t('accounts:dialog.type')}>
               <select
                 value={form.type}
                 onChange={(e) => setForm({ ...form, type: e.target.value as AccountType })}
@@ -295,13 +300,13 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
               >
                 {ACCOUNT_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {ACCOUNT_TYPE_LABELS[type]}
+                    {accountType(type)}
                   </option>
                 ))}
               </select>
             </Field>
 
-            <Field label="币种">
+            <Field label={t('accounts:dialog.currency')}>
               <select
                 value={form.currency}
                 onChange={(e) => setForm({ ...form, currency: e.target.value })}
@@ -316,7 +321,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
             </Field>
           </div>
 
-          <Field label="机构名称（可选）">
+          <Field label={t('accounts:dialog.institution')}>
             <input
               maxLength={80}
               value={form.institution}
@@ -326,7 +331,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="期初余额">
+            <Field label={t('accounts:dialog.opening_balance')}>
               <input
                 required
                 inputMode="decimal"
@@ -336,7 +341,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
               />
             </Field>
 
-            <Field label="期初日期">
+            <Field label={t('accounts:dialog.opening_date')}>
               <input
                 required
                 type="date"
@@ -348,7 +353,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
           </div>
 
           <p className="text-xs text-[var(--color-content-muted)]">
-            信用卡与贷款账户的余额会计入负债，请填写欠款金额。
+            {t('accounts:dialog.liability_hint')}
           </p>
 
           {error && (
@@ -363,14 +368,16 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
               onClick={onClose}
               className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
             >
-              取消
+              {t('common:actions.cancel')}
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
               className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              {createMutation.isPending ? '创建中…' : '创建'}
+              {createMutation.isPending
+                ? t('accounts:dialog.creating')
+                : t('accounts:dialog.create')}
             </button>
           </div>
         </form>

@@ -443,4 +443,45 @@ describe('资料与设置', () => {
     expect(res.json().data.preferences.timezone).toBe('America/New_York');
     expect(res.json().data.preferences.theme).toBe('light');
   });
+
+  it('界面语言偏好可保存并对非法值返回 400', async () => {
+    const { token } = await registerAndLogin();
+
+    const saved = await app.inject({
+      method: 'PATCH',
+      url: '/api/profile/preferences',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { language: 'en-US' },
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().data.preferences.language).toBe('en-US');
+
+    const invalid = await app.inject({
+      method: 'PATCH',
+      url: '/api/profile/preferences',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { language: 'fr-FR' },
+    });
+    expect(invalid.statusCode).toBe(400);
+  });
+
+  it('注册时按传入语言生成系统分类名称', async () => {
+    const email = randomEmail('lang');
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { email, password: VALID_PASSWORD, nickname: 'Lang', language: 'en-US' },
+    });
+
+    const user = await app.prisma.user.findUniqueOrThrow({ where: { email } });
+    const names = await app.prisma.category.findMany({
+      where: { userId: user.id },
+      select: { name: true },
+    });
+    const settings = await app.prisma.userSettings.findUniqueOrThrow({ where: { userId: user.id } });
+
+    expect(settings.language).toBe('en-US');
+    expect(names.map((item) => item.name)).toContain('Salary');
+  });
 });

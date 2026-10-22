@@ -1,0 +1,65 @@
+{
+  "title": "设置",
+  "basic": "基础设置",
+  "base_currency": "基准币种",
+  "base_currency_hint": "所有多币种统计都会折算到该币种",
+  "timezone": "时区",
+  "timezone_hint": "月度统计按此时区划分自然月",
+  "date_format": "日期格式",
+  "theme": "主题",
+  "language": "界面语言",
+  "language_hint": "切换后立即生效，并同步到其他设备",
+  "save": "保存设置",
+  "saving": "保存中…",
+  "saved": "设置已保存",
+  "save_failed": "保存失败",
+  "loading": "加载设置…",
+  "load_failed": "设置加载失败，请刷新重试。",
+  "exchange_rates": {
+    "title": "手工汇率",
+    "description": "多币种账户折算到基准币种时需要汇率。缺失汇率时相关账户会从净资产中排除，而不是按 1:1 计算。",
+    "base_currency": "基准币种",
+    "quote_currency": "计价币种",
+    "rate": "汇率",
+    "effective_date": "生效日期",
+    "add": "添加",
+    "empty": "暂无手工汇率记录",
+    "delete": "删除"
+  },
+  "security": {
+    "title": "账户安全",
+    "hint": "查看登录设备、修改密码请前往",
+    "profile_link": "个人资料",
+    "session_count": "当前有 {{count}} 个活跃会话",
+    "last_login": "最近登录 {{time}}"
+  },
+  "profile": {
+    "title": "个人资料",
+    "basic": "基本信息",
+    "email": "邮箱",
+    "nickname": "昵称",
+    "nickname_updated": "昵称已更新",
+    "save": "保存",
+    "saving": "保存中…",
+    "save_failed": "保存失败",
+    "password": {
+      "title": "修改密码",
+      "hint": "修改后其他设备上的登录会立即失效，你需要重新登录。",
+      "current": "当前密码",
+      "new": "新密码",
+      "submit": "修改密码",
+      "submitting": "提交中…",
+      "failed": "修改失败"
+    },
+    "sessions": {
+      "title": "登录会话",
+      "revoke_others": "退出其他设备",
+      "loading": "加载会话…",
+      "unknown_device": "未知设备",
+      "current_badge": "当前",
+      "no_ip": "未记录 IP",
+      "last_used": "最近使用 {{time}}",
+      "revoke": "撤销"
+    }
+  }
+}

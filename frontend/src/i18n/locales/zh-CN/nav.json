@@ -1,0 +1,18 @@
+{
+  "dashboard": "财务总览",
+  "accounts": "财务账户",
+  "transactions": "交易流水",
+  "imports": "账单导入",
+  "categories": "分类管理",
+  "compound": "复利模拟",
+  "settings": "设置",
+  "profile": "个人资料",
+  "logout": "退出登录",
+  "open_nav": "打开导航",
+  "close_nav": "关闭导航",
+  "expand_sidebar": "展开侧边栏",
+  "collapse_sidebar": "收起侧边栏",
+  "theme_to_light": "切换到浅色模式",
+  "theme_to_dark": "切换到深色模式",
+  "close_menu": "关闭菜单"
+}

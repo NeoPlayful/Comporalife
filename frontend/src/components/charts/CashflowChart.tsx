@@ -1,6 +1,8 @@
 import type { CashflowPoint } from '@/lib/dashboard';
+import { formatNumber } from '@/lib/format';
 import './echarts';
 import ReactECharts from 'echarts-for-react';
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 
 export default function CashflowChart({
@@ -10,8 +12,15 @@ export default function CashflowChart({
   points: CashflowPoint[];
   currency: string;
 }) {
+  const { t } = useTranslation('dashboard');
+
   if (points.length === 0) {
-    return <EmptyState title="暂无现金流数据" description="记录收入或支出后即可看到月度趋势。" />;
+    return (
+      <EmptyState
+        title={t('charts.cashflow_empty_title')}
+        description={t('charts.cashflow_empty_description')}
+      />
+    );
   }
 
   const option = {
@@ -28,7 +37,7 @@ export default function CashflowChart({
       backgroundColor: 'rgba(30,32,38,0.95)',
       borderWidth: 0,
       textStyle: { color: '#e8e9ed', fontSize: 12 },
-      valueFormatter: (value: number) => `${value.toLocaleString('zh-CN')} ${currency}`,
+      valueFormatter: (value: number) => `${formatNumber(value)} ${currency}`,
     },
     xAxis: {
       type: 'category',
@@ -44,21 +53,21 @@ export default function CashflowChart({
     },
     series: [
       {
-        name: '收入',
+        name: t('charts.cashflow_income'),
         type: 'bar',
         barMaxWidth: 22,
         itemStyle: { color: '#4ea87c', borderRadius: [3, 3, 0, 0] },
         data: points.map((point) => Number(point.income)),
       },
       {
-        name: '支出',
+        name: t('charts.cashflow_expense'),
         type: 'bar',
         barMaxWidth: 22,
         itemStyle: { color: '#c76a5e', borderRadius: [3, 3, 0, 0] },
         data: points.map((point) => Number(point.expense)),
       },
       {
-        name: '结余',
+        name: t('charts.cashflow_net'),
         type: 'line',
         smooth: true,
         symbolSize: 5,

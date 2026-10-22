@@ -1,0 +1,21 @@
+{
+  "title": "Categories & tags",
+  "new_category": "New category",
+  "root_placeholder": "Top-level category name",
+  "child_placeholder": "Subcategory name",
+  "add_child": "Add subcategory",
+  "load_failed": "Failed to load categories",
+  "empty_title": "No categories yet",
+  "empty_description": "Create a top-level category to select it when recording transactions.",
+  "create_failed": "Failed to create category",
+  "delete_failed": "Failed to delete category",
+  "delete_category_aria": "Delete category {{name}}",
+  "tags": {
+    "title": "Tags",
+    "placeholder": "New tag name",
+    "add": "Add",
+    "empty": "No tags yet. Tags can mark transactions across categories.",
+    "create_failed": "Failed to create tag",
+    "delete_aria": "Delete tag {{name}}"
+  }
+}

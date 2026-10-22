@@ -46,6 +46,7 @@ export default async function profileRoutes(app: FastifyInstance) {
         timezone: true,
         dateFormat: true,
         theme: true,
+        language: true,
         simulationDefaults: true,
       },
     });
@@ -60,7 +61,13 @@ export default async function profileRoutes(app: FastifyInstance) {
     const settings = await app.prisma.userSettings.update({
       where: { userId },
       data: body,
-      select: { baseCurrency: true, timezone: true, dateFormat: true, theme: true },
+      select: {
+        baseCurrency: true,
+        timezone: true,
+        dateFormat: true,
+        theme: true,
+        language: true,
+      },
     });
 
     return ok({ preferences: settings }, request.id);

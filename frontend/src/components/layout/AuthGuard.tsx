@@ -3,12 +3,14 @@ import { refreshAccessToken } from '@/lib/client';
 import LoadingState from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 export default function AuthGuard() {
   const { user, initialized, setAuth, setInitialized, clear } = useAuthStore();
   const [checking, setChecking] = useState(!initialized);
   const location = useLocation();
+  const { t } = useTranslation('common');
 
   useEffect(() => {
     if (initialized) {
@@ -43,7 +45,7 @@ export default function AuthGuard() {
   }, [initialized, setAuth, setInitialized, clear]);
 
   if (checking || !initialized) {
-    return <LoadingState label="正在恢复会话…" />;
+    return <LoadingState label={t('state.restoring_session')} />;
   }
 
   if (!user) {

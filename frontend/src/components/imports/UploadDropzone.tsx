@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const MAX_MB = 10;
+const MAX_ROWS = 20_000;
 const ALLOWED = ['.csv', '.xlsx'];
 
 export default function UploadDropzone({
@@ -11,6 +13,7 @@ export default function UploadDropzone({
   onFile: (file: File, encoding?: 'utf-8' | 'gb18030') => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation('imports');
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -21,12 +24,12 @@ export default function UploadDropzone({
 
     const lower = file.name.toLowerCase();
     if (!ALLOWED.some((ext) => lower.endsWith(ext))) {
-      setLocalError('仅支持 .csv 与 .xlsx 文件');
+      setLocalError(t('dropzone.only_csv_xlsx'));
       return;
     }
 
     if (file.size > MAX_MB * 1024 * 1024) {
-      setLocalError(`文件超过 ${MAX_MB} MB 上限`);
+      setLocalError(t('dropzone.too_large', { maxMb: MAX_MB }));
       return;
     }
 
@@ -55,17 +58,17 @@ export default function UploadDropzone({
         } ${disabled ? 'opacity-60' : ''}`}
       >
         <Upload className="size-8 text-[var(--color-content-muted)]" aria-hidden />
-        <p className="text-sm font-medium">拖拽账单文件到此处，或</p>
+        <p className="text-sm font-medium">{t('dropzone.prompt')}</p>
         <button
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
           className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          选择文件
+          {t('dropzone.choose')}
         </button>
         <p className="text-xs text-[var(--color-content-muted)]">
-          支持 CSV 与 XLSX，单个文件不超过 {MAX_MB} MB、{20000} 行
+          {t('dropzone.hint', { maxMb: MAX_MB, maxRows: MAX_ROWS.toLocaleString() })}
         </p>
         <input
           ref={inputRef}
@@ -82,7 +85,7 @@ export default function UploadDropzone({
 
       <div className="flex items-center gap-2 text-sm">
         <label htmlFor="encoding" className="text-[var(--color-content-muted)]">
-          文件编码
+          {t('dropzone.encoding')}
         </label>
         <select
           id="encoding"
@@ -90,11 +93,11 @@ export default function UploadDropzone({
           onChange={(event) => setEncoding(event.target.value as typeof encoding)}
           className="rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1"
         >
-          <option value="auto">自动识别</option>
-          <option value="utf-8">UTF-8</option>
-          <option value="gb18030">GBK / GB18030</option>
+          <option value="auto">{t('dropzone.encoding_auto')}</option>
+          <option value="utf-8">{t('dropzone.encoding_utf8')}</option>
+          <option value="gb18030">{t('dropzone.encoding_gbk')}</option>
         </select>
-        <span className="text-xs text-[var(--color-content-muted)]">仅对 CSV 生效</span>
+        <span className="text-xs text-[var(--color-content-muted)]">{t('dropzone.encoding_hint')}</span>
       </div>
 
       {localError && (

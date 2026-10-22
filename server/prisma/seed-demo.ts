@@ -50,12 +50,12 @@ async function main() {
       let sortOrder = 0;
       for (const node of nodes) {
         const parent = await tx.category.create({
-          data: { userId: created.id, kind, name: node.name, sortOrder: sortOrder++ },
+          data: { userId: created.id, kind, name: node.names['zh-CN'], sortOrder: sortOrder++ },
         });
         let childOrder = 0;
         for (const child of node.children) {
           await tx.category.create({
-            data: { userId: created.id, kind, name: child, parentId: parent.id, sortOrder: childOrder++ },
+            data: { userId: created.id, kind, name: child['zh-CN'], parentId: parent.id, sortOrder: childOrder++ },
           });
         }
       }

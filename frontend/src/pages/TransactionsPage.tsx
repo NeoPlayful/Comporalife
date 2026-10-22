@@ -1,8 +1,9 @@
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
-import { ApiError } from '@/lib/client';
+import { useEnumLabels, TRANSACTION_TYPE_KEYS } from '@/lib/enum-labels';
+import { translateError } from '@/lib/error-message';
+import { formatDate } from '@/lib/format';
 import {
-  TRANSACTION_TYPE_LABELS,
   transactionsApi,
   type Transaction,
   type TransactionListParams,
@@ -16,10 +17,13 @@ import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, RotateCcw, Search } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { transactionType } = useEnumLabels();
   const [formOpen, setFormOpen] = useState(false);
   const [showVoided, setShowVoided] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -71,7 +75,7 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '冲正失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const bulkCategorize = useMutation({
@@ -82,7 +86,7 @@ export default function TransactionsPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '批量分类失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const transactions = listQuery.data?.transactions ?? [];
@@ -105,7 +109,7 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">交易流水</h1>
+        <h1 className="text-xl font-semibold">{t('transactions:title')}</h1>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--color-content-muted)]">
             <input
@@ -117,7 +121,7 @@ export default function TransactionsPage() {
               }}
               className="size-4 rounded border-[var(--color-border-subtle)]"
             />
-            显示已冲正
+            {t('transactions:show_voided')}
           </label>
           <button
             type="button"
@@ -125,7 +129,7 @@ export default function TransactionsPage() {
             className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
           >
             <Plus className="size-4" />
-            新增交易
+            {t('transactions:new')}
           </button>
         </div>
       </div>
@@ -143,22 +147,22 @@ export default function TransactionsPage() {
             value={filters.from}
             onChange={(e) => setFilters({ ...filters, from: e.target.value, page: 1 })}
             className="input"
-            aria-label="起始日期"
+            aria-label={t('transactions:filters.from')}
           />
           <input
             type="date"
             value={filters.to}
             onChange={(e) => setFilters({ ...filters, to: e.target.value, page: 1 })}
             className="input"
-            aria-label="结束日期"
+            aria-label={t('transactions:filters.to')}
           />
           <select
             value={filters.accountId}
             onChange={(e) => setFilters({ ...filters, accountId: e.target.value, page: 1 })}
             className="input"
-            aria-label="账户筛选"
+            aria-label={t('transactions:filters.account')}
           >
-            <option value="">全部账户</option>
+            <option value="">{t('transactions:filters.all_accounts')}</option>
             {accountsQuery.data?.accounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name}
@@ -171,12 +175,12 @@ export default function TransactionsPage() {
               setFilters({ ...filters, type: e.target.value as '' | TransactionType, page: 1 })
             }
             className="input"
-            aria-label="类型筛选"
+            aria-label={t('transactions:filters.type')}
           >
-            <option value="">全部类型</option>
-            {(Object.keys(TRANSACTION_TYPE_LABELS) as TransactionType[]).map((type) => (
+            <option value="">{t('transactions:filters.all_types')}</option>
+            {TRANSACTION_TYPE_KEYS.map((type) => (
               <option key={type} value={type}>
-                {TRANSACTION_TYPE_LABELS[type]}
+                {transactionType(type)}
               </option>
             ))}
           </select>
@@ -185,16 +189,16 @@ export default function TransactionsPage() {
             <input
               value={filters.keyword}
               onChange={(e) => setFilters({ ...filters, keyword: e.target.value, page: 1 })}
-              placeholder="搜索摘要或商户"
+              placeholder={t('transactions:filters.keyword')}
               className="input pl-8"
-              aria-label="关键词搜索"
+              aria-label={t('transactions:filters.keyword_aria')}
             />
           </div>
         </div>
 
         {selected.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg bg-[var(--color-accent)]/10 px-3 py-2 text-sm">
-            <span>已选择 {selected.size} 条</span>
+            <span>{t('transactions:bulk.selected', { count: selected.size })}</span>
             <select
               onChange={(e) => {
                 if (e.target.value) bulkCategorize.mutate(e.target.value);
@@ -202,9 +206,9 @@ export default function TransactionsPage() {
               }}
               className="input max-w-48"
               defaultValue=""
-              aria-label="批量设置分类"
+              aria-label={t('transactions:bulk.categorize_aria')}
             >
-              <option value="">批量设置分类…</option>
+              <option value="">{t('transactions:bulk.categorize')}</option>
               {categoriesQuery.data?.flat.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.parentId ? '　' : ''}
@@ -217,27 +221,29 @@ export default function TransactionsPage() {
               onClick={() => setSelected(new Set())}
               className="text-[var(--color-content-muted)]"
             >
-              取消选择
+              {t('transactions:bulk.cancel')}
             </button>
           </div>
         )}
       </div>
 
       {listQuery.isLoading && <LoadingState />}
-      {listQuery.isError && <ErrorState message="流水加载失败" onRetry={() => listQuery.refetch()} />}
+      {listQuery.isError && (
+        <ErrorState message={t('transactions:load_failed')} onRetry={() => listQuery.refetch()} />
+      )}
 
       {listQuery.data && transactions.length === 0 && (
         <div className="card">
           <EmptyState
-            title="暂无流水"
-            description="新增一笔支出或收入后，这里会显示完整的交易记录。"
+            title={t('transactions:empty_title')}
+            description={t('transactions:empty_description')}
             action={
               <button
                 type="button"
                 onClick={() => setFormOpen(true)}
                 className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
               >
-                新增第一笔交易
+                {t('transactions:empty_action')}
               </button>
             }
           />
@@ -256,15 +262,15 @@ export default function TransactionsPage() {
                       checked={allChecked}
                       onChange={toggleAll}
                       className="size-4 rounded border-[var(--color-border-subtle)]"
-                      aria-label="全选"
+                      aria-label={t('transactions:table.select_all')}
                     />
                   </th>
-                  <th className="px-3 py-2">日期</th>
-                  <th className="px-3 py-2">摘要</th>
-                  <th className="px-3 py-2">来源</th>
-                  <th className="px-3 py-2">分类</th>
-                  <th className="px-3 py-2">账户</th>
-                  <th className="px-3 py-2 text-right">金额</th>
+                  <th className="px-3 py-2">{t('transactions:table.date')}</th>
+                  <th className="px-3 py-2">{t('transactions:table.description')}</th>
+                  <th className="px-3 py-2">{t('transactions:table.source')}</th>
+                  <th className="px-3 py-2">{t('transactions:table.category')}</th>
+                  <th className="px-3 py-2">{t('transactions:table.account')}</th>
+                  <th className="px-3 py-2 text-right">{t('transactions:table.amount')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-subtle)]">
@@ -282,16 +288,16 @@ export default function TransactionsPage() {
                         checked={selected.has(tx.id)}
                         onChange={() => toggleOne(tx.id)}
                         className="size-4 rounded border-[var(--color-border-subtle)]"
-                        aria-label={`选择 ${tx.description}`}
+                        aria-label={t('transactions:table.select_row', { description: tx.description })}
                       />
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-[var(--color-content-muted)]">
-                      {tx.occurredAt.slice(0, 10)}
+                      {formatDate(tx.occurredAt)}
                     </td>
                     <td className="px-3 py-2">
                       <span className={tx.status === 'voided' ? 'line-through' : ''}>{tx.description}</span>
                       <span className="ml-2 text-xs text-[var(--color-content-muted)]">
-                        {TRANSACTION_TYPE_LABELS[tx.type]}
+                        {transactionType(tx.type)}
                       </span>
                     </td>
                     <td className="px-3 py-2">
@@ -301,14 +307,16 @@ export default function TransactionsPage() {
                           onClick={(event) => event.stopPropagation()}
                           className="rounded bg-sky-500/15 px-1.5 py-0.5 text-xs text-sky-500"
                         >
-                          导入
+                          {t('transactions:table.source_import')}
                         </Link>
                       ) : (
-                        <span className="text-xs text-[var(--color-content-muted)]">手工</span>
+                        <span className="text-xs text-[var(--color-content-muted)]">
+                          {t('transactions:table.source_manual')}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-[var(--color-content-muted)]">
-                      {tx.category?.name ?? '未分类'}
+                      {tx.category?.name ?? t('transactions:table.uncategorized')}
                     </td>
                     <td className="px-3 py-2 text-[var(--color-content-muted)]">
                       {tx.account?.name ?? '—'}
@@ -325,7 +333,11 @@ export default function TransactionsPage() {
           {pagination && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-[var(--color-content-muted)]">
-                共 {pagination.total} 条 · 第 {pagination.page}/{pagination.totalPages} 页
+                {t('transactions:pagination.summary', {
+                  total: pagination.total,
+                  page: pagination.page,
+                  totalPages: pagination.totalPages,
+                })}
               </span>
               <div className="flex gap-2">
                 <button
@@ -334,7 +346,7 @@ export default function TransactionsPage() {
                   onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
                   className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 disabled:opacity-40"
                 >
-                  上一页
+                  {t('transactions:pagination.prev')}
                 </button>
                 <button
                   type="button"
@@ -342,7 +354,7 @@ export default function TransactionsPage() {
                   onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
                   className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 disabled:opacity-40"
                 >
-                  下一页
+                  {t('transactions:pagination.next')}
                 </button>
               </div>
             </div>
@@ -378,17 +390,24 @@ function TransactionDetail({
   voiding: boolean;
 }) {
   const [confirmVoid, setConfirmVoid] = useState(false);
+  const { t } = useTranslation();
+  const { transactionType } = useEnumLabels();
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="关闭" />
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+        aria-label={t('common:actions.close')}
+      />
       <div className="card relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-b-none p-5 sm:rounded-xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-medium">{transaction.description}</h2>
             <p className="mt-0.5 text-xs text-[var(--color-content-muted)]">
-              {transaction.occurredAt.slice(0, 10)} · {TRANSACTION_TYPE_LABELS[transaction.type]}
-              {transaction.status === 'voided' && ' · 已冲正'}
+              {formatDate(transaction.occurredAt)} · {transactionType(transaction.type)}
+              {transaction.status === 'voided' && t('transactions:detail.voided_suffix')}
             </p>
           </div>
           <MoneyDisplay
@@ -400,28 +419,38 @@ function TransactionDetail({
         </div>
 
         <dl className="space-y-2 text-sm">
-          <Row label="分类" value={transaction.category?.name ?? '未分类'} />
-          {transaction.merchant && <Row label="商户" value={transaction.merchant} />}
-          {transaction.note && <Row label="备注" value={transaction.note} />}
+          <Row
+            label={t('transactions:detail.category')}
+            value={transaction.category?.name ?? t('transactions:table.uncategorized')}
+          />
+          {transaction.merchant && (
+            <Row label={t('transactions:detail.merchant')} value={transaction.merchant} />
+          )}
+          {transaction.note && <Row label={t('transactions:detail.note')} value={transaction.note} />}
           {transaction.tags.length > 0 && (
-            <Row label="标签" value={transaction.tags.map((tag) => tag.name).join('、')} />
+            <Row
+              label={t('transactions:detail.tags')}
+              value={transaction.tags.map((tag) => tag.name).join(t('common:list_separator'))}
+            />
           )}
         </dl>
 
         <div className="mt-4">
-          <h3 className="mb-2 text-xs font-medium text-[var(--color-content-muted)]">复式分录</h3>
+          <h3 className="mb-2 text-xs font-medium text-[var(--color-content-muted)]">
+            {t('transactions:detail.entries')}
+          </h3>
           <ul className="divide-y divide-[var(--color-border-subtle)] rounded-lg border border-[var(--color-border-subtle)]">
             {transaction.entries.map((entry, index) => (
               <li key={index} className="flex items-center justify-between px-3 py-2 text-sm">
                 <span className={entry.accountId ? '' : 'text-[var(--color-content-muted)]'}>
-                  {entry.accountName ?? '外部对手方'}
+                  {entry.accountName ?? t('transactions:detail.external_counterparty')}
                 </span>
                 <MoneyDisplay amount={entry.amount} currency={entry.currency} colorize />
               </li>
             ))}
           </ul>
           <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-            两条分录求和为零，表示资金只是从一方转移到另一方。
+            {t('transactions:detail.entries_hint')}
           </p>
         </div>
 
@@ -431,7 +460,7 @@ function TransactionDetail({
             onClick={onClose}
             className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
           >
-            关闭
+            {t('common:actions.close')}
           </button>
           {transaction.status === 'posted' &&
             (confirmVoid ? (
@@ -441,7 +470,7 @@ function TransactionDetail({
                 disabled={voiding}
                 className="rounded-lg bg-[var(--color-negative)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
-                {voiding ? '冲正中…' : '确认冲正'}
+                {voiding ? t('transactions:detail.voiding') : t('transactions:detail.confirm_void')}
               </button>
             ) : (
               <button
@@ -450,14 +479,14 @@ function TransactionDetail({
                 className="flex items-center gap-1.5 rounded-lg border border-[var(--color-negative)] px-4 py-2 text-sm text-[var(--color-negative)]"
               >
                 <RotateCcw className="size-4" />
-                冲正
+                {t('transactions:detail.void')}
               </button>
             ))}
         </div>
 
         {confirmVoid && (
           <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-            冲正会保留记录但撤销其对余额的影响，历史仍可追溯。
+            {t('transactions:detail.void_hint')}
           </p>
         )}
       </div>

@@ -1,31 +1,66 @@
+import { SUPPORTED_LANGUAGES } from '../../config/constants.js';
+
+export type TemplateLanguage = (typeof SUPPORTED_LANGUAGES)[number];
+
 export interface CategoryTemplateNode {
-  name: string;
-  children: string[];
+  names: Record<TemplateLanguage, string>;
+  children: Array<Record<TemplateLanguage, string>>;
 }
 
 /**
  * 系统预设分类模板。
- * 注册时复制为当前用户的分类记录，避免 userId 可空的权限分支。
+ * 注册时按用户界面语言复制为分类记录，落库后即视为用户数据，不再随界面语言变化。
  */
+const zh: TemplateLanguage = 'zh-CN';
+const en: TemplateLanguage = 'en-US';
+
 export const CATEGORY_TEMPLATE: Record<'income' | 'expense', CategoryTemplateNode[]> = {
   income: [
-    { name: '工资', children: ['基本工资', '绩效奖金', '加班费'] },
-    { name: '奖金', children: [] },
-    { name: '利息', children: [] },
-    { name: '分红', children: [] },
-    { name: '其他收入', children: ['红包', '报销', '退款'] },
+    { names: { [zh]: '工资', [en]: 'Salary' }, children: [{ [zh]: '基本工资', [en]: 'Base salary' }, { [zh]: '绩效奖金', [en]: 'Performance bonus' }, { [zh]: '加班费', [en]: 'Overtime pay' }] },
+    { names: { [zh]: '奖金', [en]: 'Bonus' }, children: [] },
+    { names: { [zh]: '利息', [en]: 'Interest' }, children: [] },
+    { names: { [zh]: '分红', [en]: 'Dividends' }, children: [] },
+    {
+      names: { [zh]: '其他收入', [en]: 'Other income' },
+      children: [{ [zh]: '红包', [en]: 'Red packet' }, { [zh]: '报销', [en]: 'Reimbursement' }, { [zh]: '退款', [en]: 'Refund' }],
+    },
   ],
   expense: [
-    { name: '住房', children: ['房租', '房贷', '物业费', '水电燃气'] },
-    { name: '食品', children: ['日常餐饮', '外出就餐', '生鲜采购'] },
-    { name: '交通', children: ['公共交通', '打车', '燃油', '车辆保养'] },
-    { name: '教育', children: ['学费', '书籍', '培训课程'] },
-    { name: '医疗', children: ['门诊', '药品', '体检', '保险医疗'] },
-    { name: '保险', children: ['寿险', '健康险', '财产险'] },
-    { name: '娱乐', children: ['影音订阅', '旅行', '运动健身'] },
-    { name: '购物', children: ['服饰', '数码', '家居'] },
-    { name: '其他支出', children: ['手续费', '捐赠'] },
+    {
+      names: { [zh]: '住房', [en]: 'Housing' },
+      children: [{ [zh]: '房租', [en]: 'Rent' }, { [zh]: '房贷', [en]: 'Mortgage' }, { [zh]: '物业费', [en]: 'Property fee' }, { [zh]: '水电燃气', [en]: 'Utilities' }],
+    },
+    {
+      names: { [zh]: '食品', [en]: 'Food' },
+      children: [{ [zh]: '日常餐饮', [en]: 'Daily meals' }, { [zh]: '外出就餐', [en]: 'Dining out' }, { [zh]: '生鲜采购', [en]: 'Groceries' }],
+    },
+    {
+      names: { [zh]: '交通', [en]: 'Transport' },
+      children: [{ [zh]: '公共交通', [en]: 'Public transit' }, { [zh]: '打车', [en]: 'Taxi' }, { [zh]: '燃油', [en]: 'Fuel' }, { [zh]: '车辆保养', [en]: 'Car maintenance' }],
+    },
+    {
+      names: { [zh]: '教育', [en]: 'Education' },
+      children: [{ [zh]: '学费', [en]: 'Tuition' }, { [zh]: '书籍', [en]: 'Books' }, { [zh]: '培训课程', [en]: 'Courses' }],
+    },
+    {
+      names: { [zh]: '医疗', [en]: 'Medical' },
+      children: [{ [zh]: '门诊', [en]: 'Outpatient' }, { [zh]: '药品', [en]: 'Medicine' }, { [zh]: '体检', [en]: 'Checkup' }, { [zh]: '保险医疗', [en]: 'Medical insurance' }],
+    },
+    {
+      names: { [zh]: '保险', [en]: 'Insurance' },
+      children: [{ [zh]: '寿险', [en]: 'Life insurance' }, { [zh]: '健康险', [en]: 'Health insurance' }, { [zh]: '财产险', [en]: 'Property insurance' }],
+    },
+    {
+      names: { [zh]: '娱乐', [en]: 'Entertainment' },
+      children: [{ [zh]: '影音订阅', [en]: 'Subscriptions' }, { [zh]: '旅行', [en]: 'Travel' }, { [zh]: '运动健身', [en]: 'Fitness' }],
+    },
+    {
+      names: { [zh]: '购物', [en]: 'Shopping' },
+      children: [{ [zh]: '服饰', [en]: 'Clothing' }, { [zh]: '数码', [en]: 'Electronics' }, { [zh]: '家居', [en]: 'Home' }],
+    },
+    {
+      names: { [zh]: '其他支出', [en]: 'Other expenses' },
+      children: [{ [zh]: '手续费', [en]: 'Fees' }, { [zh]: '捐赠', [en]: 'Donation' }],
+    },
   ],
 };
-
-export const DEFAULT_ACCOUNT_NAME = '默认现金账户';

@@ -8,20 +8,22 @@ import {
   Upload,
   Wallet,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { to: '/dashboard', label: '财务总览', icon: LayoutDashboard },
-  { to: '/accounts', label: '财务账户', icon: Wallet },
-  { to: '/transactions', label: '交易流水', icon: ArrowLeftRight },
-  { to: '/imports', label: '账单导入', icon: Upload },
-  { to: '/categories', label: '分类管理', icon: Tags },
-  { to: '/compound', label: '复利模拟', icon: Calculator },
-  { to: '/settings', label: '设置', icon: Settings },
-];
+  { to: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
+  { to: '/accounts', key: 'accounts', icon: Wallet },
+  { to: '/transactions', key: 'transactions', icon: ArrowLeftRight },
+  { to: '/imports', key: 'imports', icon: Upload },
+  { to: '/categories', key: 'categories', icon: Tags },
+  { to: '/compound', key: 'compound', icon: Calculator },
+  { to: '/settings', key: 'settings', icon: Settings },
+] as const;
 
 export default function Sidebar() {
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
+  const { t } = useTranslation();
 
   return (
     <aside
@@ -31,34 +33,40 @@ export default function Sidebar() {
     >
       <div className="flex h-16 items-center gap-2 px-4">
         <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-accent)] font-bold text-white">
-          复
+          {t('common:brand_initial')}
         </div>
-        {!collapsed && <p className="min-w-0 truncate text-sm font-semibold">Comporalife</p>}
+        {!collapsed && <p className="min-w-0 truncate text-sm font-semibold">{t('common:app_name')}</p>}
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            title={collapsed ? label : undefined}
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
-                  : 'text-[var(--color-content-muted)] hover:bg-black/5 hover:text-[var(--color-content)] dark:hover:bg-white/5'
-              }`
-            }
-          >
-            <Icon className="size-4 shrink-0" aria-hidden />
-            {!collapsed && <span className="truncate">{label}</span>}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(({ to, key, icon: Icon }) => {
+          const label = t(`nav:${key}`);
+
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) =>
+                `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                  isActive
+                    ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
+                    : 'text-[var(--color-content-muted)] hover:bg-black/5 hover:text-[var(--color-content)] dark:hover:bg-white/5'
+                }`
+              }
+            >
+              <Icon className="size-4 shrink-0" aria-hidden />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       <div className="border-t border-[var(--color-border-subtle)] p-3">
         {!collapsed && (
-          <p className="text-xs text-[var(--color-content-muted)]">版本 v{__APP_VERSION__}</p>
+          <p className="text-xs text-[var(--color-content-muted)]">
+            {t('common:footer.version', { version: __APP_VERSION__ })}
+          </p>
         )}
       </div>
     </aside>

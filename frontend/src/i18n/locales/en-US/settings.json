@@ -1,0 +1,65 @@
+{
+  "title": "Settings",
+  "basic": "General",
+  "base_currency": "Base currency",
+  "base_currency_hint": "All multi-currency totals are converted to this currency",
+  "timezone": "Timezone",
+  "timezone_hint": "Monthly totals are split by natural months in this timezone",
+  "date_format": "Date format",
+  "theme": "Theme",
+  "language": "Language",
+  "language_hint": "Applies immediately and syncs to your other devices",
+  "save": "Save settings",
+  "saving": "Saving…",
+  "saved": "Settings saved",
+  "save_failed": "Failed to save",
+  "loading": "Loading settings…",
+  "load_failed": "Failed to load settings. Please refresh and try again.",
+  "exchange_rates": {
+    "title": "Manual exchange rates",
+    "description": "Multi-currency accounts need rates to convert into the base currency. Accounts with missing rates are excluded from net worth rather than converted 1:1.",
+    "base_currency": "Base currency",
+    "quote_currency": "Quote currency",
+    "rate": "Rate",
+    "effective_date": "Effective date",
+    "add": "Add",
+    "empty": "No manual exchange rates yet",
+    "delete": "Delete"
+  },
+  "security": {
+    "title": "Account security",
+    "hint": "To view signed-in devices or change your password, go to",
+    "profile_link": "Profile",
+    "session_count": "{{count}} active sessions",
+    "last_login": "Last sign-in {{time}}"
+  },
+  "profile": {
+    "title": "Profile",
+    "basic": "Basic info",
+    "email": "Email",
+    "nickname": "Nickname",
+    "nickname_updated": "Nickname updated",
+    "save": "Save",
+    "saving": "Saving…",
+    "save_failed": "Failed to save",
+    "password": {
+      "title": "Change password",
+      "hint": "Other devices will be signed out immediately, and you'll need to sign in again.",
+      "current": "Current password",
+      "new": "New password",
+      "submit": "Change password",
+      "submitting": "Submitting…",
+      "failed": "Failed to change password"
+    },
+    "sessions": {
+      "title": "Sessions",
+      "revoke_others": "Sign out other devices",
+      "loading": "Loading sessions…",
+      "unknown_device": "Unknown device",
+      "current_badge": "Current",
+      "no_ip": "No IP recorded",
+      "last_used": "Last used {{time}}",
+      "revoke": "Revoke"
+    }
+  }
+}

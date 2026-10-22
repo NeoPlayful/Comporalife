@@ -1,11 +1,20 @@
 import type { NetWorthTrend } from '@/lib/dashboard';
+import { formatNumber } from '@/lib/format';
 import './echarts';
 import ReactECharts from 'echarts-for-react';
+import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 
 export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
+  const { t } = useTranslation('dashboard');
+
   if (data.series.length === 0) {
-    return <EmptyState title="暂无净资产数据" description="创建账户并记账后即可看到趋势。" />;
+    return (
+      <EmptyState
+        title={t('charts.net_worth_empty_title')}
+        description={t('charts.net_worth_empty_description')}
+      />
+    );
   }
 
   const option = {
@@ -15,7 +24,7 @@ export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
       backgroundColor: 'rgba(30,32,38,0.95)',
       borderWidth: 0,
       textStyle: { color: '#e8e9ed', fontSize: 12 },
-      valueFormatter: (value: number) => `${value.toLocaleString('zh-CN')} ${data.baseCurrency}`,
+      valueFormatter: (value: number) => `${formatNumber(value)} ${data.baseCurrency}`,
     },
     xAxis: {
       type: 'category',

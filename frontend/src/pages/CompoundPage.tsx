@@ -1,4 +1,5 @@
-import { ApiError } from '@/lib/client';
+import { translateError } from '@/lib/error-message';
+import { formatNumber } from '@/lib/format';
 import {
   DEFAULT_PARAMS,
   simulationsApi,
@@ -11,15 +12,13 @@ import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Info, Save, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
-const PACKAGE_LABELS: Record<CompoundParams['contributionFrequency'], string> = {
-  none: '不追加',
-  monthly: '每月',
-  annual: '每年',
-};
+const FREQUENCY_KEYS: CompoundParams['contributionFrequency'][] = ['none', 'monthly', 'annual'];
 
 export default function CompoundPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [params, setParams] = useState<CompoundParams>(DEFAULT_PARAMS);
   const [debounced, setDebounced] = useState<CompoundParams>(DEFAULT_PARAMS);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +59,7 @@ export default function CompoundPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['scenarios'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '保存失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const deleteMutation = useMutation({
@@ -69,7 +68,7 @@ export default function CompoundPage() {
       setCompareIds((ids) => ids.filter((id) => id !== ''));
       queryClient.invalidateQueries({ queryKey: ['scenarios'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '删除失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const duplicateMutation = useMutation({
@@ -96,7 +95,7 @@ export default function CompoundPage() {
 
     return [
       {
-        label: '当前参数',
+        label: t('compound:chart.current_params'),
         points: result.yearlySchedule.map((row) => ({
           year: row.year,
           totalContributed: row.totalContributed,
@@ -104,7 +103,7 @@ export default function CompoundPage() {
         })),
       },
     ];
-  }, [compareIds.length, compareQuery.data, result]);
+  }, [compareIds.length, compareQuery.data, result, t]);
 
   const compareMode = compareIds.length >= 2;
   const displayResult = compareMode ? null : result;
@@ -113,9 +112,9 @@ export default function CompoundPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">复利与定投模拟</h1>
+          <h1 className="text-xl font-semibold">{t('compound:title')}</h1>
           <p className="mt-0.5 text-xs text-[var(--color-content-muted)]">
-            固定收益率仅为数学假设，不代表实际投资收益
+            {t('compound:disclaimer')}
           </p>
         </div>
         <button
@@ -124,7 +123,7 @@ export default function CompoundPage() {
           className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
         >
           <Save className="size-4" />
-          保存方案
+          {t('compound:save_scenario')}
         </button>
       </div>
 
@@ -147,7 +146,7 @@ export default function CompoundPage() {
             maxLength={60}
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
-            placeholder="方案名称，例如「基准 7%」"
+            placeholder={t('compound:scenario_name_placeholder')}
             className="input max-w-xs"
           />
           <button
@@ -155,36 +154,38 @@ export default function CompoundPage() {
             disabled={!saveName.trim() || saveMutation.isPending}
             className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            保存
+            {t('compound:save')}
           </button>
           <button
             type="button"
             onClick={() => setSaveOpen(false)}
             className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
           >
-            取消
+            {t('compound:cancel')}
           </button>
         </form>
       )}
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <section className="card h-fit space-y-3 p-4">
-          <h2 className="text-sm font-medium">参数</h2>
+          <h2 className="text-sm font-medium">{t('compound:params.title')}</h2>
 
           <NumberField
-            label="初始本金"
+            label={t('compound:params.principal')}
             value={params.principal}
             onChange={(value) => setParams({ ...params, principal: value })}
           />
 
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <NumberField
-              label="定期投入"
+              label={t('compound:params.contribution')}
               value={params.contributionAmount}
               onChange={(value) => setParams({ ...params, contributionAmount: value })}
             />
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--color-content-muted)]">频率</span>
+              <span className="mb-1 block text-[var(--color-content-muted)]">
+                {t('compound:params.frequency')}
+              </span>
               <select
                 value={params.contributionFrequency}
                 onChange={(e) =>
@@ -195,20 +196,20 @@ export default function CompoundPage() {
                 }
                 className="input"
               >
-                {(Object.keys(PACKAGE_LABELS) as Array<CompoundParams['contributionFrequency']>).map(
-                  (key) => (
-                    <option key={key} value={key}>
-                      {PACKAGE_LABELS[key]}
-                    </option>
-                  ),
-                )}
+                {FREQUENCY_KEYS.map((key) => (
+                  <option key={key} value={key}>
+                    {t(`enums:contribution_frequency.${key}`)}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
 
           {params.contributionFrequency !== 'none' && (
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--color-content-muted)]">投入时点</span>
+              <span className="mb-1 block text-[var(--color-content-muted)]">
+                {t('compound:params.timing')}
+              </span>
               <select
                 value={params.contributionTiming}
                 onChange={(e) =>
@@ -219,20 +220,22 @@ export default function CompoundPage() {
                 }
                 className="input"
               >
-                <option value="end">期末投入</option>
-                <option value="begin">期初投入</option>
+                <option value="end">{t('compound:params.timing_end')}</option>
+                <option value="begin">{t('compound:params.timing_begin')}</option>
               </select>
             </label>
           )}
 
           <PercentField
-            label="年化收益率"
+            label={t('compound:params.annual_return')}
             value={params.annualReturnRate}
             onChange={(value) => setParams({ ...params, annualReturnRate: value })}
           />
 
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--color-content-muted)]">投资期限（年）</span>
+            <span className="mb-1 block text-[var(--color-content-muted)]">
+              {t('compound:params.years')}
+            </span>
             <input
               type="number"
               min={1}
@@ -246,33 +249,31 @@ export default function CompoundPage() {
           </label>
 
           <PercentField
-            label="通胀率"
+            label={t('compound:params.inflation')}
             value={params.inflationRate}
             onChange={(value) => setParams({ ...params, inflationRate: value })}
           />
 
           <PercentField
-            label="年费用率"
+            label={t('compound:params.fee')}
             value={params.feeRate}
             onChange={(value) => setParams({ ...params, feeRate: value })}
           />
         </section>
 
         <div className="space-y-4">
-          {calculateQuery.isLoading && <LoadingState label="计算中…" />}
+          {calculateQuery.isLoading && <LoadingState label={t('compound:calculating')} />}
 
           {calculateQuery.isError && (
             <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-              {calculateQuery.error instanceof ApiError
-                ? calculateQuery.error.message
-                : '参数不合法，请检查输入'}
+              {translateError(calculateQuery.error, t)}
             </p>
           )}
 
           <section className="card p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium">
-                {compareMode ? '方案对比' : '资金增长曲线'}
+                {compareMode ? t('compound:chart.comparison') : t('compound:chart.growth')}
               </h2>
               {compareMode && (
                 <button
@@ -280,7 +281,7 @@ export default function CompoundPage() {
                   onClick={() => setCompareIds([])}
                   className="text-xs text-[var(--color-content-muted)] hover:text-[var(--color-accent)]"
                 >
-                  退出对比
+                  {t('compound:chart.exit_comparison')}
                 </button>
               )}
             </div>
@@ -289,8 +290,8 @@ export default function CompoundPage() {
 
             {!compareMode && (
               <div className="mt-3 flex flex-wrap gap-4 text-xs text-[var(--color-content-muted)]">
-                <span>蓝：累计本金</span>
-                <span>绿：复利收益</span>
+                <span>{t('compound:chart.legend_principal')}</span>
+                <span>{t('compound:chart.legend_interest')}</span>
               </div>
             )}
           </section>
@@ -298,25 +299,47 @@ export default function CompoundPage() {
           {displayResult && (
             <>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <ResultCard label="期末名义价值" value={displayResult.finalNominalValue} highlight />
-                <ResultCard label="累计投入本金" value={displayResult.totalContributed} />
-                <ResultCard label="累计收益" value={displayResult.totalGain} tone="positive" />
-                <ResultCard label="通胀调整后价值" value={displayResult.finalRealValue} />
+                <ResultCard
+                  label={t('compound:results.final_nominal')}
+                  value={displayResult.finalNominalValue}
+                  highlight
+                />
+                <ResultCard
+                  label={t('compound:results.total_contributed')}
+                  value={displayResult.totalContributed}
+                />
+                <ResultCard
+                  label={t('compound:results.total_gain')}
+                  value={displayResult.totalGain}
+                  tone="positive"
+                />
+                <ResultCard
+                  label={t('compound:results.final_real')}
+                  value={displayResult.finalRealValue}
+                />
               </div>
 
               <section className="card overflow-hidden">
                 <h2 className="border-b border-[var(--color-border-subtle)] px-4 py-3 text-sm font-medium">
-                  年度明细
+                  {t('compound:schedule.title')}
                 </h2>
                 <div className="max-h-80 overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-[var(--color-surface-raised)] text-left text-xs text-[var(--color-content-muted)]">
                       <tr>
-                        <th className="px-4 py-2">年</th>
-                        <th className="px-4 py-2 text-right">当年投入</th>
-                        <th className="px-4 py-2 text-right">累计投入</th>
-                        <th className="px-4 py-2 text-right">名义价值</th>
-                        <th className="px-4 py-2 text-right">实际价值</th>
+                        <th className="px-4 py-2">{t('compound:schedule.year')}</th>
+                        <th className="px-4 py-2 text-right">
+                          {t('compound:schedule.contributed_this_year')}
+                        </th>
+                        <th className="px-4 py-2 text-right">
+                          {t('compound:schedule.total_contributed')}
+                        </th>
+                        <th className="px-4 py-2 text-right">
+                          {t('compound:schedule.nominal_value')}
+                        </th>
+                        <th className="px-4 py-2 text-right">
+                          {t('compound:schedule.real_value')}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--color-border-subtle)]">
@@ -324,24 +347,16 @@ export default function CompoundPage() {
                         <tr key={row.year}>
                           <td className="px-4 py-1.5 text-[var(--color-content-muted)]">{row.year}</td>
                           <td className="px-4 py-1.5 text-right tabular-nums">
-                            {Number(row.contributedThisYear).toLocaleString('zh-CN', {
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatNumber(row.contributedThisYear, { maximumFractionDigits: 0 })}
                           </td>
                           <td className="px-4 py-1.5 text-right tabular-nums text-[var(--color-content-muted)]">
-                            {Number(row.totalContributed).toLocaleString('zh-CN', {
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatNumber(row.totalContributed, { maximumFractionDigits: 0 })}
                           </td>
                           <td className="px-4 py-1.5 text-right tabular-nums">
-                            {Number(row.nominalValue).toLocaleString('zh-CN', {
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatNumber(row.nominalValue, { maximumFractionDigits: 0 })}
                           </td>
                           <td className="px-4 py-1.5 text-right tabular-nums text-[var(--color-content-muted)]">
-                            {Number(row.realValue).toLocaleString('zh-CN', {
-                              maximumFractionDigits: 0,
-                            })}
+                            {formatNumber(row.realValue, { maximumFractionDigits: 0 })}
                           </td>
                         </tr>
                       ))}
@@ -353,20 +368,27 @@ export default function CompoundPage() {
               <section className="card p-4">
                 <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
                   <Info className="size-4 text-[var(--color-content-muted)]" />
-                  计算假设
+                  {t('compound:assumptions.title')}
                 </h2>
                 <dl className="grid gap-1.5 text-xs text-[var(--color-content-muted)] sm:grid-cols-2">
                   {Object.entries(displayResult.assumptions)
                     .filter(([key]) => key !== 'modelVersion')
                     .map(([key, value]) => (
                       <div key={key} className="flex gap-2">
-                        <dt className="shrink-0">{ASSUMPTION_LABELS[key] ?? key}：</dt>
-                        <dd className="break-all">{String(value)}</dd>
+                        <dt className="shrink-0">
+                          {t(`compound:assumptions.labels.${key}`, { defaultValue: key })}
+                          {t('compound:label_separator')}
+                        </dt>
+                        <dd className="break-all">
+                          {key === 'disclaimer' ? t('compound:disclaimer') : String(value)}
+                        </dd>
                       </div>
                     ))}
                 </dl>
                 <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-                  模型版本 {displayResult.modelVersion} · 结果可复现
+                  {t('compound:assumptions.model_version', {
+                    version: displayResult.modelVersion,
+                  })}
                 </p>
               </section>
             </>
@@ -376,15 +398,15 @@ export default function CompoundPage() {
 
       <section className="card p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">已保存方案（{scenarios.length}）</h2>
-          <p className="text-xs text-[var(--color-content-muted)]">
-            勾选 2-4 个方案可进入对比视图
-          </p>
+          <h2 className="text-sm font-medium">
+            {t('compound:saved.title', { count: scenarios.length })}
+          </h2>
+          <p className="text-xs text-[var(--color-content-muted)]">{t('compound:saved.hint')}</p>
         </div>
 
         {scenarios.length === 0 ? (
           <p className="py-6 text-center text-sm text-[var(--color-content-muted)]">
-            还没有保存的方案。调整参数后点击「保存方案」即可保留。
+            {t('compound:saved.empty')}
           </p>
         ) : (
           <ul className="divide-y divide-[var(--color-border-subtle)]">
@@ -402,7 +424,7 @@ export default function CompoundPage() {
                       )
                     }
                     className="size-4 rounded border-[var(--color-border-subtle)]"
-                    aria-label={`对比 ${scenario.name}`}
+                    aria-label={t('compound:saved.compare_aria', { name: scenario.name })}
                   />
 
                   <button
@@ -423,10 +445,13 @@ export default function CompoundPage() {
                   >
                     <p className="truncate text-sm">{scenario.name}</p>
                     <p className="text-xs text-[var(--color-content-muted)]">
-                      本金 {Number(scenario.principal).toLocaleString('zh-CN')} ·{' '}
-                      {(Number(scenario.annualReturnRate) * 100).toFixed(1)}% · {scenario.years} 年
+                      {t('compound:saved.summary', {
+                        principal: formatNumber(scenario.principal),
+                        rate: (Number(scenario.annualReturnRate) * 100).toFixed(1),
+                        years: scenario.years,
+                      })}
                       {scenario.contributionFrequency !== 'none' &&
-                        ` · ${PACKAGE_LABELS[scenario.contributionFrequency]}`}
+                        ` · ${t(`enums:contribution_frequency.${scenario.contributionFrequency}`)}`}
                     </p>
                   </button>
 
@@ -435,8 +460,8 @@ export default function CompoundPage() {
                       type="button"
                       onClick={() => duplicateMutation.mutate(scenario.id)}
                       className="grid size-8 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5"
-                      aria-label={`复制 ${scenario.name}`}
-                      title="复制"
+                      aria-label={t('compound:saved.copy_aria', { name: scenario.name })}
+                      title={t('compound:saved.copy')}
                     >
                       <Copy className="size-4" />
                     </button>
@@ -444,8 +469,8 @@ export default function CompoundPage() {
                       type="button"
                       onClick={() => deleteMutation.mutate(scenario.id)}
                       className="grid size-8 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-black/5 hover:text-[var(--color-negative)] dark:hover:bg-white/5"
-                      aria-label={`删除 ${scenario.name}`}
-                      title="删除"
+                      aria-label={t('compound:saved.delete_aria', { name: scenario.name })}
+                      title={t('compound:saved.delete')}
                     >
                       <Trash2 className="size-4" />
                     </button>
@@ -492,11 +517,15 @@ function PercentField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useTranslation('compound');
   const percent = Number(value) * 100;
 
   return (
     <label className="block text-sm">
-      <span className="mb-1 block text-[var(--color-content-muted)]">{label}（%）</span>
+      <span className="mb-1 block text-[var(--color-content-muted)]">
+        {label}
+        {t('params.percent_suffix')}
+      </span>
       <input
         type="number"
         step="0.1"
@@ -530,20 +559,8 @@ function ResultCard({
           tone === 'positive' ? 'text-[var(--color-positive)]' : ''
         }`}
       >
-        {Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+        {formatNumber(value, { maximumFractionDigits: 0 })}
       </p>
     </div>
   );
 }
-
-const ASSUMPTION_LABELS: Record<string, string> = {
-  monthlyRateBasis: '利率换算',
-  monthlyFeeBasis: '费用换算',
-  iterationOrder: '迭代顺序',
-  contributionTiming: '投入时点',
-  annualContributionMonth: '年付规则',
-  annualReturnRate: '年化收益率',
-  inflationRate: '通胀率',
-  feeRate: '费用率',
-  disclaimer: '声明',
-};

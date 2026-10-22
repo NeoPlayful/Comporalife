@@ -29,12 +29,17 @@ export interface Preferences {
   timezone: string;
   dateFormat: string;
   theme: 'dark' | 'light' | 'system';
+  language: 'zh-CN' | 'en-US';
   simulationDefaults: Record<string, unknown> | null;
 }
 
 export const authApi = {
-  register: (body: { email: string; password: string; nickname: string }) =>
-    api.post<LoginResult>('/api/auth/register', body),
+  register: (body: {
+    email: string;
+    password: string;
+    nickname: string;
+    language?: 'zh-CN' | 'en-US';
+  }) => api.post<LoginResult>('/api/auth/register', body),
 
   login: (body: { email: string; password: string }) => api.post<LoginResult>('/api/auth/login', body),
 

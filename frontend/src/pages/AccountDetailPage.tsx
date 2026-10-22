@@ -1,24 +1,15 @@
-import {
-  ACCOUNT_TYPE_LABELS,
-  LIABILITY_TYPES,
-  accountsApi,
-  type Reconciliation,
-} from '@/lib/accounts';
-import { ApiError } from '@/lib/client';
+import { LIABILITY_TYPES, accountsApi, type Reconciliation } from '@/lib/accounts';
+import { useEnumLabels } from '@/lib/enum-labels';
+import { translateError } from '@/lib/error-message';
+import { formatDate, formatNumber } from '@/lib/format';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-
-const TRANSACTION_TYPE_LABELS: Record<string, string> = {
-  income: '收入',
-  expense: '支出',
-  transfer: '转账',
-  adjustment: '调整',
-};
 
 function defaultRange() {
   const to = new Date();
@@ -31,6 +22,8 @@ export default function AccountDetailPage() {
   const { id = '' } = useParams();
   const queryClient = useQueryClient();
   const [range] = useState(defaultRange);
+  const { t } = useTranslation();
+  const { accountType, transactionType } = useEnumLabels();
 
   const accountQuery = useQuery({
     queryKey: ['account', id],
@@ -53,7 +46,7 @@ export default function AccountDetailPage() {
   });
 
   if (accountQuery.isLoading) return <LoadingState />;
-  if (accountQuery.isError) return <ErrorState message="账户加载失败" />;
+  if (accountQuery.isError) return <ErrorState message={t('accounts:detail.load_failed')} />;
 
   const account = accountQuery.data!.account;
   const isLiability = LIABILITY_TYPES.includes(account.type);
@@ -64,17 +57,17 @@ export default function AccountDetailPage() {
         <Link
           to="/accounts"
           className="grid size-8 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5"
-          aria-label="返回账户列表"
+          aria-label={t('accounts:detail.back')}
         >
           <ArrowLeft className="size-4" />
         </Link>
         <h1 className="text-xl font-semibold">{account.name}</h1>
         <span className="rounded bg-black/5 px-1.5 py-0.5 text-xs text-[var(--color-content-muted)] dark:bg-white/5">
-          {ACCOUNT_TYPE_LABELS[account.type]}
+          {accountType(account.type)}
         </span>
         {account.status === 'archived' && (
           <span className="rounded bg-black/5 px-1.5 py-0.5 text-xs text-[var(--color-content-muted)] dark:bg-white/5">
-            已归档
+            {t('accounts:archived_badge')}
           </span>
         )}
       </div>
@@ -82,7 +75,7 @@ export default function AccountDetailPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="card p-4">
           <p className="text-xs text-[var(--color-content-muted)]">
-            {isLiability ? '当前欠款' : '当前余额'}
+            {isLiability ? t('accounts:detail.current_debt') : t('accounts:detail.balance')}
           </p>
           <MoneyDisplay
             amount={account.balance}
@@ -90,48 +83,61 @@ export default function AccountDetailPage() {
             className="mt-1 block text-xl font-semibold"
           />
           <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-            期初 + 已入账分录 · 共 {account.entryCount ?? 0} 条分录
+            {t('accounts:detail.balance_hint', { count: account.entryCount ?? 0 })}
           </p>
         </div>
 
         <div className="card p-4">
-          <p className="text-xs text-[var(--color-content-muted)]">期初余额</p>
+          <p className="text-xs text-[var(--color-content-muted)]">
+            {t('accounts:detail.opening_balance')}
+          </p>
           <MoneyDisplay
             amount={account.openingBalance}
             currency={account.currency}
             className="mt-1 block text-lg font-medium"
           />
           <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-            基准日 {account.openingBalanceDate.slice(0, 10)}
+            {t('accounts:detail.opening_date', { date: formatDate(account.openingBalanceDate) })}
           </p>
         </div>
 
         <div className="card p-4">
-          <p className="text-xs text-[var(--color-content-muted)]">机构</p>
+          <p className="text-xs text-[var(--color-content-muted)]">
+            {t('accounts:detail.institution')}
+          </p>
           <p className="mt-1 text-lg font-medium">{account.institution ?? '—'}</p>
-          <p className="mt-1 text-xs text-[var(--color-content-muted)]">币种 {account.currency}</p>
+          <p className="mt-1 text-xs text-[var(--color-content-muted)]">
+            {t('accounts:detail.currency_label', { currency: account.currency })}
+          </p>
         </div>
       </div>
 
       <section className="card p-4">
-        <h2 className="mb-3 text-sm font-medium">余额走势</h2>
-        {historyQuery.isLoading && <LoadingState label="加载余额历史…" />}
+        <h2 className="mb-3 text-sm font-medium">{t('accounts:detail.history')}</h2>
+        {historyQuery.isLoading && <LoadingState label={t('accounts:detail.history_loading')} />}
         {historyQuery.data && <BalanceSparkline series={historyQuery.data.series} />}
         <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-          {historyQuery.data?.basis} · 区间 {range.from} 至 {range.to} ·{' '}
-          {historyQuery.data?.granularity === 'day' ? '按日' : '按月'}
+          {t('accounts:detail.history_range', {
+            basis: historyQuery.data?.basis ?? '',
+            from: formatDate(range.from),
+            to: formatDate(range.to),
+            granularity:
+              historyQuery.data?.granularity === 'day'
+                ? t('accounts:detail.granularity.day')
+                : t('accounts:detail.granularity.month'),
+          })}
         </p>
       </section>
 
       <section className="card overflow-hidden">
         <h2 className="border-b border-[var(--color-border-subtle)] px-4 py-3 text-sm font-medium">
-          账户流水
+          {t('accounts:detail.transactions')}
         </h2>
 
         {txQuery.isLoading && <LoadingState />}
         {txQuery.data && txQuery.data.transactions.length === 0 && (
           <p className="px-4 py-8 text-center text-sm text-[var(--color-content-muted)]">
-            暂无流水。记账后这里会显示该账户的资金变动。
+            {t('accounts:detail.transactions_empty')}
           </p>
         )}
         {txQuery.data && txQuery.data.transactions.length > 0 && (
@@ -143,9 +149,9 @@ export default function AccountDetailPage() {
                     {tx.description}
                   </p>
                   <p className="text-xs text-[var(--color-content-muted)]">
-                    {tx.occurredAt.slice(0, 10)} · {TRANSACTION_TYPE_LABELS[tx.type] ?? tx.type}
+                    {formatDate(tx.occurredAt)} · {transactionType(tx.type)}
                     {tx.category && ` · ${tx.category.name}`}
-                    {tx.status === 'voided' && ' · 已冲正'}
+                    {tx.status === 'voided' && t('transactions:detail.voided_suffix')}
                   </p>
                 </div>
                 <MoneyDisplay
@@ -173,8 +179,10 @@ export default function AccountDetailPage() {
 }
 
 function BalanceSparkline({ series }: { series: Array<{ period: string; balance: string }> }) {
+  const { t } = useTranslation('accounts');
+
   if (series.length < 2) {
-    return <p className="text-sm text-[var(--color-content-muted)]">数据不足以绘制趋势</p>;
+    return <p className="text-sm text-[var(--color-content-muted)]">{t('detail.history_insufficient')}</p>;
   }
 
   const values = series.map((point) => Number(point.balance));
@@ -196,7 +204,12 @@ function BalanceSparkline({ series }: { series: Array<{ period: string; balance:
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-32 w-full min-w-[320px]" role="img" aria-label="余额走势图">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-32 w-full min-w-[320px]"
+        role="img"
+        aria-label={t('detail.history_aria')}
+      >
         <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2" />
       </svg>
       <div className="flex justify-between text-xs text-[var(--color-content-muted)]">
@@ -218,6 +231,7 @@ function ReconcileSection({
   reconciliations: Reconciliation[];
   onChanged: () => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [statementBalance, setStatementBalance] = useState('');
   const [reconciledAt, setReconciledAt] = useState(new Date().toISOString().slice(0, 10));
@@ -239,24 +253,27 @@ function ReconcileSection({
       setError(null);
       setResult(
         data.suggestion
-          ? `对账已记录，差异 ${data.reconciliation.difference}。${data.suggestion}`
-          : '对账一致，差异为 0。',
+          ? t('accounts:detail.reconciliation.result_with_diff', {
+              difference: formatNumber(data.reconciliation.difference),
+              suggestion: data.suggestion,
+            })
+          : t('accounts:detail.reconciliation.result_matched'),
       );
       onChanged();
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '对账失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   return (
     <section className="card p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-medium">对账记录</h2>
+        <h2 className="text-sm font-medium">{t('accounts:detail.reconciliation.title')}</h2>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
           className="text-sm text-[var(--color-accent)]"
         >
-          {open ? '取消' : '新建对账'}
+          {open ? t('common:actions.cancel') : t('accounts:detail.reconciliation.new')}
         </button>
       </div>
 
@@ -276,7 +293,9 @@ function ReconcileSection({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--color-content-muted)]">对账单余额</span>
+              <span className="mb-1 block text-[var(--color-content-muted)]">
+                {t('accounts:detail.reconciliation.statement_balance')}
+              </span>
               <input
                 required
                 inputMode="decimal"
@@ -286,7 +305,9 @@ function ReconcileSection({
               />
             </label>
             <label className="block text-sm">
-              <span className="mb-1 block text-[var(--color-content-muted)]">对账日期</span>
+              <span className="mb-1 block text-[var(--color-content-muted)]">
+                {t('accounts:detail.reconciliation.reconciled_at')}
+              </span>
               <input
                 required
                 type="date"
@@ -298,12 +319,14 @@ function ReconcileSection({
           </div>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--color-content-muted)]">备注（可选）</span>
+            <span className="mb-1 block text-[var(--color-content-muted)]">
+              {t('accounts:detail.reconciliation.note_optional')}
+            </span>
             <input maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} className="input" />
           </label>
 
           <p className="text-xs text-[var(--color-content-muted)]">
-            对账只记录差异，不会自动修改账户余额。如需修正，请创建一笔余额调整交易。
+            {t('accounts:detail.reconciliation.hint')}
           </p>
 
           {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
@@ -313,23 +336,31 @@ function ReconcileSection({
             disabled={mutation.isPending}
             className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {mutation.isPending ? '提交中…' : '保存对账'}
+            {mutation.isPending
+              ? t('accounts:detail.reconciliation.saving')
+              : t('accounts:detail.reconciliation.submit')}
           </button>
         </form>
       )}
 
       {reconciliations.length === 0 ? (
-        <p className="text-sm text-[var(--color-content-muted)]">暂无对账记录</p>
+        <p className="text-sm text-[var(--color-content-muted)]">
+          {t('accounts:detail.reconciliation.empty')}
+        </p>
       ) : (
         <ul className="divide-y divide-[var(--color-border-subtle)]">
           {reconciliations.map((record) => (
             <li key={record.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-              <span className="text-[var(--color-content-muted)]">{record.reconciledAt.slice(0, 10)}</span>
               <span className="text-[var(--color-content-muted)]">
-                对账单 <MoneyDisplay amount={record.statementBalance} currency={currency} />
+                {formatDate(record.reconciledAt)}
+              </span>
+              <span className="text-[var(--color-content-muted)]">
+                {t('accounts:detail.reconciliation.statement_prefix')}{' '}
+                <MoneyDisplay amount={record.statementBalance} currency={currency} />
               </span>
               <span className={Number(record.difference) === 0 ? 'text-[var(--color-positive)]' : 'text-[var(--color-negative)]'}>
-                差异 <MoneyDisplay amount={record.difference} currency={currency} />
+                {t('accounts:detail.reconciliation.difference_prefix')}{' '}
+                <MoneyDisplay amount={record.difference} currency={currency} />
               </span>
             </li>
           ))}

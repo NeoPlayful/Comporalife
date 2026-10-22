@@ -1,18 +1,14 @@
 import { accountsApi, type Account } from '@/lib/accounts';
 import { categoriesApi, type FlatCategory } from '@/lib/categories';
-import { ApiError } from '@/lib/client';
+import { translateError } from '@/lib/error-message';
 import { transactionsApi, transfersApi } from '@/lib/transactions';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 type FormType = 'expense' | 'income' | 'transfer' | 'adjustment';
 
-const TYPE_OPTIONS: Array<{ value: FormType; label: string }> = [
-  { value: 'expense', label: '支出' },
-  { value: 'income', label: '收入' },
-  { value: 'transfer', label: '转账' },
-  { value: 'adjustment', label: '余额调整' },
-];
+const TYPE_OPTIONS: FormType[] = ['expense', 'income', 'transfer', 'adjustment'];
 
 export default function TransactionForm({
   onClose,
@@ -22,6 +18,7 @@ export default function TransactionForm({
   onSaved: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [type, setType] = useState<FormType>('expense');
   const [accountId, setAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
@@ -88,7 +85,7 @@ export default function TransactionForm({
       onSaved();
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : '保存失败');
+      setError(translateError(err, t));
     },
   });
 
@@ -106,10 +103,15 @@ export default function TransactionForm({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <button type="button" className="absolute inset-0 bg-black/50" onClick={onClose} aria-label="关闭" />
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        onClick={onClose}
+        aria-label={t('common:actions.close')}
+      />
 
       <div className="card relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-b-none p-5 sm:rounded-xl">
-        <h2 className="mb-4 text-base font-medium">新增交易</h2>
+        <h2 className="mb-4 text-base font-medium">{t('transactions:form.title')}</h2>
 
         <form
           onSubmit={(e) => {
@@ -121,23 +123,31 @@ export default function TransactionForm({
           <div className="grid grid-cols-4 gap-1 rounded-lg bg-black/5 p-1 dark:bg-white/5">
             {TYPE_OPTIONS.map((option) => (
               <button
-                key={option.value}
+                key={option}
                 type="button"
-                onClick={() => setType(option.value)}
+                onClick={() => setType(option)}
                 className={`rounded-md px-2 py-1.5 text-sm transition-colors ${
-                  type === option.value
+                  type === option
                     ? 'bg-[var(--color-surface-raised)] font-medium text-[var(--color-content)]'
                     : 'text-[var(--color-content-muted)]'
                 }`}
               >
-                {option.label}
+                {t(`transactions:form.types.${option}`)}
               </button>
             ))}
           </div>
 
-          <Field label={type === 'transfer' ? '转出账户' : '账户'}>
+          <Field
+            label={
+              type === 'transfer'
+                ? t('transactions:form.from_account')
+                : t('transactions:form.account')
+            }
+          >
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="input">
-              {accounts.length === 0 && <option value="">请先创建账户</option>}
+              {accounts.length === 0 && (
+                <option value="">{t('transactions:form.create_account_first')}</option>
+              )}
               {accounts.map((account: Account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}（{account.currency}）
@@ -147,13 +157,13 @@ export default function TransactionForm({
           </Field>
 
           {type === 'transfer' && (
-            <Field label="转入账户">
+            <Field label={t('transactions:form.to_account')}>
               <select
                 value={toAccountId}
                 onChange={(e) => setToAccountId(e.target.value)}
                 className="input"
               >
-                <option value="">请选择</option>
+                <option value="">{t('transactions:form.select_account')}</option>
                 {accounts
                   .filter((account) => account.id !== accountId)
                   .map((account) => (
@@ -164,20 +174,26 @@ export default function TransactionForm({
               </select>
               {currencyMismatch && (
                 <span className="mt-1 block text-xs text-[var(--color-negative)]">
-                  当前版本不支持跨币种转账
+                  {t('transactions:form.cross_currency_unsupported')}
                 </span>
               )}
             </Field>
           )}
 
           {type !== 'transfer' && (
-            <Field label={type === 'adjustment' ? '调整分类（必填）' : '分类'}>
+            <Field
+              label={
+                type === 'adjustment'
+                  ? t('transactions:form.adjustment_category')
+                  : t('transactions:form.category')
+              }
+            >
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="input"
               >
-                <option value="">未分类</option>
+                <option value="">{t('transactions:form.uncategorized')}</option>
                 {categories.map((category: FlatCategory) => (
                   <option key={category.id} value={category.id}>
                     {category.parentId ? '　' : ''}
@@ -189,7 +205,7 @@ export default function TransactionForm({
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label={`金额（${accountCurrency}）`}>
+            <Field label={t('transactions:form.amount', { currency: accountCurrency })}>
               <input
                 required
                 inputMode="decimal"
@@ -200,7 +216,7 @@ export default function TransactionForm({
               />
             </Field>
 
-            <Field label="日期">
+            <Field label={t('transactions:form.date')}>
               <input
                 required
                 type="date"
@@ -211,19 +227,23 @@ export default function TransactionForm({
             </Field>
           </div>
 
-          <Field label="摘要">
+          <Field label={t('transactions:form.description')}>
             <input
               required
               maxLength={200}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={type === 'transfer' ? '留空则自动生成' : '例如：午餐'}
+              placeholder={
+                type === 'transfer'
+                  ? t('transactions:form.transfer_description_placeholder')
+                  : t('transactions:form.description_placeholder')
+              }
               className="input"
             />
           </Field>
 
           {type !== 'transfer' && (
-            <Field label="商户（可选）">
+            <Field label={t('transactions:form.merchant')}>
               <input
                 maxLength={100}
                 value={merchant}
@@ -233,13 +253,13 @@ export default function TransactionForm({
             </Field>
           )}
 
-          <Field label="备注（可选）">
+          <Field label={t('transactions:form.note')}>
             <input maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} className="input" />
           </Field>
 
           {type === 'adjustment' && (
             <p className="text-xs text-[var(--color-content-muted)]">
-              余额调整会生成一笔带外部对手方的调整交易，用于把账户余额校正到实际值。
+              {t('transactions:form.adjustment_hint')}
             </p>
           )}
 
@@ -255,14 +275,14 @@ export default function TransactionForm({
               onClick={onClose}
               className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
             >
-              取消
+              {t('transactions:form.cancel')}
             </button>
             <button
               type="submit"
               disabled={!canSubmit || saveMutation.isPending}
               className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
             >
-              {saveMutation.isPending ? '保存中…' : '保存'}
+              {saveMutation.isPending ? t('transactions:form.saving') : t('transactions:form.save')}
             </button>
           </div>
         </form>

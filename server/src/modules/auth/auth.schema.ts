@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SUPPORTED_LANGUAGES } from '../../config/constants.js';
 
 export const passwordSchema = z
   .string()
@@ -11,6 +12,8 @@ export const registerSchema = z.object({
   email: z.string().email('邮箱格式不正确').max(255),
   password: passwordSchema,
   nickname: z.string().trim().min(1, '昵称不能为空').max(50, '昵称最多 50 个字符'),
+  // 决定注册时生成的系统分类名称，未传时按默认中文
+  language: z.enum(SUPPORTED_LANGUAGES).optional(),
 });
 
 export const loginSchema = z.object({

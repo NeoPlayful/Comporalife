@@ -1,14 +1,17 @@
 import { authApi } from '@/lib/auth';
-import { ApiError } from '@/lib/client';
+import { translateError } from '@/lib/error-message';
+import { formatDateTime } from '@/lib/format';
 import LoadingState from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/stores/auth-store';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function ProfilePage() {
   const user = useAuthStore((state) => state.user);
   const clear = useAuthStore((state) => state.clear);
   const queryClient = useQueryClient();
+  const { t } = useTranslation('settings');
 
   const [nickname, setNickname] = useState(user?.nickname ?? '');
   const [message, setMessage] = useState<string | null>(null);
@@ -25,13 +28,13 @@ export default function ProfilePage() {
   const updateProfile = useMutation({
     mutationFn: () => authApi.updateProfile({ nickname }),
     onSuccess: () => {
-      setMessage('昵称已更新');
+      setMessage(t('profile.nickname_updated'));
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
     },
     onError: (err) => {
       setMessage(null);
-      setError(err instanceof ApiError ? err.message : '保存失败');
+      setError(translateError(err, t));
     },
   });
 
@@ -46,7 +49,7 @@ export default function ProfilePage() {
       window.location.assign('/login');
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : '修改失败');
+      setError(translateError(err, t));
     },
   });
 
@@ -62,7 +65,7 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      <h1 className="text-xl font-semibold">个人资料</h1>
+      <h1 className="text-xl font-semibold">{t('profile.title')}</h1>
 
       {(message || error) && (
         <p
@@ -78,11 +81,13 @@ export default function ProfilePage() {
       )}
 
       <section className="card space-y-4 p-5">
-        <h2 className="text-sm font-medium">基本信息</h2>
+        <h2 className="text-sm font-medium">{t('profile.basic')}</h2>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--color-content-muted)]">邮箱</span>
+            <span className="mb-1 block text-[var(--color-content-muted)]">
+              {t('profile.email')}
+            </span>
             <input
               value={user?.email ?? ''}
               readOnly
@@ -91,7 +96,9 @@ export default function ProfilePage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--color-content-muted)]">昵称</span>
+            <span className="mb-1 block text-[var(--color-content-muted)]">
+              {t('profile.nickname')}
+            </span>
             <input
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
@@ -107,19 +114,19 @@ export default function ProfilePage() {
           disabled={updateProfile.isPending || nickname.trim().length === 0}
           className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {updateProfile.isPending ? '保存中…' : '保存'}
+          {updateProfile.isPending ? t('profile.saving') : t('profile.save')}
         </button>
       </section>
 
       <section className="card space-y-4 p-5">
-        <h2 className="text-sm font-medium">修改密码</h2>
-        <p className="text-xs text-[var(--color-content-muted)]">
-          修改后其他设备上的登录会立即失效，你需要重新登录。
-        </p>
+        <h2 className="text-sm font-medium">{t('profile.password.title')}</h2>
+        <p className="text-xs text-[var(--color-content-muted)]">{t('profile.password.hint')}</p>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--color-content-muted)]">当前密码</span>
+            <span className="mb-1 block text-[var(--color-content-muted)]">
+              {t('profile.password.current')}
+            </span>
             <input
               type="password"
               autoComplete="current-password"
@@ -130,7 +137,9 @@ export default function ProfilePage() {
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-[var(--color-content-muted)]">新密码</span>
+            <span className="mb-1 block text-[var(--color-content-muted)]">
+              {t('profile.password.new')}
+            </span>
             <input
               type="password"
               autoComplete="new-password"
@@ -147,24 +156,24 @@ export default function ProfilePage() {
           disabled={changePassword.isPending || !oldPassword || newPassword.length < 8}
           className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm disabled:opacity-60"
         >
-          {changePassword.isPending ? '提交中…' : '修改密码'}
+          {changePassword.isPending ? t('profile.password.submitting') : t('profile.password.submit')}
         </button>
       </section>
 
       <section className="card space-y-4 p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">登录会话</h2>
+          <h2 className="text-sm font-medium">{t('profile.sessions.title')}</h2>
           <button
             type="button"
             onClick={() => revokeOthers.mutate()}
             disabled={revokeOthers.isPending}
             className="text-sm text-[var(--color-content-muted)] hover:text-[var(--color-negative)]"
           >
-            退出其他设备
+            {t('profile.sessions.revoke_others')}
           </button>
         </div>
 
-        {sessionsQuery.isLoading && <LoadingState label="加载会话…" />}
+        {sessionsQuery.isLoading && <LoadingState label={t('profile.sessions.loading')} />}
 
         {sessionsQuery.data && (
           <ul className="divide-y divide-[var(--color-border-subtle)]">
@@ -172,16 +181,18 @@ export default function ProfilePage() {
               <li key={session.id} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm">
-                    {session.userAgent ?? '未知设备'}
+                    {session.userAgent ?? t('profile.sessions.unknown_device')}
                     {session.current && (
                       <span className="ml-2 rounded bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-xs text-[var(--color-accent)]">
-                        当前
+                        {t('profile.sessions.current_badge')}
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-[var(--color-content-muted)]">
-                    {session.ip ?? '未记录 IP'} · 最近使用{' '}
-                    {new Date(session.lastUsedAt ?? session.createdAt).toLocaleString('zh-CN')}
+                    {session.ip ?? t('profile.sessions.no_ip')} ·{' '}
+                    {t('profile.sessions.last_used', {
+                      time: formatDateTime(session.lastUsedAt ?? session.createdAt),
+                    })}
                   </p>
                 </div>
 
@@ -191,7 +202,7 @@ export default function ProfilePage() {
                     onClick={() => revokeSession.mutate(session.id)}
                     className="shrink-0 text-sm text-[var(--color-content-muted)] hover:text-[var(--color-negative)]"
                   >
-                    撤销
+                    {t('profile.sessions.revoke')}
                   </button>
                 )}
               </li>
