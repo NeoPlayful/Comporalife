@@ -1,0 +1,97 @@
+{
+  "title": "预算",
+  "description": "给每个周期设定支出上限，并跟踪执行进度",
+  "period": {
+    "label": "预算周期",
+    "monthly": "月度",
+    "yearly": "年度",
+    "previous": "上一周期",
+    "next": "下一周期",
+    "current": "当前周期",
+    "year": "年份",
+    "month": "月份"
+  },
+  "summary": {
+    "available": "可用额度",
+    "spent": "已花费",
+    "remaining": "剩余",
+    "carry_in": "上月结转",
+    "carry_out": "将结转",
+    "usage": "使用率 {{value}}",
+    "no_total": "未设置总预算",
+    "no_total_hint": "设置总预算后可跟踪整体执行情况"
+  },
+  "status": {
+    "ok": "正常",
+    "warning": "接近上限",
+    "exceeded": "已超额",
+    "unknown": "数据不完整"
+  },
+  "items": {
+    "title": "分类额度",
+    "category": "分类",
+    "amount": "额度",
+    "spent": "已花费",
+    "remaining": "剩余",
+    "add": "添加分类额度",
+    "empty": "还没有分类额度",
+    "empty_hint": "为常用支出分类设定额度，预算才能给出有意义的提示。",
+    "child_note": "含 {{count}} 个子分类"
+  },
+  "uncategorized": {
+    "title": "未分类支出 {{amount}}",
+    "hint": "未分类支出计入总预算，但不计入任何分类额度。",
+    "action": "去分类"
+  },
+  "alerts": {
+    "title": "预算预警",
+    "total_scope": "总预算",
+    "empty": "当前周期没有预警"
+  },
+  "carryover": {
+    "title": "结转说明",
+    "body": "本周期结转自最近 {{count}} 个开启结转的周期，只累计正结余。",
+    "truncated": "结转最多回溯 12 个周期，更早的结余已不再累计。",
+    "disabled": "本周期未开启结转"
+  },
+  "form": {
+    "create": "新建预算",
+    "edit": "编辑额度",
+    "total_amount": "总预算额度",
+    "total_amount_hint": "留空表示只跟踪分类额度",
+    "rollover": "结转到下一周期",
+    "rollover_hint": "只结转正结余，超支不会透支下期额度",
+    "rollover_yearly_disabled": "年度预算不支持结转",
+    "note": "备注",
+    "category": "分类",
+    "amount": "额度",
+    "select_category": "选择支出分类",
+    "add_item": "添加一项",
+    "remove_item": "移除",
+    "save": "保存",
+    "saving": "保存中…",
+    "cancel": "取消",
+    "confirm_delete": "确认删除该预算？",
+    "delete_hint": "删除预算不会影响任何交易记录。"
+  },
+  "copy": {
+    "action": "复制到下一周期",
+    "success": "已复制到 {{period}}",
+    "exists": "目标周期已存在预算"
+  },
+  "empty_title": "还没有预算",
+  "empty_description": "创建第一个预算，为这个月的支出设定上限。",
+  "empty_action": "创建预算",
+  "not_found_title": "该周期还没有预算",
+  "not_found_description": "可以为这个周期创建预算，或从上一周期复制。",
+  "load_failed": "预算加载失败",
+  "save_failed": "保存失败",
+  "errors": {
+    "BUDGET_PERIOD_EXISTS": "该周期的预算已存在",
+    "BUDGET_ITEM_INVALID": "分类额度无效",
+    "BUDGET_CATEGORY_CONFLICT": "同一预算内不能同时为父子分类设置额度",
+    "BUDGET_ROLLOVER_UNSUPPORTED": "年度预算不支持结转",
+    "BUDGET_ARCHIVED": "预算已归档，无法修改",
+    "BUDGET_NOT_FOUND": "预算不存在"
+  }
+}

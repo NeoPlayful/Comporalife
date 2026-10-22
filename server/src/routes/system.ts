@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
+import { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_MAX_SERIES_POINTS } from '../config/constants.js';
 import { env } from '../config/env.js';
 import { ok } from '../lib/api-utils.js';
 
@@ -15,7 +16,7 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-1';
+const PHASE = 'phase-3';
 
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断
@@ -69,14 +70,20 @@ export default async function systemRoutes(app: FastifyInstance) {
           'import-templates',
           'classification-rules',
           'transfer-matching',
+          'analytics',
+          'budgets',
         ],
-        planned: ['budgets', 'portfolios', 'monte-carlo', 'goals', 'reports', 'admin'],
+        planned: ['portfolios', 'monte-carlo', 'goals', 'reports', 'admin'],
         baseCurrencyDefault: env.DEFAULT_CURRENCY,
         maxSimulationYears: 100,
         importLimits: {
           maxFileMb: env.IMPORT_MAX_FILE_MB,
           maxRows: env.IMPORT_MAX_ROWS,
           formats: ['csv', 'xlsx'],
+        },
+        analyticsLimits: {
+          maxRangeDays: ANALYTICS_MAX_RANGE_DAYS,
+          maxSeriesPoints: ANALYTICS_MAX_SERIES_POINTS,
         },
       },
       request.id,

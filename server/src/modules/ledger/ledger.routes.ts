@@ -41,6 +41,17 @@ export default async function ledgerRoutes(app: FastifyInstance) {
       ...(query.status === 'all' ? {} : { status: query.status }),
       ...(query.type ? { type: query.type } : {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      // 未分类下钻只针对收入与支出；转账与调整本就没有分类
+      ...(query.uncategorized
+        ? {
+            categoryId: null,
+            type: { in: ['income', 'expense'] as Array<'income' | 'expense'> },
+          }
+        : {}),
+      ...(query.source ? { source: query.source } : {}),
+      ...(query.merchant
+        ? { merchant: { contains: query.merchant, mode: 'insensitive' as const } }
+        : {}),
       ...(query.from || query.to
         ? {
             occurredAt: {

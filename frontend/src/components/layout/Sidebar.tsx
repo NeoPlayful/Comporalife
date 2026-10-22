@@ -1,10 +1,12 @@
 import { useUiStore } from '@/stores/ui-store';
 import {
   ArrowLeftRight,
+  BarChart3,
   Calculator,
   LayoutDashboard,
   Settings,
   Tags,
+  Target,
   Upload,
   Wallet,
 } from 'lucide-react';
@@ -16,6 +18,8 @@ const NAV_ITEMS = [
   { to: '/accounts', key: 'accounts', icon: Wallet },
   { to: '/transactions', key: 'transactions', icon: ArrowLeftRight },
   { to: '/imports', key: 'imports', icon: Upload },
+  { to: '/analytics', key: 'analytics', icon: BarChart3 },
+  { to: '/budgets', key: 'budgets', icon: Target },
   { to: '/categories', key: 'categories', icon: Tags },
   { to: '/compound', key: 'compound', icon: Calculator },
   { to: '/settings', key: 'settings', icon: Settings },

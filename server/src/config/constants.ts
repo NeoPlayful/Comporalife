@@ -121,3 +121,36 @@ export const IMPORT_DATE_FORMATS = [
 ] as const;
 
 export const IMPORT_AMOUNT_MODES = ['signed', 'debitCredit'] as const;
+
+// ===== 收支分析与预算 =====
+
+/** 单次分析区间上限，保证内存聚合可控 */
+export const ANALYTICS_MAX_RANGE_DAYS = 1826;
+
+/** 时间序列点数上限，超出自动降级粒度 */
+export const ANALYTICS_MAX_SERIES_POINTS = 400;
+
+/** 周期识别默认回溯月份 */
+export const ANALYTICS_DEFAULT_LOOKBACK_MONTHS = 24;
+export const ANALYTICS_MIN_LOOKBACK_MONTHS = 6;
+export const ANALYTICS_MAX_LOOKBACK_MONTHS = 24;
+
+/** 周期识别最少出现次数 */
+export const RECURRING_MIN_OCCURRENCES = 3;
+
+/** 大额支出：笔数低于该值时 P95 不稳定，改用中位数倍数 */
+export const LARGE_EXPENSE_MIN_SAMPLES = 20;
+export const LARGE_EXPENSE_MEDIAN_MULTIPLE = 3;
+
+/** 预算：使用率达到该比例即预警 */
+export const BUDGET_WARNING_RATIO = 0.8;
+
+/** 预算结转最多回溯的周期数 */
+export const BUDGET_CARRYOVER_MAX_PERIODS = 12;
+
+/** 单个预算最多分类额度数 */
+export const BUDGET_MAX_ITEMS = 50;
+
+export const BUDGET_PERIOD_TYPES = ['monthly', 'yearly'] as const;
+export const BUDGET_STATUSES = ['active', 'archived'] as const;
+export const ANALYTICS_GRANULARITIES = ['day', 'week', 'month'] as const;

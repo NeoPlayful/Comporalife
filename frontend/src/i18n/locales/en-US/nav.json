@@ -2,6 +2,8 @@
   "dashboard": "Dashboard",
   "accounts": "Accounts",
   "transactions": "Transactions",
+  "analytics": "Analytics",
+  "budgets": "Budgets",
   "imports": "Imports",
   "categories": "Categories",
   "compound": "Compounding",

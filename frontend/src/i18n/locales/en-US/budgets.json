@@ -1,0 +1,97 @@
+{
+  "title": "Budgets",
+  "description": "Set spending limits per period and track progress",
+  "period": {
+    "label": "Budget period",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "previous": "Previous period",
+    "next": "Next period",
+    "current": "Current period",
+    "year": "Year",
+    "month": "Month"
+  },
+  "summary": {
+    "available": "Available",
+    "spent": "Spent",
+    "remaining": "Remaining",
+    "carry_in": "Carried in",
+    "carry_out": "Carries out",
+    "usage": "{{value}} used",
+    "no_total": "No total budget",
+    "no_total_hint": "Set a total budget to track overall progress"
+  },
+  "status": {
+    "ok": "On track",
+    "warning": "Near limit",
+    "exceeded": "Over budget",
+    "unknown": "Incomplete data"
+  },
+  "items": {
+    "title": "Category limits",
+    "category": "Category",
+    "amount": "Limit",
+    "spent": "Spent",
+    "remaining": "Remaining",
+    "add": "Add category limit",
+    "empty": "No category limits yet",
+    "empty_hint": "Set limits on the categories you spend from most; that is when budgets become useful.",
+    "child_note": "Includes {{count}} subcategories"
+  },
+  "uncategorized": {
+    "title": "Uncategorized spending {{amount}}",
+    "hint": "Uncategorized spending counts toward the total budget but not toward any category limit.",
+    "action": "Categorize"
+  },
+  "alerts": {
+    "title": "Budget alerts",
+    "total_scope": "Total budget",
+    "empty": "No alerts this period"
+  },
+  "carryover": {
+    "title": "Carryover",
+    "body": "This period carries over from the last {{count}} period(s) with rollover enabled; only positive remainders carry.",
+    "truncated": "Carryover looks back at most 12 periods; older remainders are no longer counted.",
+    "disabled": "Rollover is off for this period"
+  },
+  "form": {
+    "create": "New budget",
+    "edit": "Edit limits",
+    "total_amount": "Total budget",
+    "total_amount_hint": "Leave empty to track category limits only",
+    "rollover": "Roll over to next period",
+    "rollover_hint": "Only positive remainders carry; overspending never borrows from next period",
+    "rollover_yearly_disabled": "Yearly budgets do not support rollover",
+    "note": "Note",
+    "category": "Category",
+    "amount": "Limit",
+    "select_category": "Select an expense category",
+    "add_item": "Add a row",
+    "remove_item": "Remove",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "confirm_delete": "Delete this budget?",
+    "delete_hint": "Deleting a budget does not affect any transactions."
+  },
+  "copy": {
+    "action": "Copy to next period",
+    "success": "Copied to {{period}}",
+    "exists": "A budget already exists for that period"
+  },
+  "empty_title": "No budgets yet",
+  "empty_description": "Create your first budget to cap this month's spending.",
+  "empty_action": "Create budget",
+  "not_found_title": "No budget for this period",
+  "not_found_description": "Create one for this period, or copy it from the previous one.",
+  "load_failed": "Failed to load budgets",
+  "save_failed": "Failed to save",
+  "errors": {
+    "BUDGET_PERIOD_EXISTS": "A budget already exists for this period",
+    "BUDGET_ITEM_INVALID": "Invalid category limit",
+    "BUDGET_CATEGORY_CONFLICT": "A budget cannot include both a category and its parent",
+    "BUDGET_ROLLOVER_UNSUPPORTED": "Yearly budgets do not support rollover",
+    "BUDGET_ARCHIVED": "This budget is archived and cannot be changed",
+    "BUDGET_NOT_FOUND": "Budget not found"
+  }
+}
