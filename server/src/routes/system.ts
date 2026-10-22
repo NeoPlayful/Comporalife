@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
-import { ANALYTICS_MAX_RANGE_DAYS, ANALYTICS_MAX_SERIES_POINTS } from '../config/constants.js';
+import {
+  ANALYTICS_MAX_RANGE_DAYS,
+  ANALYTICS_MAX_SERIES_POINTS,
+  INVESTMENT_MAX_CASHFLOWS,
+  INVESTMENT_MAX_SERIES_POINTS,
+  INVESTMENT_PRICE_STALE_DAYS,
+} from '../config/constants.js';
 import { env } from '../config/env.js';
 import { ok } from '../lib/api-utils.js';
 
@@ -16,7 +22,7 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-3';
+const PHASE = 'phase-4';
 
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断
@@ -72,8 +78,10 @@ export default async function systemRoutes(app: FastifyInstance) {
           'transfer-matching',
           'analytics',
           'budgets',
+          'portfolios',
+          'instruments',
         ],
-        planned: ['portfolios', 'monte-carlo', 'goals', 'reports', 'admin'],
+        planned: ['monte-carlo', 'goals', 'reports', 'admin'],
         baseCurrencyDefault: env.DEFAULT_CURRENCY,
         maxSimulationYears: 100,
         importLimits: {
@@ -84,6 +92,11 @@ export default async function systemRoutes(app: FastifyInstance) {
         analyticsLimits: {
           maxRangeDays: ANALYTICS_MAX_RANGE_DAYS,
           maxSeriesPoints: ANALYTICS_MAX_SERIES_POINTS,
+        },
+        investmentLimits: {
+          priceStaleDays: INVESTMENT_PRICE_STALE_DAYS,
+          maxSeriesPoints: INVESTMENT_MAX_SERIES_POINTS,
+          maxCashflows: INVESTMENT_MAX_CASHFLOWS,
         },
       },
       request.id,

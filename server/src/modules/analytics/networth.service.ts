@@ -4,16 +4,21 @@ import { LIABILITY_ACCOUNT_TYPES } from '../../config/constants.js';
 import { roundMoney, toDecimal } from '../../lib/money.js';
 import { convertMany } from '../currencies/currency.service.js';
 import { computeBalances } from '../accounts/balance.service.js';
+import { loadAllPortfolioValuations } from '../portfolios/valuation.service.js';
 
 export interface NetWorthResult {
   totalAssets: Decimal;
   totalLiabilities: Decimal;
   netWorth: Decimal;
+  /** 证券市值（已折算基准币种），不含证券账户现金 */
+  securitiesValue: Decimal;
   baseCurrency: string;
   asOf: Date;
   missingPairs: string[];
   rateDates: string[];
   excludedAccounts: Array<{ id: string; name: string; currency: string; reason: string }>;
+  staleValuations: Array<{ portfolioId: string; name: string; priceDate: string | null }>;
+  unpriced: Array<{ portfolioId: string; name: string; symbols: string[] }>;
 }
 
 const LIABILITY_TYPES = new Set<string>(LIABILITY_ACCOUNT_TYPES);
@@ -53,7 +58,18 @@ export async function computeNetWorth(
     }
   }
 
-  const [assetConversion, liabilityConversion] = await Promise.all([
+  // 证券市值是净资产里的增量部分：证券账户的现金已经计入账户余额，
+  // 这里只加持仓市值，绝不再加组合现金
+  const portfolioValuations = await loadAllPortfolioValuations(prisma, {
+    userId: params.userId,
+    asOf: params.asOf,
+  });
+
+  const securitiesItems = portfolioValuations
+    .filter((item) => item.marketValue.gt(0))
+    .map((item) => ({ amount: item.marketValue, currency: item.currency }));
+
+  const [assetConversion, liabilityConversion, securitiesConversion] = await Promise.all([
     convertMany(prisma, {
       userId: params.userId,
       baseCurrency: params.baseCurrency,
@@ -66,9 +82,21 @@ export async function computeNetWorth(
       asOf: params.asOf,
       items: liabilityItems,
     }),
+    convertMany(prisma, {
+      userId: params.userId,
+      baseCurrency: params.baseCurrency,
+      asOf: params.asOf,
+      items: securitiesItems,
+    }),
   ]);
 
-  const missingPairs = [...new Set([...assetConversion.missingPairs, ...liabilityConversion.missingPairs])];
+  const missingPairs = [
+    ...new Set([
+      ...assetConversion.missingPairs,
+      ...liabilityConversion.missingPairs,
+      ...securitiesConversion.missingPairs,
+    ]),
+  ];
   const missingCurrencies = new Set(missingPairs.map((pair) => pair.split('->')[0] ?? ''));
 
   // 明确列出被排除的账户，而不是只给一个币种对
@@ -81,14 +109,24 @@ export async function computeNetWorth(
       reason: `缺少 ${account.currency}→${params.baseCurrency} 汇率`,
     }));
 
+  const totalAssets = assetConversion.total.plus(securitiesConversion.total);
+
   return {
-    totalAssets: assetConversion.total,
+    totalAssets,
     totalLiabilities: liabilityConversion.total,
-    netWorth: roundMoney(assetConversion.total.minus(liabilityConversion.total)),
+    netWorth: roundMoney(totalAssets.minus(liabilityConversion.total)),
+    securitiesValue: securitiesConversion.total,
     baseCurrency: params.baseCurrency,
     asOf: params.asOf,
     missingPairs,
     rateDates: [params.asOf.toISOString().slice(0, 10)],
     excludedAccounts,
+    // 过期估值与无价标的必须显式暴露，不能让用户以为市值是实时的
+    staleValuations: portfolioValuations
+      .filter((item) => item.stale && item.marketValue.gt(0))
+      .map((item) => ({ portfolioId: item.portfolioId, name: item.name, priceDate: item.priceDate })),
+    unpriced: portfolioValuations
+      .filter((item) => item.missingSymbols.length > 0)
+      .map((item) => ({ portfolioId: item.portfolioId, name: item.name, symbols: item.missingSymbols })),
   };
 }

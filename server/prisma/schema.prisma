@@ -49,6 +49,7 @@ enum TransactionType {
   expense
   transfer
   adjustment
+  investment
 }
 
 enum TransactionStatus {
@@ -149,6 +150,13 @@ model User {
   classificationRules ClassificationRule[]
   budgets             Budget[]
   budgetItems         BudgetItem[]
+  instruments         Instrument[]
+  instrumentPrices    InstrumentPrice[]
+  portfolios          Portfolio[]
+  portfolioTrades     PortfolioTrade[]
+  portfolioCashflows  PortfolioCashflow[]
+  portfolioValuations PortfolioValuation[]
+  portfolioTargets    PortfolioTarget[]
 
   @@map("users")
 }
@@ -206,6 +214,7 @@ model Account {
   entries         TransactionEntry[]
   reconciliations AccountReconciliation[]
   importBatches   ImportBatch[]
+  portfolios      Portfolio[]
 
   @@index([userId, status])
   @@map("accounts")
@@ -550,4 +559,206 @@ model BudgetItem {
   @@unique([budgetId, categoryId])
   @@index([userId, categoryId])
   @@map("budget_items")
+}
+
+// ===== 投资 =====
+
+enum AssetClass {
+  stock
+  etf
+  fund
+  bond
+  cash
+  other
+}
+
+enum TradeKind {
+  buy
+  sell
+  dividend
+  interest
+  fee
+  tax
+}
+
+enum CostBasisMethod {
+  average
+}
+
+enum CashflowKind {
+  deposit
+  withdraw
+}
+
+enum PriceSource {
+  manual
+  imported
+  provider
+}
+
+enum ValuationSource {
+  computed
+  manual
+}
+
+enum PortfolioStatus {
+  active
+  archived
+}
+
+enum AllocationDimension {
+  asset_class
+  instrument
+  currency
+}
+
+model Instrument {
+  id         String     @id @default(uuid()) @db.Uuid
+  userId     String     @map("user_id") @db.Uuid
+  symbol     String
+  name       String
+  assetClass AssetClass @map("asset_class")
+  currency   String
+  note       String?
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prices InstrumentPrice[]
+  trades PortfolioTrade[]
+
+  @@unique([userId, symbol])
+  @@index([userId, assetClass])
+  @@map("instruments")
+}
+
+model InstrumentPrice {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String      @map("user_id") @db.Uuid
+  instrumentId String      @map("instrument_id") @db.Uuid
+  priceDate    DateTime    @map("price_date") @db.Date
+  price        Decimal     @db.Decimal(20, 8)
+  source       PriceSource @default(manual)
+  note         String?
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, priceDate])
+  @@index([instrumentId, priceDate(sort: Desc)])
+  @@index([userId])
+  @@map("instrument_prices")
+}
+
+model Portfolio {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  // 一个资金账户最多对应一个组合：组合价值含账户现金，共用账户会把现金算两次
+  accountId       String          @map("account_id") @db.Uuid
+  name            String
+  currency        String
+  costBasisMethod CostBasisMethod @default(average) @map("cost_basis_method")
+  status          PortfolioStatus @default(active)
+  note            String?
+  version         Int             @default(1)
+  archivedAt      DateTime?       @map("archived_at") @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account    Account              @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  trades     PortfolioTrade[]
+  cashflows  PortfolioCashflow[]
+  valuations PortfolioValuation[]
+  targets    PortfolioTarget[]
+
+  @@unique([userId, name])
+  @@unique([userId, accountId])
+  @@index([userId, status])
+  @@map("portfolios")
+}
+
+model PortfolioTrade {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  portfolioId   String    @map("portfolio_id") @db.Uuid
+  instrumentId  String?   @map("instrument_id") @db.Uuid
+  kind          TradeKind
+  tradeDate     DateTime  @map("trade_date") @db.Timestamptz(6)
+  quantity      Decimal?  @db.Decimal(24, 8)
+  price         Decimal?  @db.Decimal(20, 8)
+  amount        Decimal   @db.Decimal(20, 6)
+  fee           Decimal   @default(0) @db.Decimal(20, 6)
+  tax           Decimal   @default(0) @db.Decimal(20, 6)
+  transactionId String?   @map("transaction_id") @db.Uuid
+  note          String?
+  // 非空即不参与持仓重放与所有聚合
+  voidedAt      DateTime? @map("voided_at") @db.Timestamptz(6)
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio  Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument Instrument? @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+
+  @@index([portfolioId, tradeDate])
+  @@index([portfolioId, instrumentId, tradeDate])
+  @@index([userId, tradeDate])
+  @@index([transactionId])
+  @@map("portfolio_trades")
+}
+
+model PortfolioCashflow {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @map("user_id") @db.Uuid
+  portfolioId   String       @map("portfolio_id") @db.Uuid
+  kind          CashflowKind
+  flowDate      DateTime     @map("flow_date") @db.Timestamptz(6)
+  amount        Decimal      @db.Decimal(20, 6)
+  transactionId String?      @map("transaction_id") @db.Uuid
+  note          String?
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, flowDate])
+  @@map("portfolio_cashflows")
+}
+
+model PortfolioValuation {
+  id            String          @id @default(uuid()) @db.Uuid
+  userId        String          @map("user_id") @db.Uuid
+  portfolioId   String          @map("portfolio_id") @db.Uuid
+  valuationDate DateTime        @map("valuation_date") @db.Date
+  // 仅证券市值，不含现金，避免与账本现金重复
+  marketValue   Decimal         @map("market_value") @db.Decimal(20, 6)
+  source        ValuationSource @default(computed)
+  note          String?
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, valuationDate])
+  @@map("portfolio_valuations")
+}
+
+model PortfolioTarget {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String              @map("user_id") @db.Uuid
+  portfolioId  String              @map("portfolio_id") @db.Uuid
+  dimension    AllocationDimension
+  key          String
+  targetWeight Decimal             @map("target_weight") @db.Decimal(9, 6)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, dimension, key])
+  @@map("portfolio_targets")
 }

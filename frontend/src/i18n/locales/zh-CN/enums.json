@@ -66,5 +66,53 @@
   "contribution_timing": {
     "begin": "期初",
     "end": "期末"
+  },
+  "asset_class": {
+    "stock": "股票",
+    "etf": "ETF",
+    "fund": "基金",
+    "bond": "债券",
+    "cash": "现金类",
+    "other": "其他"
+  },
+  "trade_kind": {
+    "buy": "买入",
+    "sell": "卖出",
+    "dividend": "股息",
+    "interest": "利息",
+    "fee": "手续费",
+    "tax": "税费"
+  },
+  "cost_basis_method": {
+    "average": "加权平均成本"
+  },
+  "cashflow_kind": {
+    "deposit": "入金",
+    "withdraw": "出金"
+  },
+  "allocation_dimension": {
+    "asset_class": "资产类别",
+    "instrument": "标的",
+    "currency": "币种"
+  },
+  "portfolio_status": {
+    "active": "使用中",
+    "archived": "已归档"
+  },
+  "price_source": {
+    "manual": "手工录入",
+    "imported": "导入",
+    "provider": "行情源"
+  },
+  "valuation_source": {
+    "computed": "自动计算",
+    "manual": "手工录入"
+  },
+  "performance_reason": {
+    "insufficient_data": "数据不足",
+    "missing_valuation": "缺少估值",
+    "zero_start_value": "起始价值为 0",
+    "no_cashflow_sign_change": "现金流方向单一，无法求解",
+    "not_converged": "求解未收敛"
   }
 }

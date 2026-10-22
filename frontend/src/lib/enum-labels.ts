@@ -34,5 +34,13 @@ export function useEnumLabels() {
       t(`contribution_frequency.${value}`, { defaultValue: value }),
     contributionTiming: (value: string) =>
       t(`contribution_timing.${value}`, { defaultValue: value }),
+    assetClass: (value: string) => t(`asset_class.${value}`, { defaultValue: value }),
+    tradeKind: (value: string) => t(`trade_kind.${value}`, { defaultValue: value }),
+    cashflowKind: (value: string) => t(`cashflow_kind.${value}`, { defaultValue: value }),
+    portfolioStatus: (value: string) => t(`portfolio_status.${value}`, { defaultValue: value }),
+    allocationDimension: (value: string) =>
+      t(`allocation_dimension.${value}`, { defaultValue: value }),
+    performanceReason: (value: string) =>
+      t(`performance_reason.${value}`, { defaultValue: value }),
   };
 }
