@@ -1,0 +1,21 @@
+{
+  "title": "分类与标签",
+  "new_category": "新建分类",
+  "root_placeholder": "一级分类名称",
+  "child_placeholder": "子分类名称",
+  "add_child": "添加子类",
+  "load_failed": "分类加载失败",
+  "empty_title": "还没有分类",
+  "empty_description": "创建一级分类后即可在记账时选择。",
+  "create_failed": "创建分类失败",
+  "delete_failed": "删除分类失败",
+  "delete_category_aria": "删除分类 {{name}}",
+  "tags": {
+    "title": "标签",
+    "placeholder": "新标签名称",
+    "add": "添加",
+    "empty": "暂无标签。标签可用于跨分类标记交易。",
+    "create_failed": "创建标签失败",
+    "delete_aria": "删除标签 {{name}}"
+  }
+}

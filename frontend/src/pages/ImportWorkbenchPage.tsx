@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import BatchStatusBadge from '@/components/imports/BatchStatusBadge';
 import DuplicateReview from '@/components/imports/DuplicateReview';
@@ -9,6 +10,7 @@ import PreviewTable from '@/components/imports/PreviewTable';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { ApiError } from '@/lib/client';
+import { translateError } from '@/lib/error-message';
 import { importsApi, type ColumnMapping, type CommitResult } from '@/lib/imports';
 
 const DEFAULT_MAPPING: ColumnMapping = {
@@ -23,6 +25,7 @@ export default function ImportWorkbenchPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslation('imports');
 
   const [step, setStep] = useState(2);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
@@ -60,12 +63,12 @@ export default function ImportWorkbenchPage() {
       }),
     onSuccess: async () => {
       setError(null);
-      setMessage('映射已保存');
+      setMessage(t('mapping.saved'));
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       await rowsQuery.refetch();
       setStep(3);
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '保存映射失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const validate = useMutation({
@@ -73,7 +76,11 @@ export default function ImportWorkbenchPage() {
     onSuccess: async (result) => {
       setError(null);
       setMessage(
-        `校验完成：有效 ${result.batch.counts.valid} 行，无效 ${result.batch.counts.invalid} 行，重复 ${result.batch.counts.duplicate} 行`,
+        t('validate.validated', {
+          valid: result.batch.counts.valid,
+          invalid: result.batch.counts.invalid,
+          duplicate: result.batch.counts.duplicate,
+        }),
       );
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       await queryClient.invalidateQueries({ queryKey: ['imports', id, 'rows'] });
@@ -81,7 +88,7 @@ export default function ImportWorkbenchPage() {
       const totalDuplicates = result.batch.counts.duplicate + result.batch.counts.suspected;
       setStep(totalDuplicates > 0 ? 4 : 5);
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '校验失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const decideDuplicates = useMutation({
@@ -89,11 +96,11 @@ export default function ImportWorkbenchPage() {
       importsApi.decideDuplicates(id, decisions),
     onSuccess: async () => {
       setError(null);
-      setMessage('重复行已确认');
+      setMessage(t('duplicates.saved'));
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       setStep(5);
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '保存确认失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const commit = useMutation({
@@ -110,14 +117,14 @@ export default function ImportWorkbenchPage() {
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '提交失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const rollback = useMutation({
     mutationFn: () => importsApi.rollback(id),
     onSuccess: async () => {
       setError(null);
-      setMessage('批次已撤销，相关交易已冲正');
+      setMessage(t('workbench.rollback.done'));
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -125,10 +132,16 @@ export default function ImportWorkbenchPage() {
     onError: (err) => {
       if (err instanceof ApiError && err.code === 'IMPORT_ROLLBACK_BLOCKED') {
         const details = err.details as { blockedTransactions?: Array<{ reason: string }> } | undefined;
-        const reasons = details?.blockedTransactions?.map((item) => item.reason).join('；');
-        setError(`无法撤销：${reasons ?? '存在依赖'}`);
+        const reasons = details?.blockedTransactions
+          ?.map((item) => item.reason)
+          .join(t('common:list_separator'));
+        setError(
+          t('workbench.rollback.blocked', {
+            reasons: reasons ?? t('workbench.rollback.blocked_default'),
+          }),
+        );
       } else {
-        setError(err instanceof ApiError ? err.message : '撤销失败');
+        setError(translateError(err, t));
       }
     },
   });
@@ -137,14 +150,16 @@ export default function ImportWorkbenchPage() {
     mutationFn: () => importsApi.cancel(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
-      setMessage('批次已取消');
+      setMessage(t('workbench.cancel.done'));
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '取消失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
-  if (detail.isPending) return <LoadingState label="加载导入批次…" />;
+  if (detail.isPending) return <LoadingState label={t('loading_batches')} />;
   if (detail.error || !batch) {
-    return <ErrorState message="导入批次不存在或无权访问" onRetry={() => void detail.refetch()} />;
+    return (
+      <ErrorState message={t('workbench.load_failed')} onRetry={() => void detail.refetch()} />
+    );
   }
 
   const counts = batch.counts;
@@ -158,12 +173,21 @@ export default function ImportWorkbenchPage() {
             <BatchStatusBadge status={batch.status} />
           </div>
           <p className="mt-1 text-sm text-[var(--color-content-muted)]">
-            {batch.accountName} · {batch.format.toUpperCase()} · {batch.encoding}
-            {batch.sheetName ? ` · 工作表 ${batch.sheetName}` : ''} · 共 {counts.total} 行
+            {t('workbench.meta', {
+              account: batch.accountName,
+              format: batch.format.toUpperCase(),
+              encoding: batch.encoding,
+              total: counts.total,
+            })}
+            {batch.sheetName ? ` · ${t('workbench.sheet', { name: batch.sheetName })}` : ''}
           </p>
         </div>
-        <button type="button" onClick={() => navigate('/imports')} className="text-sm text-[var(--color-accent)]">
-          返回列表
+        <button
+          type="button"
+          onClick={() => navigate('/imports')}
+          className="text-sm text-[var(--color-accent)]"
+        >
+          {t('workbench.back')}
         </button>
       </div>
 
@@ -180,17 +204,17 @@ export default function ImportWorkbenchPage() {
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="有效" value={counts.valid} tone="text-emerald-500" />
-        <Stat label="无效" value={counts.invalid} tone="text-[var(--color-negative)]" />
-        <Stat label="重复" value={counts.duplicate} tone="text-amber-500" />
-        <Stat label="疑似" value={counts.suspected} tone="text-amber-500" />
+        <Stat label={t('workbench.stats.valid')} value={counts.valid} tone="text-emerald-500" />
+        <Stat label={t('workbench.stats.invalid')} value={counts.invalid} tone="text-[var(--color-negative)]" />
+        <Stat label={t('workbench.stats.duplicate')} value={counts.duplicate} tone="text-amber-500" />
+        <Stat label={t('workbench.stats.suspected')} value={counts.suspected} tone="text-amber-500" />
       </div>
 
       {step === 2 && (
         <section className="card space-y-4 p-4">
-          <h2 className="text-sm font-medium">字段映射</h2>
+          <h2 className="text-sm font-medium">{t('mapping.title')}</h2>
           {headers.length === 0 ? (
-            <p className="text-sm text-[var(--color-content-muted)]">未读取到表头，无法映射。</p>
+            <p className="text-sm text-[var(--color-content-muted)]">{t('mapping.no_headers')}</p>
           ) : (
             <>
               <MappingEditor
@@ -202,13 +226,13 @@ export default function ImportWorkbenchPage() {
               <div className="flex flex-wrap items-end gap-3">
                 <div className="space-y-1">
                   <label htmlFor="template-name" className="block text-xs text-[var(--color-content-muted)]">
-                    保存为模板（可选）
+                    {t('mapping.save_template')}
                   </label>
                   <input
                     id="template-name"
                     value={templateName}
                     onChange={(event) => setTemplateName(event.target.value)}
-                    placeholder="例如：示例银行 CSV"
+                    placeholder={t('mapping.template_placeholder')}
                     className="rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-3 py-1.5 text-sm"
                   />
                 </div>
@@ -218,7 +242,7 @@ export default function ImportWorkbenchPage() {
                   onClick={() => saveMapping.mutate()}
                   className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                 >
-                  {saveMapping.isPending ? '保存中…' : '保存映射'}
+                  {saveMapping.isPending ? t('mapping.saving') : t('mapping.save_mapping')}
                 </button>
               </div>
             </>
@@ -229,14 +253,14 @@ export default function ImportWorkbenchPage() {
       {step >= 3 && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-medium">数据预览</h2>
+            <h2 className="text-sm font-medium">{t('preview.title')}</h2>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setStep(2)}
                 className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm"
               >
-                改映射
+                {t('preview.change_mapping')}
               </button>
               {batch.status !== 'completed' && batch.status !== 'rolled_back' && (
                 <button
@@ -245,19 +269,22 @@ export default function ImportWorkbenchPage() {
                   onClick={() => validate.mutate()}
                   className="rounded-lg bg-[var(--color-accent)] px-4 py-1.5 text-sm font-medium text-white disabled:opacity-60"
                 >
-                  {validate.isPending ? '校验中…' : '开始校验'}
+                  {validate.isPending ? t('preview.validating') : t('preview.start_validate')}
                 </button>
               )}
             </div>
           </div>
           {rowsQuery.isPending ? (
-            <LoadingState label="加载行数据…" />
+            <LoadingState label={t('preview.loading_rows')} />
           ) : (
             <PreviewTable rows={rowsQuery.data?.rows ?? []} />
           )}
           {rowsQuery.data && rowsQuery.data.pagination.total > rowsQuery.data.rows.length && (
             <p className="text-xs text-[var(--color-content-muted)]">
-              仅显示前 {rowsQuery.data.rows.length} 行，共 {rowsQuery.data.pagination.total} 行
+              {t('preview.truncated', {
+                shown: rowsQuery.data.rows.length,
+                total: rowsQuery.data.pagination.total,
+              })}
             </p>
           )}
         </section>
@@ -265,9 +292,9 @@ export default function ImportWorkbenchPage() {
 
       {step === 4 && (
         <section className="space-y-3">
-          <h2 className="text-sm font-medium">重复确认</h2>
+          <h2 className="text-sm font-medium">{t('duplicates.title')}</h2>
           {duplicatesQuery.isPending ? (
-            <LoadingState label="加载重复行…" />
+            <LoadingState label={t('duplicates.loading')} />
           ) : (
             <DuplicateReview
               exact={duplicatesQuery.data?.exact ?? []}
@@ -281,14 +308,17 @@ export default function ImportWorkbenchPage() {
 
       {step === 5 && (
         <section className="card space-y-3 p-4">
-          <h2 className="text-sm font-medium">提交结果</h2>
+          <h2 className="text-sm font-medium">{t('workbench.result.title')}</h2>
 
           {commitResult ? (
             <div className="space-y-1 text-sm">
-              <p>已导入 {commitResult.importedRows} 笔交易</p>
+              <p>{t('workbench.result.imported', { count: commitResult.importedRows })}</p>
               <p className="text-[var(--color-content-muted)]">
-                跳过 {commitResult.skippedRows} 行 · 自动分类 {commitResult.categoryMatched} 笔 · 未分类{' '}
-                {commitResult.uncategorized} 笔
+                {t('workbench.result.summary', {
+                  skipped: commitResult.skippedRows,
+                  matched: commitResult.categoryMatched,
+                  uncategorized: commitResult.uncategorized,
+                })}
               </p>
               <div className="flex flex-wrap gap-2 pt-2">
                 <button
@@ -296,31 +326,35 @@ export default function ImportWorkbenchPage() {
                   onClick={() => navigate('/transactions')}
                   className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm"
                 >
-                  查看流水
+                  {t('workbench.result.view_transactions')}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/imports/unmatched')}
                   className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm"
                 >
-                  去匹配转账
+                  {t('workbench.result.match_transfers')}
                 </button>
                 <a
                   href={importsApi.errorExportUrl(id)}
                   className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm"
                 >
-                  导出错误行
+                  {t('workbench.result.export_errors')}
                 </a>
               </div>
             </div>
           ) : batch.status === 'completed' ? (
             <p className="text-sm text-[var(--color-content-muted)]">
-              该批次已提交，共导入 {counts.imported} 笔交易。
+              {t('workbench.result.already_completed', { count: counts.imported })}
             </p>
           ) : (
             <>
               <p className="text-sm">
-                将导入 <strong>{counts.valid}</strong> 笔交易，跳过 {counts.skipped + counts.duplicate + counts.invalid} 行。
+                {t('workbench.result.confirm_summary_valid')}
+                <strong>{counts.valid}</strong>
+                {t('workbench.result.confirm_summary_rest', {
+                  skipped: counts.skipped + counts.duplicate + counts.invalid,
+                })}
               </p>
               <button
                 type="button"
@@ -328,7 +362,7 @@ export default function ImportWorkbenchPage() {
                 onClick={() => commit.mutate()}
                 className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
-                {commit.isPending ? '提交中…' : '确认导入'}
+                {commit.isPending ? t('workbench.result.committing') : t('workbench.result.confirm_import')}
               </button>
             </>
           )}
@@ -341,11 +375,11 @@ export default function ImportWorkbenchPage() {
             type="button"
             disabled={cancel.isPending}
             onClick={() => {
-              if (window.confirm('取消后本次上传的数据不会入账，确定取消？')) cancel.mutate();
+              if (window.confirm(t('workbench.cancel.confirm'))) cancel.mutate();
             }}
             className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm text-[var(--color-content-muted)]"
           >
-            取消批次
+            {t('workbench.cancel.action')}
           </button>
         )}
 
@@ -354,11 +388,11 @@ export default function ImportWorkbenchPage() {
             type="button"
             disabled={rollback.isPending}
             onClick={() => {
-              if (window.confirm('撤销会冲正本批次全部交易并要求重新导入，确定继续？')) rollback.mutate();
+              if (window.confirm(t('workbench.rollback.confirm'))) rollback.mutate();
             }}
             className="rounded-lg border border-[var(--color-negative)] px-3 py-1.5 text-sm text-[var(--color-negative)]"
           >
-            {rollback.isPending ? '撤销中…' : '撤销本批次'}
+            {rollback.isPending ? t('workbench.rollback.running') : t('workbench.rollback.action')}
           </button>
         )}
       </div>

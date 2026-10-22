@@ -61,15 +61,6 @@ export interface AccountTransaction {
 
 export const LIABILITY_TYPES: AccountType[] = ['credit_card', 'loan'];
 
-export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
-  cash: '现金',
-  bank: '银行',
-  credit_card: '信用卡',
-  brokerage: '证券',
-  loan: '贷款',
-  other: '其他',
-};
-
 export const accountsApi = {
   list: (params?: { status?: 'active' | 'archived' | 'all'; type?: AccountType }) => {
     const query = new URLSearchParams();

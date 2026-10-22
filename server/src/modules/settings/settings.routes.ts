@@ -15,6 +15,7 @@ export default async function settingsRoutes(app: FastifyInstance) {
         timezone: true,
         dateFormat: true,
         theme: true,
+        language: true,
         simulationDefaults: true,
       },
     });
@@ -44,6 +45,7 @@ export default async function settingsRoutes(app: FastifyInstance) {
         timezone: true,
         dateFormat: true,
         theme: true,
+        language: true,
         simulationDefaults: true,
       },
     });

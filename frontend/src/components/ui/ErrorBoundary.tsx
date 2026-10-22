@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Component, type ErrorInfo } from 'react';
+import i18n from '@/i18n';
 import ErrorState from './ErrorState';
 
 interface Props {
@@ -8,18 +9,14 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  message: string;
 }
 
 /** 捕获渲染异常，避免整页白屏；网络错误由各页面的 ErrorState 处理 */
 export default class ErrorBoundary extends Component<Props, State> {
-  override state: State = { hasError: false, message: '' };
+  override state: State = { hasError: false };
 
-  static getDerivedStateFromError(error: unknown): State {
-    return {
-      hasError: true,
-      message: error instanceof Error ? error.message : '页面渲染出错',
-    };
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo) {
@@ -31,9 +28,9 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <ErrorState
-          message="页面出现异常"
+          message={i18n.t('common:state.render_error')}
           onRetry={() => {
-            this.setState({ hasError: false, message: '' });
+            this.setState({ hasError: false });
             window.location.reload();
           }}
         />

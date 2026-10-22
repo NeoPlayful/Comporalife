@@ -164,6 +164,7 @@ model UserSettings {
   timezone           String   @default("Asia/Shanghai")
   dateFormat         String   @default("YYYY-MM-DD") @map("date_format")
   theme              Theme    @default(dark)
+  language           String   @default("zh-CN")
   simulationDefaults Json?    @map("simulation_defaults")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)

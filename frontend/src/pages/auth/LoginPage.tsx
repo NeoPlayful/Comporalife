@@ -1,14 +1,17 @@
 import { ApiError } from '@/lib/client';
+import { translateError } from '@/lib/error-message';
 import { authApi } from '@/lib/auth';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useAuthStore } from '@/stores/auth-store';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuth = useAuthStore((state) => state.setAuth);
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,13 +33,13 @@ export default function LoginPage() {
       if (err instanceof ApiError) {
         setError(
           err.code === 'USER_DISABLED'
-            ? '账号已被禁用，请联系管理员'
+            ? t('auth:login.error_disabled')
             : err.status === 429
-              ? '尝试次数过多，请稍后再试'
-              : '邮箱或密码错误',
+              ? t('auth:login.error_rate_limited')
+              : t('auth:login.error_credentials'),
         );
       } else {
-        setError('网络异常，请稍后重试');
+        setError(translateError(err, t));
       }
     } finally {
       setSubmitting(false);
@@ -44,11 +47,11 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthLayout title="登录 Comporalife" subtitle="管理你的资产、现金流与长期复利">
+    <AuthLayout title={t('auth:login.title')} subtitle={t('auth:login.subtitle')}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="email" className="mb-1 block text-sm text-[var(--color-content-muted)]">
-            邮箱
+            {t('auth:login.email')}
           </label>
           <input
             id="email"
@@ -63,7 +66,7 @@ export default function LoginPage() {
 
         <div>
           <label htmlFor="password" className="mb-1 block text-sm text-[var(--color-content-muted)]">
-            密码
+            {t('auth:login.password')}
           </label>
           <input
             id="password"
@@ -87,15 +90,15 @@ export default function LoginPage() {
           disabled={submitting}
           className="w-full rounded-lg bg-[var(--color-accent)] py-2 text-sm font-medium text-white disabled:opacity-60"
         >
-          {submitting ? '登录中…' : '登录'}
+          {submitting ? t('auth:login.submitting') : t('auth:login.submit')}
         </button>
 
         <div className="flex items-center justify-between text-sm text-[var(--color-content-muted)]">
           <Link to="/register" className="hover:text-[var(--color-accent)]">
-            注册账号
+            {t('auth:login.register_link')}
           </Link>
           <Link to="/forgot-password" className="hover:text-[var(--color-accent)]">
-            忘记密码
+            {t('auth:login.forgot_link')}
           </Link>
         </div>
       </form>

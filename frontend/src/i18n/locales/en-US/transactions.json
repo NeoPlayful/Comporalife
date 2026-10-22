@@ -1,0 +1,88 @@
+{
+  "title": "Transactions",
+  "show_voided": "Show reversed",
+  "new": "New transaction",
+  "filters": {
+    "from": "Start date",
+    "to": "End date",
+    "account": "Filter by account",
+    "all_accounts": "All accounts",
+    "type": "Filter by type",
+    "all_types": "All types",
+    "keyword": "Search description or merchant",
+    "keyword_aria": "Keyword search"
+  },
+  "bulk": {
+    "selected": "{{count}} selected",
+    "categorize": "Set category…",
+    "categorize_aria": "Set category in bulk",
+    "cancel": "Clear selection"
+  },
+  "load_failed": "Failed to load transactions",
+  "void_failed": "Failed to reverse transaction",
+  "bulk_categorize_failed": "Failed to categorize in bulk",
+  "empty_title": "No transactions yet",
+  "empty_description": "Once you add an expense or income, the full record will appear here.",
+  "empty_action": "Add your first transaction",
+  "table": {
+    "select_all": "Select all",
+    "select_row": "Select {{description}}",
+    "date": "Date",
+    "description": "Description",
+    "source": "Source",
+    "category": "Category",
+    "account": "Account",
+    "amount": "Amount",
+    "source_import": "Import",
+    "source_manual": "Manual",
+    "uncategorized": "Uncategorized"
+  },
+  "pagination": {
+    "summary": "{{total}} total · page {{page}}/{{totalPages}}",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "detail": {
+    "voided_suffix": " · reversed",
+    "category": "Category",
+    "merchant": "Merchant",
+    "note": "Note",
+    "tags": "Tags",
+    "entries": "Double-entry lines",
+    "external_counterparty": "External counterparty",
+    "entries_hint": "The two lines sum to zero, meaning funds only moved from one side to the other.",
+    "void": "Reverse",
+    "voiding": "Reversing…",
+    "confirm_void": "Confirm reversal",
+    "void_hint": "Reversing keeps the record but removes its effect on balances, so history stays auditable."
+  },
+  "form": {
+    "title": "New transaction",
+    "types": {
+      "expense": "Expense",
+      "income": "Income",
+      "transfer": "Transfer",
+      "adjustment": "Balance adjustment"
+    },
+    "account": "Account",
+    "from_account": "From account",
+    "to_account": "To account",
+    "select_account": "Select…",
+    "create_account_first": "Create an account first",
+    "category": "Category",
+    "adjustment_category": "Adjustment category (required)",
+    "uncategorized": "Uncategorized",
+    "amount": "Amount ({{currency}})",
+    "date": "Date",
+    "description": "Description",
+    "description_placeholder": "e.g. Lunch",
+    "transfer_description_placeholder": "Leave blank to auto-generate",
+    "merchant": "Merchant (optional)",
+    "note": "Note (optional)",
+    "adjustment_hint": "A balance adjustment creates an adjustment transaction with an external counterparty, correcting the account balance to its actual value.",
+    "cross_currency_unsupported": "Cross-currency transfers are not supported yet",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…"
+  }
+}

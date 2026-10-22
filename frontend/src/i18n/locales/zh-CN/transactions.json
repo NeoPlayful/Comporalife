@@ -1,0 +1,88 @@
+{
+  "title": "交易流水",
+  "show_voided": "显示已冲正",
+  "new": "新增交易",
+  "filters": {
+    "from": "起始日期",
+    "to": "结束日期",
+    "account": "账户筛选",
+    "all_accounts": "全部账户",
+    "type": "类型筛选",
+    "all_types": "全部类型",
+    "keyword": "搜索摘要或商户",
+    "keyword_aria": "关键词搜索"
+  },
+  "bulk": {
+    "selected": "已选择 {{count}} 条",
+    "categorize": "批量设置分类…",
+    "categorize_aria": "批量设置分类",
+    "cancel": "取消选择"
+  },
+  "load_failed": "流水加载失败",
+  "void_failed": "冲正失败",
+  "bulk_categorize_failed": "批量分类失败",
+  "empty_title": "暂无流水",
+  "empty_description": "新增一笔支出或收入后，这里会显示完整的交易记录。",
+  "empty_action": "新增第一笔交易",
+  "table": {
+    "select_all": "全选",
+    "select_row": "选择 {{description}}",
+    "date": "日期",
+    "description": "摘要",
+    "source": "来源",
+    "category": "分类",
+    "account": "账户",
+    "amount": "金额",
+    "source_import": "导入",
+    "source_manual": "手工",
+    "uncategorized": "未分类"
+  },
+  "pagination": {
+    "summary": "共 {{total}} 条 · 第 {{page}}/{{totalPages}} 页",
+    "prev": "上一页",
+    "next": "下一页"
+  },
+  "detail": {
+    "voided_suffix": " · 已冲正",
+    "category": "分类",
+    "merchant": "商户",
+    "note": "备注",
+    "tags": "标签",
+    "entries": "复式分录",
+    "external_counterparty": "外部对手方",
+    "entries_hint": "两条分录求和为零，表示资金只是从一方转移到另一方。",
+    "void": "冲正",
+    "voiding": "冲正中…",
+    "confirm_void": "确认冲正",
+    "void_hint": "冲正会保留记录但撤销其对余额的影响，历史仍可追溯。"
+  },
+  "form": {
+    "title": "新增交易",
+    "types": {
+      "expense": "支出",
+      "income": "收入",
+      "transfer": "转账",
+      "adjustment": "余额调整"
+    },
+    "account": "账户",
+    "from_account": "转出账户",
+    "to_account": "转入账户",
+    "select_account": "请选择",
+    "create_account_first": "请先创建账户",
+    "category": "分类",
+    "adjustment_category": "调整分类（必填）",
+    "uncategorized": "未分类",
+    "amount": "金额（{{currency}}）",
+    "date": "日期",
+    "description": "摘要",
+    "description_placeholder": "例如：午餐",
+    "transfer_description_placeholder": "留空则自动生成",
+    "merchant": "商户（可选）",
+    "note": "备注（可选）",
+    "adjustment_hint": "余额调整会生成一笔带外部对手方的调整交易，用于把账户余额校正到实际值。",
+    "cross_currency_unsupported": "当前版本不支持跨币种转账",
+    "cancel": "取消",
+    "save": "保存",
+    "saving": "保存中…"
+  }
+}

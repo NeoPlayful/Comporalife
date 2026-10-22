@@ -1,0 +1,70 @@
+{
+  "account_type": {
+    "cash": "Cash",
+    "bank": "Bank",
+    "credit_card": "Credit card",
+    "brokerage": "Brokerage",
+    "loan": "Loan",
+    "other": "Other"
+  },
+  "account_status": {
+    "active": "Active",
+    "archived": "Archived"
+  },
+  "transaction_type": {
+    "income": "Income",
+    "expense": "Expense",
+    "transfer": "Transfer",
+    "adjustment": "Adjustment",
+    "reversal": "Reversal"
+  },
+  "category_kind": {
+    "income": "Income",
+    "expense": "Expense"
+  },
+  "role": {
+    "super_admin": "Super admin",
+    "admin": "Admin",
+    "user": "User"
+  },
+  "user_status": {
+    "active": "Active",
+    "disabled": "Disabled",
+    "pending_verification": "Pending verification"
+  },
+  "import_status": {
+    "uploaded": "Uploaded",
+    "parsed": "Parsed",
+    "mapped": "Mapped",
+    "validated": "Validated",
+    "committing": "Committing",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "rolled_back": "Rolled back"
+  },
+  "import_row_status": {
+    "pending": "Pending",
+    "valid": "Valid",
+    "invalid": "Invalid",
+    "duplicate": "Duplicate",
+    "suspected": "Suspected duplicate",
+    "skipped": "Skipped",
+    "imported": "Imported",
+    "failed": "Failed"
+  },
+  "theme": {
+    "dark": "Dark",
+    "light": "Light",
+    "system": "System"
+  },
+  "contribution_frequency": {
+    "none": "None",
+    "monthly": "Monthly",
+    "annual": "Annual"
+  },
+  "contribution_timing": {
+    "begin": "Beginning",
+    "end": "End"
+  }
+}

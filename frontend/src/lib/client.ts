@@ -1,7 +1,12 @@
 export interface ApiEnvelope<T> {
   success: boolean;
   data?: T;
-  error?: { code: string; message: string; details?: unknown };
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+    params?: Record<string, unknown>;
+  };
   meta?: { requestId: string; [key: string]: unknown };
 }
 
@@ -9,15 +14,24 @@ export class ApiError extends Error {
   readonly code: string;
   readonly status: number;
   readonly details?: unknown;
+  readonly params?: Record<string, unknown>;
   readonly requestId?: string;
 
-  constructor(status: number, code: string, message: string, details?: unknown, requestId?: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details?: unknown,
+    requestId?: string,
+    params?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.details = details;
     this.requestId = requestId;
+    this.params = params;
   }
 }
 
@@ -145,6 +159,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       payload.error?.message ?? '请求失败',
       payload.error?.details,
       payload.meta?.requestId,
+      payload.error?.params,
     );
   }
 
@@ -189,6 +204,7 @@ async function requestMultipart<T>(path: string, form: FormData, options: Reques
       payload.error?.message ?? '请求失败',
       payload.error?.details,
       payload.meta?.requestId,
+      payload.error?.params,
     );
   }
 

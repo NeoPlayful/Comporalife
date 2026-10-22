@@ -1,5 +1,7 @@
 import './echarts';
 import ReactECharts from 'echarts-for-react';
+import { useTranslation } from 'react-i18next';
+import { formatNumber } from '@/lib/format';
 import EmptyState from '../ui/EmptyState';
 
 export interface CompoundSeriesPoint {
@@ -14,9 +16,15 @@ interface Props {
 }
 
 export default function CompoundChart({ series, currency = 'CNY' }: Props) {
+  const { t } = useTranslation('dashboard');
   const primary = series[0];
   if (!primary || primary.points.length === 0) {
-    return <EmptyState title="暂无模拟数据" description="调整参数后图表会实时更新。" />;
+    return (
+      <EmptyState
+        title={t('charts.compound_empty_title')}
+        description={t('charts.compound_empty_description')}
+      />
+    );
   }
 
   const comparisonMode = series.length > 1;
@@ -37,12 +45,12 @@ export default function CompoundChart({ series, currency = 'CNY' }: Props) {
           backgroundColor: 'rgba(30,32,38,0.95)',
           borderWidth: 0,
           textStyle: { color: '#e8e9ed', fontSize: 12 },
-          valueFormatter: (value: number) => `${value.toLocaleString('zh-CN')} ${currency}`,
+          valueFormatter: (value: number) => `${formatNumber(value)} ${currency}`,
         },
         xAxis: {
           type: 'category',
           data: primary.points.map((point) => point.year),
-          name: '年',
+          name: t('charts.year'),
           nameTextStyle: { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
           axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
           axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
@@ -79,12 +87,12 @@ export default function CompoundChart({ series, currency = 'CNY' }: Props) {
           backgroundColor: 'rgba(30,32,38,0.95)',
           borderWidth: 0,
           textStyle: { color: '#e8e9ed', fontSize: 12 },
-          valueFormatter: (value: number) => `${value.toLocaleString('zh-CN')} ${currency}`,
+          valueFormatter: (value: number) => `${formatNumber(value)} ${currency}`,
         },
         xAxis: {
           type: 'category',
           data: primary.points.map((point) => point.year),
-          name: '年',
+          name: t('charts.year'),
           nameTextStyle: { color: 'rgba(255,255,255,0.4)', fontSize: 11 },
           axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
           axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
@@ -97,7 +105,7 @@ export default function CompoundChart({ series, currency = 'CNY' }: Props) {
         },
         series: [
           {
-            name: '累计本金',
+            name: t('charts.compound_principal'),
             type: 'line',
             stack: 'total',
             symbol: 'none',
@@ -106,7 +114,7 @@ export default function CompoundChart({ series, currency = 'CNY' }: Props) {
             data: primary.points.map((point) => Number(point.totalContributed)),
           },
           {
-            name: '复利收益',
+            name: t('charts.compound_interest'),
             type: 'line',
             stack: 'total',
             symbol: 'none',

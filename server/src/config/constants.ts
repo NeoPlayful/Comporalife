@@ -44,6 +44,8 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   TWD: 'NT$',
 };
 
+export const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US'] as const;
+
 export const LIABILITY_ACCOUNT_TYPES = ['credit_card', 'loan'] as const;
 
 export const ACCOUNT_TYPES = ['cash', 'bank', 'credit_card', 'brokerage', 'loan', 'other'] as const;

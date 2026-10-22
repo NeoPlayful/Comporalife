@@ -1,0 +1,75 @@
+{
+  "title": "Compounding & DCA simulation",
+  "disclaimer": "A fixed return rate is a mathematical assumption, not a promise of actual returns",
+  "save_scenario": "Save scenario",
+  "save_failed": "Failed to save",
+  "delete_failed": "Failed to delete",
+  "scenario_name_placeholder": "Scenario name, e.g. \"Base case 7%\"",
+  "save": "Save",
+  "cancel": "Cancel",
+  "params": {
+    "title": "Parameters",
+    "principal": "Initial principal",
+    "contribution": "Regular contribution",
+    "frequency": "Frequency",
+    "timing": "Contribution timing",
+    "timing_end": "End of period",
+    "timing_begin": "Beginning of period",
+    "annual_return": "Annual return",
+    "years": "Investment horizon (years)",
+    "inflation": "Inflation rate",
+    "fee": "Annual fee rate",
+    "percent_suffix": " (%)"
+  },
+  "calculating": "Calculating…",
+  "invalid_params": "Invalid parameters. Please check your input.",
+  "chart": {
+    "comparison": "Scenario comparison",
+    "growth": "Growth curve",
+    "exit_comparison": "Exit comparison",
+    "legend_principal": "Blue: contributed principal",
+    "legend_interest": "Green: compound gains",
+    "current_params": "Current parameters"
+  },
+  "results": {
+    "final_nominal": "Final nominal value",
+    "total_contributed": "Total contributed",
+    "total_gain": "Total gain",
+    "final_real": "Inflation-adjusted value"
+  },
+  "schedule": {
+    "title": "Yearly breakdown",
+    "year": "Year",
+    "contributed_this_year": "Contributed this year",
+    "total_contributed": "Total contributed",
+    "nominal_value": "Nominal value",
+    "real_value": "Real value"
+  },
+  "assumptions": {
+    "title": "Calculation assumptions",
+    "model_version": "Model version {{version}} · results are reproducible",
+    "labels": {
+      "monthlyRateBasis": "Rate conversion",
+      "monthlyFeeBasis": "Fee conversion",
+      "iterationOrder": "Iteration order",
+      "contributionTiming": "Contribution timing",
+      "annualContributionMonth": "Annual contribution rule",
+      "annualReturnRate": "Annual return",
+      "inflationRate": "Inflation rate",
+      "feeRate": "Fee rate",
+      "disclaimer": "Disclaimer"
+    }
+  },
+  "saved": {
+    "title": "Saved scenarios ({{count}})",
+    "hint": "Select 2-4 scenarios to compare them",
+    "empty": "No saved scenarios yet. Adjust the parameters and click \"Save scenario\" to keep one.",
+    "summary": "Principal {{principal}} · {{rate}}% · {{years}} years",
+    "compare_aria": "Compare {{name}}",
+    "copy_aria": "Duplicate {{name}}",
+    "delete_aria": "Delete {{name}}",
+    "copy": "Duplicate",
+    "delete": "Delete"
+  },
+  "label_separator": ": "
+}

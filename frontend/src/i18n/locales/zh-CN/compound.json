@@ -1,0 +1,75 @@
+{
+  "title": "复利与定投模拟",
+  "disclaimer": "固定收益率仅为数学假设，不代表实际投资收益",
+  "save_scenario": "保存方案",
+  "save_failed": "保存失败",
+  "delete_failed": "删除失败",
+  "scenario_name_placeholder": "方案名称，例如「基准 7%」",
+  "save": "保存",
+  "cancel": "取消",
+  "params": {
+    "title": "参数",
+    "principal": "初始本金",
+    "contribution": "定期投入",
+    "frequency": "频率",
+    "timing": "投入时点",
+    "timing_end": "期末投入",
+    "timing_begin": "期初投入",
+    "annual_return": "年化收益率",
+    "years": "投资期限（年）",
+    "inflation": "通胀率",
+    "fee": "年费用率",
+    "percent_suffix": "（%）"
+  },
+  "calculating": "计算中…",
+  "invalid_params": "参数不合法，请检查输入",
+  "chart": {
+    "comparison": "方案对比",
+    "growth": "资金增长曲线",
+    "exit_comparison": "退出对比",
+    "legend_principal": "蓝：累计本金",
+    "legend_interest": "绿：复利收益",
+    "current_params": "当前参数"
+  },
+  "results": {
+    "final_nominal": "期末名义价值",
+    "total_contributed": "累计投入本金",
+    "total_gain": "累计收益",
+    "final_real": "通胀调整后价值"
+  },
+  "schedule": {
+    "title": "年度明细",
+    "year": "年",
+    "contributed_this_year": "当年投入",
+    "total_contributed": "累计投入",
+    "nominal_value": "名义价值",
+    "real_value": "实际价值"
+  },
+  "assumptions": {
+    "title": "计算假设",
+    "model_version": "模型版本 {{version}} · 结果可复现",
+    "labels": {
+      "monthlyRateBasis": "利率换算",
+      "monthlyFeeBasis": "费用换算",
+      "iterationOrder": "迭代顺序",
+      "contributionTiming": "投入时点",
+      "annualContributionMonth": "年付规则",
+      "annualReturnRate": "年化收益率",
+      "inflationRate": "通胀率",
+      "feeRate": "费用率",
+      "disclaimer": "声明"
+    }
+  },
+  "saved": {
+    "title": "已保存方案（{{count}}）",
+    "hint": "勾选 2-4 个方案可进入对比视图",
+    "empty": "还没有保存的方案。调整参数后点击「保存方案」即可保留。",
+    "summary": "本金 {{principal}} · {{rate}}% · {{years}} 年",
+    "compare_aria": "对比 {{name}}",
+    "copy_aria": "复制 {{name}}",
+    "delete_aria": "删除 {{name}}",
+    "copy": "复制",
+    "delete": "删除"
+  },
+  "label_separator": "："
+}

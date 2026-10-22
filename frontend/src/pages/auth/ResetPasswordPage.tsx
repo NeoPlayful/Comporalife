@@ -1,11 +1,14 @@
 import { authApi } from '@/lib/auth';
+import { translateError } from '@/lib/error-message';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') ?? '';
+  const { t } = useTranslation('auth');
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -18,7 +21,7 @@ export default function ResetPasswordPage() {
     setError(null);
 
     if (password !== confirm) {
-      setError('两次输入的密码不一致');
+      setError(t('register.error_mismatch'));
       return;
     }
 
@@ -27,7 +30,7 @@ export default function ResetPasswordPage() {
       await authApi.resetPassword({ token, newPassword: password });
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '重置失败，链接可能已过期');
+      setError(translateError(err, t));
     } finally {
       setSubmitting(false);
     }
@@ -35,34 +38,32 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <AuthLayout title="链接无效">
-        <p className="text-sm text-[var(--color-content-muted)]">重置链接缺少令牌，请重新申请。</p>
+      <AuthLayout title={t('reset.invalid_title')}>
+        <p className="text-sm text-[var(--color-content-muted)]">{t('reset.invalid_body')}</p>
         <Link to="/forgot-password" className="mt-4 block text-center text-sm hover:text-[var(--color-accent)]">
-          重新申请
+          {t('reset.reapply')}
         </Link>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="设置新密码">
+    <AuthLayout title={t('reset.title')}>
       {done ? (
         <div className="space-y-4">
-          <p className="text-sm text-[var(--color-content-muted)]">
-            密码已重置，所有设备上的登录会话均已失效。
-          </p>
+          <p className="text-sm text-[var(--color-content-muted)]">{t('reset.done')}</p>
           <Link
             to="/login"
             className="block rounded-lg bg-[var(--color-accent)] py-2 text-center text-sm font-medium text-white"
           >
-            重新登录
+            {t('reset.relogin')}
           </Link>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="password" className="mb-1 block text-sm text-[var(--color-content-muted)]">
-              新密码
+              {t('reset.password')}
             </label>
             <input
               id="password"
@@ -78,7 +79,7 @@ export default function ResetPasswordPage() {
 
           <div>
             <label htmlFor="confirm" className="mb-1 block text-sm text-[var(--color-content-muted)]">
-              确认新密码
+              {t('reset.confirm')}
             </label>
             <input
               id="confirm"
@@ -102,7 +103,7 @@ export default function ResetPasswordPage() {
             disabled={submitting}
             className="w-full rounded-lg bg-[var(--color-accent)] py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {submitting ? '提交中…' : '重置密码'}
+            {submitting ? t('reset.submitting') : t('reset.submit')}
           </button>
         </form>
       )}

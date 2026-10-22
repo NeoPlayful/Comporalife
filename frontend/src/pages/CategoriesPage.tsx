@@ -1,20 +1,23 @@
 import {
-  KIND_LABELS,
   categoriesApi,
   tagsApi,
   type CategoryKind,
   type CategoryNode,
 } from '@/lib/categories';
-import { ApiError } from '@/lib/client';
+import { useEnumLabels } from '@/lib/enum-labels';
+import { translateError } from '@/lib/error-message';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function CategoriesPage() {
   const [kind, setKind] = useState<CategoryKind>('expense');
+  const { t } = useTranslation();
+  const { categoryKind } = useEnumLabels();
 
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
@@ -37,7 +40,7 @@ export default function CategoriesPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['tags'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '创建标签失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const deleteTag = useMutation({
@@ -54,7 +57,7 @@ export default function CategoriesPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '创建分类失败'),
+    onError: () => setError(t('categories:create_failed')),
   });
 
   const deleteCategory = useMutation({
@@ -63,14 +66,14 @@ export default function CategoriesPage() {
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : '删除分类失败'),
+    onError: (err) => setError(translateError(err, t)),
   });
 
   const roots = treeQuery.data?.categories ?? [];
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold">分类与标签</h1>
+      <h1 className="text-xl font-semibold">{t('categories:title')}</h1>
 
       {error && (
         <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
@@ -92,7 +95,7 @@ export default function CategoriesPage() {
                     : 'text-[var(--color-content-muted)]'
                 }`}
               >
-                {KIND_LABELS[item]}
+                {categoryKind(item)}
               </button>
             ))}
           </div>
@@ -106,13 +109,13 @@ export default function CategoriesPage() {
             className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
           >
             <Plus className="size-4" />
-            新建分类
+            {t('categories:new_category')}
           </button>
         </div>
 
         {addingUnder === 'root' && (
           <InlineInput
-            placeholder="一级分类名称"
+            placeholder={t('categories:root_placeholder')}
             value={newName}
             onChange={setNewName}
             onCancel={() => setAddingUnder(null)}
@@ -122,10 +125,15 @@ export default function CategoriesPage() {
         )}
 
         {treeQuery.isLoading && <LoadingState />}
-        {treeQuery.isError && <ErrorState message="分类加载失败" onRetry={() => treeQuery.refetch()} />}
+        {treeQuery.isError && (
+          <ErrorState message={t('categories:load_failed')} onRetry={() => treeQuery.refetch()} />
+        )}
 
         {treeQuery.data && roots.length === 0 && (
-          <EmptyState title="还没有分类" description="创建一级分类后即可在记账时选择。" />
+          <EmptyState
+            title={t('categories:empty_title')}
+            description={t('categories:empty_description')}
+          />
         )}
 
         {roots.length > 0 && (
@@ -153,7 +161,7 @@ export default function CategoriesPage() {
       </section>
 
       <section className="card p-4">
-        <h2 className="mb-3 text-sm font-medium">标签</h2>
+        <h2 className="mb-3 text-sm font-medium">{t('categories:tags.title')}</h2>
 
         <form
           onSubmit={(e) => {
@@ -166,7 +174,7 @@ export default function CategoriesPage() {
             maxLength={20}
             value={tagName}
             onChange={(e) => setTagName(e.target.value)}
-            placeholder="新标签名称"
+            placeholder={t('categories:tags.placeholder')}
             className="input max-w-xs"
           />
           <button
@@ -174,12 +182,12 @@ export default function CategoriesPage() {
             disabled={!tagName.trim() || createTag.isPending}
             className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            添加
+            {t('categories:tags.add')}
           </button>
         </form>
 
         {tagsQuery.data && tagsQuery.data.tags.length === 0 && (
-          <p className="text-sm text-[var(--color-content-muted)]">暂无标签。标签可用于跨分类标记交易。</p>
+          <p className="text-sm text-[var(--color-content-muted)]">{t('categories:tags.empty')}</p>
         )}
 
         {tagsQuery.data && tagsQuery.data.tags.length > 0 && (
@@ -197,7 +205,7 @@ export default function CategoriesPage() {
                   type="button"
                   onClick={() => deleteTag.mutate(tag.id)}
                   className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)]"
-                  aria-label={`删除标签 ${tag.name}`}
+                  aria-label={t('categories:tags.delete_aria', { name: tag.name })}
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -229,6 +237,8 @@ function CategoryGroup({
   onSubmitAdd: () => void;
   onDelete: (id: string) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <li>
       <div className="flex items-center justify-between gap-2">
@@ -240,14 +250,14 @@ function CategoryGroup({
               onClick={onStartAdd}
               className="text-xs text-[var(--color-content-muted)] hover:text-[var(--color-accent)]"
             >
-              添加子类
+              {t('categories:add_child')}
             </button>
           )}
           <button
             type="button"
             onClick={() => onDelete(node.id)}
             className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)]"
-            aria-label={`删除分类 ${node.name}`}
+            aria-label={t('categories:delete_category_aria', { name: node.name })}
           >
             <Trash2 className="size-3.5" />
           </button>
@@ -263,7 +273,7 @@ function CategoryGroup({
                 type="button"
                 onClick={() => onDelete(child.id)}
                 className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)]"
-                aria-label={`删除分类 ${child.name}`}
+                aria-label={t('categories:delete_category_aria', { name: child.name })}
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -275,7 +285,7 @@ function CategoryGroup({
       {addingUnder === node.id && (
         <div className="mt-2 ml-3">
           <InlineInput
-            placeholder="子分类名称"
+            placeholder={t('categories:child_placeholder')}
             value={newName}
             onChange={onNewNameChange}
             onCancel={onCancelAdd}
@@ -303,6 +313,8 @@ function InlineInput({
   onSubmit: () => void;
   disabled: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <form
       onSubmit={(e) => {
@@ -324,14 +336,14 @@ function InlineInput({
         disabled={disabled}
         className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm text-white disabled:opacity-60"
       >
-        保存
+        {t('common:actions.save')}
       </button>
       <button
         type="button"
         onClick={onCancel}
         className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
       >
-        取消
+        {t('common:actions.cancel')}
       </button>
     </form>
   );

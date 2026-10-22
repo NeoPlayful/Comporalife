@@ -75,13 +75,21 @@ export class AppError extends Error {
   readonly code: ErrorCodeValue;
   readonly statusCode: number;
   readonly details?: unknown;
+  /** 供前端按错误码插值的参数，例如 { maxMb: 10 } */
+  readonly params?: Record<string, unknown>;
 
-  constructor(code: ErrorCodeValue, message: string, details?: unknown) {
+  constructor(
+    code: ErrorCodeValue,
+    message: string,
+    details?: unknown,
+    params?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = 'AppError';
     this.code = code;
     this.statusCode = ERROR_STATUS[code];
     this.details = details;
+    this.params = params;
   }
 }
 
@@ -111,12 +119,22 @@ export const errors = {
 
   importEmpty: () => new AppError(ErrorCode.IMPORT_EMPTY, '文件中没有可导入的数据行'),
   importFileTooLarge: (maxMb: number) =>
-    new AppError(ErrorCode.IMPORT_FILE_TOO_LARGE, `文件超过 ${maxMb} MB 上限`),
+    new AppError(
+      ErrorCode.IMPORT_FILE_TOO_LARGE,
+      `文件超过 ${maxMb} MB 上限`,
+      undefined,
+      { maxMb },
+    ),
   importFormatUnsupported: (message = '仅支持 CSV 与 XLSX 文件') =>
     new AppError(ErrorCode.IMPORT_FORMAT_UNSUPPORTED, message),
   importParseFailed: (message = '文件解析失败') => new AppError(ErrorCode.IMPORT_PARSE_FAILED, message),
   importRowLimitExceeded: (max: number) =>
-    new AppError(ErrorCode.IMPORT_ROW_LIMIT_EXCEEDED, `数据行超过 ${max} 行上限，请拆分文件`),
+    new AppError(
+      ErrorCode.IMPORT_ROW_LIMIT_EXCEEDED,
+      `数据行超过 ${max} 行上限，请拆分文件`,
+      undefined,
+      { max },
+    ),
   importMappingInvalid: (message = '列映射无效', details?: unknown) =>
     new AppError(ErrorCode.IMPORT_MAPPING_INVALID, message, details),
   importNotReady: (message = '导入尚未通过校验') => new AppError(ErrorCode.IMPORT_NOT_READY, message),

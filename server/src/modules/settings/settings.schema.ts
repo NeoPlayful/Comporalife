@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SUPPORTED_CURRENCIES } from '../../config/constants.js';
+import { SUPPORTED_CURRENCIES, SUPPORTED_LANGUAGES } from '../../config/constants.js';
 
 const currencySchema = z
   .string()
@@ -29,6 +29,7 @@ export const updateSettingsSchema = z
     timezone: timezoneSchema.optional(),
     dateFormat: z.enum(['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY']).optional(),
     theme: z.enum(['dark', 'light', 'system']).optional(),
+    language: z.enum(SUPPORTED_LANGUAGES).optional(),
     simulationDefaults: simulationDefaultsSchema.nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, '至少需要修改一项设置');

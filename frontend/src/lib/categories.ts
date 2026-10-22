@@ -28,11 +28,6 @@ export interface Tag {
   createdAt: string;
 }
 
-export const KIND_LABELS: Record<CategoryKind, string> = {
-  income: '收入',
-  expense: '支出',
-};
-
 export const categoriesApi = {
   tree: (kind?: CategoryKind) =>
     api.get<{ categories: CategoryNode[]; flat: FlatCategory[] }>(

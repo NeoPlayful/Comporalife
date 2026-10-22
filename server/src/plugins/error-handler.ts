@@ -19,7 +19,12 @@ async function errorHandlerPlugin(app: FastifyInstance) {
     if (error instanceof AppError) {
       return reply.status(error.statusCode).send({
         success: false,
-        error: { code: error.code, message: error.message, details: error.details },
+        error: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          params: error.params,
+        },
         meta: { requestId },
       });
     }

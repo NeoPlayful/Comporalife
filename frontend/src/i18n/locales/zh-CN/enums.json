@@ -1,0 +1,70 @@
+{
+  "account_type": {
+    "cash": "现金",
+    "bank": "银行卡",
+    "credit_card": "信用卡",
+    "brokerage": "投资账户",
+    "loan": "贷款",
+    "other": "其他"
+  },
+  "account_status": {
+    "active": "使用中",
+    "archived": "已归档"
+  },
+  "transaction_type": {
+    "income": "收入",
+    "expense": "支出",
+    "transfer": "转账",
+    "adjustment": "调整",
+    "reversal": "冲正"
+  },
+  "category_kind": {
+    "income": "收入",
+    "expense": "支出"
+  },
+  "role": {
+    "super_admin": "超级管理员",
+    "admin": "管理员",
+    "user": "普通用户"
+  },
+  "user_status": {
+    "active": "正常",
+    "disabled": "已禁用",
+    "pending_verification": "待验证"
+  },
+  "import_status": {
+    "uploaded": "已上传",
+    "parsed": "已解析",
+    "mapped": "已映射",
+    "validated": "已校验",
+    "committing": "提交中",
+    "completed": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消",
+    "rolled_back": "已撤销"
+  },
+  "import_row_status": {
+    "pending": "待处理",
+    "valid": "有效",
+    "invalid": "无效",
+    "duplicate": "重复",
+    "suspected": "疑似重复",
+    "skipped": "已跳过",
+    "imported": "已导入",
+    "failed": "失败"
+  },
+  "theme": {
+    "dark": "深色",
+    "light": "浅色",
+    "system": "跟随系统"
+  },
+  "contribution_frequency": {
+    "none": "不定投",
+    "monthly": "每月",
+    "annual": "每年"
+  },
+  "contribution_timing": {
+    "begin": "期初",
+    "end": "期末"
+  }
+}

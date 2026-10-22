@@ -1,4 +1,5 @@
 import { CURRENCY_DECIMALS } from '@/utils/constants';
+import { formatNumber } from '@/lib/format';
 
 interface MoneyDisplayProps {
   /** 后端返回的十进制字符串，避免浮点误差 */
@@ -7,16 +8,6 @@ interface MoneyDisplayProps {
   /** 是否显示正负号颜色 */
   colorize?: boolean;
   className?: string;
-}
-
-function formatAmount(amount: string | number, decimals: number): string {
-  const numeric = typeof amount === 'string' ? Number(amount) : amount;
-  if (!Number.isFinite(numeric)) return '—';
-
-  return numeric.toLocaleString('zh-CN', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
 }
 
 export default function MoneyDisplay({
@@ -37,7 +28,10 @@ export default function MoneyDisplay({
 
   return (
     <span className={`tabular-nums ${tone} ${className}`}>
-      {formatAmount(amount, decimals)}
+      {formatNumber(Number.isFinite(numeric) ? numeric : null, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })}
       <span className="ml-1 text-xs text-[var(--color-content-muted)]">{currency}</span>
     </span>
   );

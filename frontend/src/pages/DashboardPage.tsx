@@ -1,4 +1,3 @@
-import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/lib/accounts';
 import '@/components/charts/echarts';
 import ReactECharts from 'echarts-for-react';
 import { dashboardApi } from '@/lib/dashboard';
@@ -8,13 +7,17 @@ import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
-import { TRANSACTION_TYPE_LABELS } from '@/lib/transactions';
+import { useEnumLabels } from '@/lib/enum-labels';
+import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import '@/components/charts/echarts';
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
+  const { accountType, transactionType } = useEnumLabels();
+
   const overviewQuery = useQuery({ queryKey: ['dashboard', 'overview'], queryFn: dashboardApi.overview });
   const cashflowQuery = useQuery({ queryKey: ['dashboard', 'cashflow'], queryFn: () => dashboardApi.cashflow() });
   const trendQuery = useQuery({ queryKey: ['dashboard', 'trend'], queryFn: () => dashboardApi.netWorthTrend() });
@@ -25,7 +28,9 @@ export default function DashboardPage() {
 
   if (overviewQuery.isLoading) return <LoadingState />;
   if (overviewQuery.isError) {
-    return <ErrorState message="Dashboard 加载失败" onRetry={() => overviewQuery.refetch()} />;
+    return (
+      <ErrorState message={t('dashboard:load_failed')} onRetry={() => overviewQuery.refetch()} />
+    );
   }
 
   const overview = overviewQuery.data!;
@@ -34,17 +39,17 @@ export default function DashboardPage() {
   if (accounts.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-semibold">财务总览</h1>
+        <h1 className="text-xl font-semibold">{t('dashboard:title')}</h1>
         <div className="card">
           <EmptyState
-            title="欢迎使用 Comporalife"
-            description="先创建一个账户，然后记录你的第一笔收入或支出。"
+            title={t('dashboard:welcome_title')}
+            description={t('dashboard:welcome_description')}
             action={
               <Link
                 to="/accounts"
                 className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
               >
-                创建账户
+                {t('dashboard:create_account')}
               </Link>
             }
           />
@@ -60,27 +65,44 @@ export default function DashboardPage() {
     (quality?.reconciliationDifferences.length ?? 0) > 0 ||
     (quality?.archivedWithNonZeroBalance.length ?? 0) > 0;
 
+  const listSeparator = t('common:list_separator');
+
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold">财务总览</h1>
+      <h1 className="text-xl font-semibold">{t('dashboard:title')}</h1>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="净资产"
+          label={t('dashboard:metrics.net_worth')}
           value={overview.netWorth}
           currency={overview.baseCurrency}
-          hint={`资产 ${Number(overview.totalAssets).toLocaleString('zh-CN')} · 负债 ${Number(overview.totalLiabilities).toLocaleString('zh-CN')}`}
+          hint={t('dashboard:metrics.assets_liabilities', {
+            assets: formatNumber(overview.totalAssets),
+            liabilities: formatNumber(overview.totalLiabilities),
+          })}
         />
-        <MetricCard label="本月收入" value={overview.monthIncome} currency={overview.baseCurrency} tone="positive" />
-        <MetricCard label="本月支出" value={overview.monthExpense} currency={overview.baseCurrency} tone="negative" />
         <MetricCard
-          label="本月结余"
+          label={t('dashboard:metrics.month_income')}
+          value={overview.monthIncome}
+          currency={overview.baseCurrency}
+          tone="positive"
+        />
+        <MetricCard
+          label={t('dashboard:metrics.month_expense')}
+          value={overview.monthExpense}
+          currency={overview.baseCurrency}
+          tone="negative"
+        />
+        <MetricCard
+          label={t('dashboard:metrics.month_net')}
           value={overview.monthNet}
           currency={overview.baseCurrency}
           hint={
             overview.savingsRate === null
-              ? '储蓄率：收入为 0 时不可计算'
-              : `储蓄率 ${(Number(overview.savingsRate) * 100).toFixed(1)}%`
+              ? t('dashboard:metrics.savings_rate_na')
+              : t('dashboard:metrics.savings_rate', {
+                  rate: (Number(overview.savingsRate) * 100).toFixed(1),
+                })
           }
         />
       </div>
@@ -89,71 +111,91 @@ export default function DashboardPage() {
         <div className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
           <p className="flex items-center gap-1.5 font-medium">
             <AlertTriangle className="size-4" />
-            缺少汇率，以下币种未计入净资产
+            {t('dashboard:missing_rates.title')}
           </p>
           <p className="mt-1">
-            {overview.basis.missingRates.join('、')} · 请在
+            {t('dashboard:missing_rates.body', {
+              currencies: overview.basis.missingRates.join(listSeparator),
+            })}
             <Link to="/settings" className="mx-1 underline">
-              设置
+              {t('dashboard:missing_rates.settings_link')}
             </Link>
-            中补录汇率
+            {t('dashboard:missing_rates.body_suffix')}
           </p>
         </div>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium">净资产趋势</h2>
+          <h2 className="mb-3 text-sm font-medium">{t('dashboard:sections.net_worth_trend')}</h2>
           {trendQuery.data ? (
             <NetWorthChart data={trendQuery.data} />
           ) : (
             <div className="h-[240px]">
-              {trendQuery.isLoading ? <LoadingState label="加载趋势…" /> : <ErrorState message="趋势加载失败" />}
+              {trendQuery.isLoading ? (
+                <LoadingState label={t('dashboard:sections.loading_trend')} />
+              ) : (
+                <ErrorState message={t('dashboard:sections.trend_failed')} />
+              )}
             </div>
           )}
           <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-            {trendQuery.data?.basis.note} · 基准币种 {overview.baseCurrency}
+            {t('dashboard:sections.trend_basis', {
+              note: trendQuery.data?.basis.note ?? '',
+              currency: overview.baseCurrency,
+            })}
           </p>
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium">月度现金流</h2>
+          <h2 className="mb-3 text-sm font-medium">{t('dashboard:sections.cashflow')}</h2>
           {cashflowQuery.data ? (
             <CashflowChart points={cashflowQuery.data.points} currency={overview.baseCurrency} />
           ) : (
             <div className="h-[260px]">
-              {cashflowQuery.isLoading ? <LoadingState label="加载现金流…" /> : <ErrorState message="现金流加载失败" />}
+              {cashflowQuery.isLoading ? (
+                <LoadingState label={t('dashboard:sections.loading_cashflow')} />
+              ) : (
+                <ErrorState message={t('dashboard:sections.cashflow_failed')} />
+              )}
             </div>
           )}
           <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-            {cashflowQuery.data?.basis.note} · 时区 {cashflowQuery.data?.basis.timezone}
+            {t('dashboard:sections.cashflow_basis', {
+              note: cashflowQuery.data?.basis.note ?? '',
+              timezone: cashflowQuery.data?.basis.timezone ?? '',
+            })}
           </p>
         </section>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium">资产配置</h2>
+          <h2 className="mb-3 text-sm font-medium">{t('dashboard:sections.allocation')}</h2>
           {allocationQuery.data ? (
             <AllocationChart data={allocationQuery.data} />
           ) : (
             <div className="h-[220px]">
-              {allocationQuery.isLoading ? <LoadingState label="加载配置…" /> : null}
+              {allocationQuery.isLoading ? (
+                <LoadingState label={t('dashboard:sections.loading_allocation')} />
+              ) : null}
             </div>
           )}
-          <p className="mt-2 text-xs text-[var(--color-content-muted)]">{allocationQuery.data?.basis.note}</p>
+          <p className="mt-2 text-xs text-[var(--color-content-muted)]">
+            {allocationQuery.data?.basis.note}
+          </p>
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium">账户余额</h2>
+          <h2 className="mb-3 text-sm font-medium">{t('dashboard:sections.account_balances')}</h2>
           <ul className="divide-y divide-[var(--color-border-subtle)]">
             {accounts.map((account) => (
               <li key={account.id} className="flex items-center justify-between py-2">
                 <Link to={`/accounts/${account.id}`} className="min-w-0 text-sm hover:underline">
                   <span className="truncate">{account.name}</span>
                   <span className="ml-2 text-xs text-[var(--color-content-muted)]">
-                    {ACCOUNT_TYPE_LABELS[account.type as AccountType] ?? account.type}
-                    {account.isLiability && ' · 负债'}
+                    {accountType(account.type)}
+                    {account.isLiability && t('dashboard:sections.liability_suffix')}
                   </span>
                 </Link>
                 <MoneyDisplay amount={account.balance} currency={account.currency} className="text-sm" />
@@ -161,7 +203,9 @@ export default function DashboardPage() {
             ))}
           </ul>
           <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-            截至 {new Date(balancesQuery.data?.asOf ?? Date.now()).toLocaleString('zh-CN')} · 期初 + 已入账分录
+            {t('dashboard:sections.balances_as_of', {
+              time: formatDateTime(balancesQuery.data?.asOf ?? Date.now()),
+            })}
           </p>
         </section>
       </div>
@@ -169,13 +213,15 @@ export default function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-medium">最近流水</h2>
+            <h2 className="text-sm font-medium">{t('dashboard:sections.recent')}</h2>
             <Link to="/transactions" className="text-xs text-[var(--color-accent)]">
-              查看全部
+              {t('dashboard:sections.view_all')}
             </Link>
           </div>
           {recentQuery.data?.transactions.length === 0 ? (
-            <p className="py-6 text-center text-sm text-[var(--color-content-muted)]">暂无流水</p>
+            <p className="py-6 text-center text-sm text-[var(--color-content-muted)]">
+              {t('dashboard:sections.recent_empty')}
+            </p>
           ) : (
             <ul className="divide-y divide-[var(--color-border-subtle)]">
               {recentQuery.data?.transactions.map((tx) => (
@@ -183,8 +229,7 @@ export default function DashboardPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm">{tx.description}</p>
                     <p className="text-xs text-[var(--color-content-muted)]">
-                      {tx.occurredAt.slice(0, 10)} ·{' '}
-                      {TRANSACTION_TYPE_LABELS[tx.type as keyof typeof TRANSACTION_TYPE_LABELS] ?? tx.type}
+                      {formatDate(tx.occurredAt)} · {transactionType(tx.type)}
                       {tx.category && ` · ${tx.category.name}`}
                     </p>
                   </div>
@@ -196,20 +241,24 @@ export default function DashboardPage() {
         </section>
 
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium">数据质量</h2>
+          <h2 className="mb-3 text-sm font-medium">{t('dashboard:sections.quality')}</h2>
           {!quality ? (
-            <LoadingState label="检查数据…" />
+            <LoadingState label={t('dashboard:sections.quality_loading')} />
           ) : !hasQualityIssue ? (
-            <p className="py-6 text-center text-sm text-[var(--color-positive)]">数据完整，未发现异常</p>
+            <p className="py-6 text-center text-sm text-[var(--color-positive)]">
+              {t('dashboard:sections.quality_ok')}
+            </p>
           ) : (
             <ul className="space-y-2 text-sm">
               {quality.uncategorizedTransactions > 0 && (
                 <li className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />
                   <span>
-                    {quality.uncategorizedTransactions} 笔流水未分类，
+                    {t('dashboard:sections.uncategorized', {
+                      count: quality.uncategorizedTransactions,
+                    })}
                     <Link to="/transactions" className="text-[var(--color-accent)]">
-                      去分类
+                      {t('dashboard:sections.go_categorize')}
                     </Link>
                   </span>
                 </li>
@@ -218,9 +267,11 @@ export default function DashboardPage() {
                 <li className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />
                   <span>
-                    缺少 {quality.missingRateCurrencies.join('、')} 汇率，
+                    {t('dashboard:sections.missing_rate', {
+                      currencies: quality.missingRateCurrencies.join(listSeparator),
+                    })}
                     <Link to="/settings" className="text-[var(--color-accent)]">
-                      补录汇率
+                      {t('dashboard:sections.add_rates')}
                     </Link>
                   </span>
                 </li>
@@ -228,13 +279,21 @@ export default function DashboardPage() {
               {quality.reconciliationDifferences.length > 0 && (
                 <li className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />
-                  <span>{quality.reconciliationDifferences.length} 个账户对账存在差异</span>
+                  <span>
+                    {t('dashboard:sections.reconciliation_diff', {
+                      count: quality.reconciliationDifferences.length,
+                    })}
+                  </span>
                 </li>
               )}
               {quality.archivedWithNonZeroBalance.length > 0 && (
                 <li className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />
-                  <span>已归档但仍有余额：{quality.archivedWithNonZeroBalance.join('、')}</span>
+                  <span>
+                    {t('dashboard:sections.archived_with_balance', {
+                      accounts: quality.archivedWithNonZeroBalance.join(listSeparator),
+                    })}
+                  </span>
                 </li>
               )}
             </ul>
@@ -278,10 +337,12 @@ function MetricCard({
 }
 
 function AllocationChart({ data }: { data: ReturnType<typeof dashboardApi.assetAllocation> extends Promise<infer T> ? T : never }) {
+  const { t } = useTranslation('dashboard');
+  const { accountType } = useEnumLabels();
   const items = data.byType.filter((item) => Number(item.amount) !== 0);
 
   if (items.length === 0) {
-    return <EmptyState title="暂无可分配的资产" />;
+    return <EmptyState title={t('sections.allocation_empty')} />;
   }
 
   const option = {
@@ -291,7 +352,7 @@ function AllocationChart({ data }: { data: ReturnType<typeof dashboardApi.assetA
       borderWidth: 0,
       textStyle: { color: '#e8e9ed', fontSize: 12 },
       formatter: (params: { name: string; value: number; percent: number }) =>
-        `${params.name}<br/>${params.value.toLocaleString('zh-CN')} ${data.baseCurrency} (${params.percent}%)`,
+        `${params.name}<br/>${formatNumber(params.value)} ${data.baseCurrency} (${params.percent}%)`,
     },
     legend: {
       bottom: 0,
@@ -308,7 +369,7 @@ function AllocationChart({ data }: { data: ReturnType<typeof dashboardApi.assetA
         itemStyle: { borderWidth: 0 },
         label: { show: false },
         data: items.map((item) => ({
-          name: ACCOUNT_TYPE_LABELS[item.type as AccountType] ?? item.type,
+          name: accountType(item.type),
           value: Number(item.amount),
         })),
         color: ['#5b8def', '#4ea87c', '#c76a5e', '#b58ce0', '#d9a55b', '#5aa9c7'],

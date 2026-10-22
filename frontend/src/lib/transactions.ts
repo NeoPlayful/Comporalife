@@ -41,13 +41,6 @@ export interface TransactionListParams {
   pageSize?: number;
 }
 
-export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
-  income: '收入',
-  expense: '支出',
-  transfer: '转账',
-  adjustment: '调整',
-};
-
 export const transactionsApi = {
   list: (params: TransactionListParams = {}) => {
     const query = new URLSearchParams();

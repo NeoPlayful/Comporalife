@@ -3,7 +3,7 @@ import type { PrismaClient, User } from '@prisma/client';
 import argon2 from 'argon2';
 import type { Redis } from 'ioredis';
 import { env, isProduction } from '../../config/env.js';
-import { PASSWORD_RESET_TTL_SECONDS } from '../../config/constants.js';
+import { PASSWORD_RESET_TTL_SECONDS, SUPPORTED_LANGUAGES } from '../../config/constants.js';
 import { hashToken, signAccessToken } from '../../lib/auth.js';
 import { errors } from '../../lib/errors.js';
 import { describeClient, newSessionValues } from '../../lib/session.js';
@@ -38,8 +38,14 @@ export class AuthService {
     private readonly redis: Redis,
   ) {}
 
-  async register(input: { email: string; password: string; nickname: string }) {
+  async register(input: {
+    email: string;
+    password: string;
+    nickname: string;
+    language?: (typeof SUPPORTED_LANGUAGES)[number];
+  }) {
     const email = input.email.toLowerCase().trim();
+    const language = input.language ?? 'zh-CN';
 
     const existing = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (existing) {
@@ -61,6 +67,7 @@ export class AuthService {
               baseCurrency: env.DEFAULT_CURRENCY,
               timezone: 'Asia/Shanghai',
               theme: 'dark',
+              language,
             },
           },
         },
@@ -74,7 +81,12 @@ export class AuthService {
         let sortOrder = 0;
         for (const node of nodes) {
           const parent = await tx.category.create({
-            data: { userId: created.id, kind, name: node.name, sortOrder: sortOrder++ },
+            data: {
+              userId: created.id,
+              kind,
+              name: node.names[language],
+              sortOrder: sortOrder++,
+            },
           });
 
           let childOrder = 0;
@@ -83,7 +95,7 @@ export class AuthService {
               data: {
                 userId: created.id,
                 kind,
-                name: child,
+                name: child[language],
                 parentId: parent.id,
                 sortOrder: childOrder++,
               },

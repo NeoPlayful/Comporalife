@@ -1,0 +1,45 @@
+{
+  "app_name": "Comporalife",
+  "brand_initial": "复",
+  "actions": {
+    "save": "保存",
+    "cancel": "取消",
+    "create": "创建",
+    "edit": "编辑",
+    "delete": "删除",
+    "confirm": "确认",
+    "close": "关闭",
+    "back": "返回",
+    "retry": "重试",
+    "search": "搜索",
+    "filter": "筛选",
+    "reset": "重置",
+    "submit": "提交",
+    "loading": "加载中…",
+    "no_data": "暂无数据",
+    "more": "更多",
+    "export": "导出",
+    "expand": "展开",
+    "collapse": "收起"
+  },
+  "state": {
+    "load_failed": "加载失败",
+    "render_error": "页面出现异常",
+    "render_error_detail": "页面渲染出错",
+    "restoring_session": "正在恢复会话…"
+  },
+  "not_found": {
+    "title": "页面不存在",
+    "back_dashboard": "返回财务总览"
+  },
+  "language": {
+    "label": "界面语言",
+    "zh_CN": "简体中文",
+    "en_US": "English"
+  },
+  "footer": {
+    "version": "版本 v{{version}}"
+  },
+  "network_error": "网络异常，请稍后重试",
+  "list_separator": "、"
+}
