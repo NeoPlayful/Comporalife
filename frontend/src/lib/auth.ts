@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, type RequestOptions } from './client';
 
 export interface AuthUser {
   id: string;
@@ -40,7 +40,7 @@ export const authApi = {
 
   logout: () => api.post<{ loggedOut: boolean }>('/api/auth/logout'),
 
-  me: () => api.get<{ user: AuthUser }>('/api/auth/me'),
+  me: (options?: RequestOptions) => api.get<{ user: AuthUser }>('/api/auth/me', options),
 
   changePassword: (body: { oldPassword: string; newPassword: string }) =>
     api.post<{ changed: boolean; requiresReauth: boolean }>('/api/auth/change-password', body),

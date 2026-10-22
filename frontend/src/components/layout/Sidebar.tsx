@@ -58,7 +58,7 @@ export default function Sidebar() {
 
       <div className="border-t border-[var(--color-border-subtle)] p-3">
         {!collapsed && (
-          <p className="text-xs text-[var(--color-content-muted)]">Phase 1 · 个人版</p>
+          <p className="text-xs text-[var(--color-content-muted)]">版本 v{__APP_VERSION__}</p>
         )}
       </div>
     </aside>

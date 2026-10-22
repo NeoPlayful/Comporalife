@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { SESSION_COOKIE_NAME } from '../../config/constants.js';
 import { isProduction } from '../../config/env.js';
 import { ok } from '../../lib/api-utils.js';
-import { errors } from '../../lib/errors.js';
+import { AppError, errors } from '../../lib/errors.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { clearRefreshCookie, setRefreshCookie } from '../../lib/session.js';
 import { AuthService } from './auth.service.js';
@@ -62,8 +62,11 @@ export default async function authRoutes(app: FastifyInstance) {
       setRefreshCookie(reply, result.refreshToken);
       return ok({ accessToken: result.accessToken }, request.id);
     } catch (err) {
-      // 刷新失败必须清除 Cookie，否则前端会在无效令牌上反复重试
-      clearRefreshCookie(reply);
+      // 只有会话确定已撤销或已过期时才清除 Cookie；
+      // 令牌哈希查不到可能只是并发轮换，清掉会误伤另一标签页刚写入的有效令牌
+      if (err instanceof AppError && err.code === 'SESSION_EXPIRED') {
+        clearRefreshCookie(reply);
+      }
       throw err;
     }
   });

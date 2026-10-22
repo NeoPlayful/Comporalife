@@ -148,6 +148,37 @@ describe('登录与会话', () => {
       cookies: { cl_refresh: oldToken },
     });
     expect(replay.statusCode).toBe(401);
+    // 重放失败不能清除 Cookie：并发轮换时浏览器可能已持有有效的新令牌
+    expect(replay.cookies.find((c) => c.name === 'cl_refresh')).toBeUndefined();
+  });
+
+  it('会话过期时才清除刷新 Cookie', async () => {
+    await registerUser();
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: {
+        email: (await app.prisma.user.findFirstOrThrow({ where: { email: { endsWith: EMAIL_DOMAIN } } })).email,
+        password: VALID_PASSWORD,
+      },
+    });
+    const oldToken = login.cookies.find((c) => c.name === 'cl_refresh')!.value;
+
+    // 直接令会话过期，模拟闲置超过 7 天
+    await app.prisma.userSession.updateMany({
+      where: { userId: (await app.prisma.user.findFirstOrThrow({ where: { email: { endsWith: EMAIL_DOMAIN } } })).id },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/refresh',
+      cookies: { cl_refresh: oldToken },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error.code).toBe('SESSION_EXPIRED');
+    expect(res.cookies.find((c) => c.name === 'cl_refresh')?.value).toBe('');
   });
 
   it('未登录访问受保护接口返回 401', async () => {
