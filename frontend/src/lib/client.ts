@@ -21,7 +21,10 @@ export class ApiError extends Error {
   }
 }
 
-let refreshPromise: Promise<boolean> | null = null;
+let refreshPromise: Promise<string | null> | null = null;
+
+/** 另一标签页可能刚完成轮换，短暂等待后重试可读到新 Cookie */
+const REFRESH_RETRY_DELAY_MS = 150;
 
 /** access token 保存在内存中，由登录流程注入，避免落盘到 localStorage */
 let accessTokenGetter: () => string | null = () => null;
@@ -38,42 +41,71 @@ export function configureAuthBridge(options: {
   onAuthLost = options.onAuthLost;
 }
 
-async function refreshSession(): Promise<boolean> {
+async function refreshSession(): Promise<string | null> {
   const response = await fetch('/api/auth/refresh', {
     method: 'POST',
     credentials: 'include',
   });
 
-  if (!response.ok) return false;
+  if (!response.ok) return null;
 
   const payload = (await response.json()) as ApiEnvelope<{ accessToken: string }>;
-  const token = payload.data?.accessToken;
-  if (!token) return false;
-
-  onTokenRefreshed(token);
-  return true;
+  return payload.data?.accessToken ?? null;
 }
 
-/** 并发请求同时 401 时只触发一次刷新，其余请求复用同一结果 */
-function refreshOnce(): Promise<boolean> {
+/**
+ * 并发请求同时 401 时只触发一次刷新，其余请求复用同一结果。
+ * 首次失败后重试一次：轮换是单次有效的，另一标签页可能已用掉旧令牌。
+ */
+function refreshOnce(): Promise<string | null> {
   if (!refreshPromise) {
-    refreshPromise = refreshSession().finally(() => {
+    refreshPromise = (async () => {
+      let token = await refreshSession();
+      if (!token) {
+        await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAY_MS));
+        token = await refreshSession();
+      }
+      return token;
+    })().finally(() => {
       refreshPromise = null;
     });
   }
   return refreshPromise;
 }
 
+/** 供会话恢复流程复用：拿到新令牌后同步到认证状态 */
+export async function refreshAccessToken(): Promise<string | null> {
+  const token = await refreshOnce();
+  if (token) onTokenRefreshed(token);
+  return token;
+}
+
 export interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   /** 内部使用：避免刷新后再次递归刷新 */
   skipRefresh?: boolean;
+  /** 显式指定访问令牌，用于会话恢复阶段 store 尚未写入的场景 */
+  token?: string | null;
+}
+
+/** 这些接口本身负责建立或刷新会话，401 时不触发自动刷新 */
+const AUTH_ENDPOINTS_WITHOUT_REFRESH = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+];
+
+function shouldAutoRefresh(path: string): boolean {
+  return !AUTH_ENDPOINTS_WITHOUT_REFRESH.some((endpoint) => path.startsWith(endpoint));
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { body, skipRefresh = false, headers, ...rest } = options;
+  const { body, skipRefresh = false, headers, token: explicitToken, ...rest } = options;
 
-  const token = accessTokenGetter();
+  const token = explicitToken !== undefined ? explicitToken : accessTokenGetter();
 
   const response = await fetch(path, {
     ...rest,
@@ -86,9 +118,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  if (response.status === 401 && !skipRefresh && !path.includes('/auth/')) {
+  if (response.status === 401 && !skipRefresh && shouldAutoRefresh(path)) {
     const refreshed = await refreshOnce();
     if (refreshed) {
+      onTokenRefreshed(refreshed);
       return request<T>(path, { ...options, skipRefresh: true });
     }
     onAuthLost();
@@ -139,7 +172,10 @@ async function requestMultipart<T>(path: string, form: FormData, options: Reques
 
   if (response.status === 401 && !skipRefresh) {
     const refreshed = await refreshOnce();
-    if (refreshed) return requestMultipart<T>(path, form, { ...options, skipRefresh: true });
+    if (refreshed) {
+      onTokenRefreshed(refreshed);
+      return requestMultipart<T>(path, form, { ...options, skipRefresh: true });
+    }
     onAuthLost();
     throw new ApiError(401, 'UNAUTHORIZED', '会话已失效，请重新登录');
   }

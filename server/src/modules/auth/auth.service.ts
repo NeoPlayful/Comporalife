@@ -193,8 +193,14 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!session || session.revokedAt || session.expiresAt <= new Date()) {
-      throw errors.unauthorized('会话已失效，请重新登录');
+    if (!session) {
+      // 哈希查不到通常说明旧令牌已被轮换：可能是并发请求或另一标签页抢先刷新。
+      // 此时浏览器已持有新 Cookie，清除它反而会踢掉有效会话，因此不动 Cookie。
+      throw errors.unauthorized('刷新令牌已失效，请重试');
+    }
+
+    if (session.revokedAt || session.expiresAt <= new Date()) {
+      throw errors.sessionExpired();
     }
 
     if (session.user.status !== 'active') {

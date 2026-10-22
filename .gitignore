@@ -23,6 +23,9 @@ playwright-report/
 test-results/
 .vitest/
 
+# 本地代码索引
+.codegraph/
+
 # 编辑器与系统
 .vscode/
 .idea/

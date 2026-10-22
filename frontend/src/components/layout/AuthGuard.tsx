@@ -1,4 +1,5 @@
 import { authApi } from '@/lib/auth';
+import { refreshAccessToken } from '@/lib/client';
 import LoadingState from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/stores/auth-store';
 import { useEffect, useState } from 'react';
@@ -20,14 +21,11 @@ export default function AuthGuard() {
     // 页面刷新后内存中的 access token 丢失，依赖 refresh cookie 恢复会话
     (async () => {
       try {
-        const refresh = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
-        if (!refresh.ok) throw new Error('no session');
+        const accessToken = await refreshAccessToken();
+        if (!accessToken) throw new Error('no session');
 
-        const payload = (await refresh.json()) as { data?: { accessToken?: string } };
-        const accessToken = payload.data?.accessToken;
-        if (!accessToken) throw new Error('no token');
-
-        const { user: fetched } = await authApi.me();
+        // 令牌必须显式传入：此时 store 尚未写入，请求层读不到
+        const { user: fetched } = await authApi.me({ token: accessToken });
         if (!cancelled) setAuth(fetched, accessToken);
       } catch {
         if (!cancelled) clear();

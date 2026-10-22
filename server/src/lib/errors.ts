@@ -1,5 +1,6 @@
 export const ErrorCode = {
   UNAUTHORIZED: 'UNAUTHORIZED',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
   FORBIDDEN: 'FORBIDDEN',
   NOT_FOUND: 'NOT_FOUND',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
@@ -37,6 +38,7 @@ export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   UNAUTHORIZED: 401,
+  SESSION_EXPIRED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   VALIDATION_ERROR: 400,
@@ -85,6 +87,7 @@ export class AppError extends Error {
 
 export const errors = {
   unauthorized: (message = '未登录或会话已失效') => new AppError(ErrorCode.UNAUTHORIZED, message),
+  sessionExpired: () => new AppError(ErrorCode.SESSION_EXPIRED, '会话已失效，请重新登录'),
   forbidden: (message = '无权访问该资源') => new AppError(ErrorCode.FORBIDDEN, message),
   notFound: (message = '资源不存在') => new AppError(ErrorCode.NOT_FOUND, message),
   validation: (message = '参数校验失败', details?: unknown) =>
