@@ -2,6 +2,8 @@
   "dashboard": "财务总览",
   "accounts": "财务账户",
   "transactions": "交易流水",
+  "analytics": "收支分析",
+  "budgets": "预算",
   "imports": "账单导入",
   "categories": "分类管理",
   "compound": "复利模拟",

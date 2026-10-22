@@ -109,6 +109,16 @@ enum TransactionSource {
   import
 }
 
+enum BudgetPeriodType {
+  monthly
+  yearly
+}
+
+enum BudgetStatus {
+  active
+  archived
+}
+
 model User {
   id              String     @id @default(uuid()) @db.Uuid
   email           String     @unique
@@ -137,6 +147,8 @@ model User {
   importBatches       ImportBatch[]
   importTemplates     ImportTemplate[]
   classificationRules ClassificationRule[]
+  budgets             Budget[]
+  budgetItems         BudgetItem[]
 
   @@map("users")
 }
@@ -232,6 +244,7 @@ model Category {
   parent       Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children     Category[]    @relation("CategoryTree")
   transactions Transaction[]
+  budgetItems  BudgetItem[]
 
   @@index([userId, kind, archived])
   @@index([userId, parentId])
@@ -495,4 +508,46 @@ model ClassificationRule {
   @@unique([userId, name])
   @@index([userId, priority])
   @@map("classification_rules")
+}
+
+model Budget {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  periodType  BudgetPeriodType @map("period_type")
+  year        Int
+  // 年度预算的 month 固定为 0：唯一索引允许多个 NULL，哨兵值才能让周期唯一性真正生效
+  month       Int
+  totalAmount Decimal?         @map("total_amount") @db.Decimal(20, 6)
+  rollover    Boolean          @default(false)
+  status      BudgetStatus     @default(active)
+  note        String?
+  version     Int              @default(1)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items BudgetItem[]
+
+  @@unique([userId, periodType, year, month])
+  @@index([userId, year, month])
+  @@map("budgets")
+}
+
+model BudgetItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  budgetId   String   @map("budget_id") @db.Uuid
+  // 冗余归属，便于越权过滤与批量清理
+  userId     String   @map("user_id") @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  amount     Decimal  @db.Decimal(20, 6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  budget   Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([budgetId, categoryId])
+  @@index([userId, categoryId])
+  @@map("budget_items")
 }

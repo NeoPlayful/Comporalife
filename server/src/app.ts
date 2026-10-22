@@ -11,7 +11,9 @@ import redisPlugin from './plugins/redis.js';
 import securityPlugin from './plugins/security.js';
 import accountsRoutes from './modules/accounts/accounts.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import analyticsRoutes from './modules/analytics/analytics.routes.js';
 import dashboardRoutes from './modules/analytics/dashboard.routes.js';
+import budgetsRoutes from './modules/budgets/budgets.routes.js';
 import categoriesRoutes from './modules/categories/categories.routes.js';
 import currenciesRoutes from './modules/currencies/currencies.routes.js';
 import importsRoutes from './modules/imports/imports.routes.js';
@@ -88,6 +90,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(matchRoutes, { prefix: API_PREFIX });
     await app.register(currenciesRoutes, { prefix: API_PREFIX });
     await app.register(dashboardRoutes, { prefix: API_PREFIX });
+    await app.register(analyticsRoutes, { prefix: API_PREFIX });
+    await app.register(budgetsRoutes, { prefix: API_PREFIX });
     await app.register(simulationsRoutes, { prefix: API_PREFIX });
     // 模板路由必须先于 /imports/:id 注册，否则会被参数路由吞掉
     await app.register(templatesRoutes, { prefix: API_PREFIX });

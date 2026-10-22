@@ -32,6 +32,16 @@ export const ErrorCode = {
   IMPORT_ROLLBACK_BLOCKED: 'IMPORT_ROLLBACK_BLOCKED',
   RULE_INVALID: 'RULE_INVALID',
   TRANSFER_MATCH_INVALID: 'TRANSFER_MATCH_INVALID',
+  // ===== 分析与预算 =====
+  ANALYTICS_RANGE_TOO_LARGE: 'ANALYTICS_RANGE_TOO_LARGE',
+  ANALYTICS_RANGE_INVALID: 'ANALYTICS_RANGE_INVALID',
+  ANALYTICS_GRANULARITY_INVALID: 'ANALYTICS_GRANULARITY_INVALID',
+  BUDGET_PERIOD_EXISTS: 'BUDGET_PERIOD_EXISTS',
+  BUDGET_ITEM_INVALID: 'BUDGET_ITEM_INVALID',
+  BUDGET_CATEGORY_CONFLICT: 'BUDGET_CATEGORY_CONFLICT',
+  BUDGET_ROLLOVER_UNSUPPORTED: 'BUDGET_ROLLOVER_UNSUPPORTED',
+  BUDGET_ARCHIVED: 'BUDGET_ARCHIVED',
+  BUDGET_NOT_FOUND: 'BUDGET_NOT_FOUND',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -69,6 +79,15 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   IMPORT_ROLLBACK_BLOCKED: 409,
   RULE_INVALID: 422,
   TRANSFER_MATCH_INVALID: 422,
+  ANALYTICS_RANGE_TOO_LARGE: 400,
+  ANALYTICS_RANGE_INVALID: 400,
+  ANALYTICS_GRANULARITY_INVALID: 400,
+  BUDGET_PERIOD_EXISTS: 409,
+  BUDGET_ITEM_INVALID: 422,
+  BUDGET_CATEGORY_CONFLICT: 422,
+  BUDGET_ROLLOVER_UNSUPPORTED: 422,
+  BUDGET_ARCHIVED: 409,
+  BUDGET_NOT_FOUND: 404,
 };
 
 export class AppError extends Error {
@@ -152,4 +171,34 @@ export const errors = {
     new AppError(ErrorCode.IMPORT_ROLLBACK_BLOCKED, '存在依赖，无法撤销该批次', { blockedTransactions: blocked }),
   ruleInvalid: (message: string, details?: unknown) => new AppError(ErrorCode.RULE_INVALID, message, details),
   transferMatchInvalid: (message: string) => new AppError(ErrorCode.TRANSFER_MATCH_INVALID, message),
+
+  analyticsRangeTooLarge: (maxDays: number) =>
+    new AppError(
+      ErrorCode.ANALYTICS_RANGE_TOO_LARGE,
+      `分析区间不能超过 ${maxDays} 天`,
+      undefined,
+      { maxDays },
+    ),
+  analyticsRangeInvalid: (message: string) => new AppError(ErrorCode.ANALYTICS_RANGE_INVALID, message),
+  analyticsGranularityInvalid: (message: string) =>
+    new AppError(ErrorCode.ANALYTICS_GRANULARITY_INVALID, message),
+
+  budgetPeriodExists: (budgetId?: string) =>
+    new AppError(
+      ErrorCode.BUDGET_PERIOD_EXISTS,
+      '该周期的预算已存在',
+      budgetId ? { budgetId } : undefined,
+    ),
+  budgetItemInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.BUDGET_ITEM_INVALID, message, details),
+  budgetCategoryConflict: (categoryIds: string[]) =>
+    new AppError(
+      ErrorCode.BUDGET_CATEGORY_CONFLICT,
+      '同一预算内不能同时为父子分类设置额度',
+      { categoryIds },
+    ),
+  budgetRolloverUnsupported: () =>
+    new AppError(ErrorCode.BUDGET_ROLLOVER_UNSUPPORTED, '年度预算不支持结转'),
+  budgetArchived: () => new AppError(ErrorCode.BUDGET_ARCHIVED, '预算已归档，无法修改'),
+  budgetNotFound: () => new AppError(ErrorCode.BUDGET_NOT_FOUND, '预算不存在'),
 };

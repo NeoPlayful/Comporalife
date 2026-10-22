@@ -16,6 +16,8 @@ const NAMESPACES = [
   'nav',
   'auth',
   'dashboard',
+  'analytics',
+  'budgets',
   'accounts',
   'transactions',
   'categories',

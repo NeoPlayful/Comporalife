@@ -30,5 +30,14 @@
   "IMPORT_ALREADY_UPLOADED": "该文件已完成过导入",
   "IMPORT_ROLLBACK_BLOCKED": "存在依赖，无法撤销该批次",
   "RULE_INVALID": "分类规则不合法",
-  "TRANSFER_MATCH_INVALID": "转账匹配无效"
+  "TRANSFER_MATCH_INVALID": "转账匹配无效",
+  "ANALYTICS_RANGE_TOO_LARGE": "分析区间不能超过 {{maxDays}} 天",
+  "ANALYTICS_RANGE_INVALID": "分析区间无效",
+  "ANALYTICS_GRANULARITY_INVALID": "不支持的时间粒度",
+  "BUDGET_PERIOD_EXISTS": "该周期的预算已存在",
+  "BUDGET_ITEM_INVALID": "分类额度无效",
+  "BUDGET_CATEGORY_CONFLICT": "同一预算内不能同时为父子分类设置额度",
+  "BUDGET_ROLLOVER_UNSUPPORTED": "年度预算不支持结转",
+  "BUDGET_ARCHIVED": "预算已归档，无法修改",
+  "BUDGET_NOT_FOUND": "预算不存在"
 }

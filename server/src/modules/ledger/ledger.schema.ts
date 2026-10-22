@@ -51,6 +51,13 @@ export const listTransactionsSchema = z.object({
   type: z.enum(['income', 'expense', 'transfer', 'adjustment']).optional(),
   status: z.enum(['posted', 'voided', 'all']).default('posted'),
   keyword: z.string().trim().max(100).optional(),
+  merchant: z.string().trim().max(100).optional(),
+  /** 只看未分类的收入/支出流水，供分析页下钻 */
+  uncategorized: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((value) => value === true || value === 'true' || value === '1'),
+  source: z.enum(['manual', 'import']).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });

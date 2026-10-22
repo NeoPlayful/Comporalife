@@ -38,14 +38,17 @@ describe('系统接口', () => {
     }
   });
 
-  it('能力声明包含 Phase 1 可用与计划能力', async () => {
+  it('能力声明包含当前阶段可用与计划能力', async () => {
     const app = await buildApp({ withPrisma: false, withRedis: false });
     try {
       const res = await app.inject({ method: 'GET', url: '/api/system/capabilities' });
       const body = res.json();
-      expect(body.data.phase).toBe('phase-1');
+      expect(body.data.phase).toBe('phase-3');
       expect(body.data.available).toContain('transactions');
+      expect(body.data.available).toContain('analytics');
+      expect(body.data.available).toContain('budgets');
       expect(body.data.planned).toContain('monte-carlo');
+      expect(body.data.planned).not.toContain('budgets');
     } finally {
       await app.close();
     }
