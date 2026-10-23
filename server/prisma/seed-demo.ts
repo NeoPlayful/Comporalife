@@ -397,6 +397,130 @@ async function main() {
     ],
   });
 
+  // 风险模拟：一个已完成的运行，让风险模拟页在演示账号下有真实可看的区间与概率
+  const mcAssets = [
+    { key: 'equity', label: '宽基指数', weight: '0.600000', expectedAnnualReturn: '0.080000', annualVolatility: '0.180000' },
+    { key: 'bond', label: '债券基金', weight: '0.400000', expectedAnnualReturn: '0.035000', annualVolatility: '0.060000' },
+  ];
+  const mcSettings = {
+    initialValue: '45000',
+    contribution: { amount: '5000', frequency: 'monthly', timing: 'end' },
+    withdrawal: { amount: '0', frequency: 'none', startYear: 1 },
+    inflationRate: '0.025',
+    feeRate: '0.005',
+    targetAmount: '3000000',
+  };
+  const mcSeed = 20261023;
+
+  const mcScenario = await prisma.monteCarloScenario.create({
+    data: {
+      userId: user.id,
+      name: '长期定投风险模拟',
+      currency: 'CNY',
+      years: 20,
+      pathCount: 5000,
+      rebalance: 'annual',
+      assets: mcAssets as never,
+      correlation: [
+        [1, 0.2],
+        [0.2, 1],
+      ] as never,
+      settings: mcSettings as never,
+      modelVersion: 'montecarlo-v1',
+      note: '演示数据：用随机市场路径估计 20 年后的财富区间',
+    },
+  });
+
+  // 直接复用引擎跑一次，保证演示结果与真实计算口径完全一致
+  const { normalizeScenario } = await import('../src/modules/simulations/monte-carlo/scenario.validation.js');
+  const { simulate } = await import('../src/modules/simulations/monte-carlo/monte-carlo.engine.js');
+  const { serializeResult, buildAssumptions } = await import(
+    '../src/modules/simulations/monte-carlo/monte-carlo.serialize.js'
+  );
+
+  const normalized = normalizeScenario({
+    years: 20,
+    pathCount: 5000,
+    rebalance: 'annual',
+    assets: mcAssets.map((asset) => ({
+      key: asset.key,
+      label: asset.label,
+      weight: Number(asset.weight),
+      expectedAnnualReturn: Number(asset.expectedAnnualReturn),
+      annualVolatility: Number(asset.annualVolatility),
+    })),
+    correlation: [
+      [1, 0.2],
+      [0.2, 1],
+    ],
+    settings: {
+      initialValue: Number(mcSettings.initialValue),
+      contribution: {
+        amount: Number(mcSettings.contribution.amount),
+        frequency: 'monthly',
+        timing: 'end',
+      },
+      withdrawal: { amount: 0, frequency: 'none', startYear: 1 },
+      inflationRate: Number(mcSettings.inflationRate),
+      feeRate: Number(mcSettings.feeRate),
+      targetAmount: Number(mcSettings.targetAmount),
+    },
+  });
+
+  const startedAt = new Date();
+  const outcome = await simulate({
+    years: normalized.years,
+    pathCount: normalized.pathCount,
+    seed: mcSeed,
+    rebalance: normalized.rebalance,
+    assets: normalized.assets,
+    cholesky: normalized.cholesky,
+    initialValue: normalized.initialValue,
+    contribution: normalized.contribution,
+    withdrawal: normalized.withdrawal,
+    inflationRate: normalized.inflationRate,
+    feeRate: normalized.feeRate,
+    targetAmount: normalized.targetAmount,
+  });
+
+  if (outcome.ok) {
+    const assumptions = {
+      ...buildAssumptions(normalized, { seed: mcSeed, modelVersion: 'montecarlo-v1', stressPreset: null }),
+      years: normalized.years,
+      pathCount: normalized.pathCount,
+      rebalance: normalized.rebalance,
+      assets: mcAssets,
+      correlation: [
+        [1, 0.2],
+        [0.2, 1],
+      ],
+      settings: mcSettings,
+      stressPreset: null,
+    };
+
+    await prisma.monteCarloRun.create({
+      data: {
+        userId: user.id,
+        scenarioId: mcScenario.id,
+        scenarioName: mcScenario.name,
+        status: 'succeeded',
+        progress: 1,
+        attempts: 1,
+        assumptions: assumptions as never,
+        seed: mcSeed,
+        modelVersion: 'montecarlo-v1',
+        pathCount: normalized.pathCount,
+        years: normalized.years,
+        startedAt,
+        finishedAt: new Date(),
+        heartbeatAt: new Date(),
+        durationMs: 420,
+        result: serializeResult(outcome.result) as never,
+        samplePaths: outcome.result.samplePaths as never,
+      },
+    });
+  }
+
   console.log(`演示账号已创建：${email} / ${password}`);
 }
 

@@ -7,6 +7,14 @@ import {
   INVESTMENT_MAX_CASHFLOWS,
   INVESTMENT_MAX_SERIES_POINTS,
   INVESTMENT_PRICE_STALE_DAYS,
+  MONTE_CARLO_DEFAULT_PATHS,
+  MONTE_CARLO_MAX_CONCURRENT_RUNS,
+  MONTE_CARLO_MAX_PATHS,
+  MONTE_CARLO_MAX_YEARS,
+  MONTE_CARLO_PREVIEW_PATHS,
+  MONTE_CARLO_PREVIEW_TIMEOUT_MS,
+  MONTE_CARLO_QUEUE_LIMIT,
+  MONTE_CARLO_TIMEOUT_SECONDS,
 } from '../config/constants.js';
 import { env } from '../config/env.js';
 import { ok } from '../lib/api-utils.js';
@@ -22,7 +30,7 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-4';
+const PHASE = 'phase-5';
 
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断
@@ -80,8 +88,9 @@ export default async function systemRoutes(app: FastifyInstance) {
           'budgets',
           'portfolios',
           'instruments',
+          'monte-carlo',
         ],
-        planned: ['monte-carlo', 'goals', 'reports', 'admin'],
+        planned: ['goals', 'reports', 'admin'],
         baseCurrencyDefault: env.DEFAULT_CURRENCY,
         maxSimulationYears: 100,
         importLimits: {
@@ -97,6 +106,16 @@ export default async function systemRoutes(app: FastifyInstance) {
           priceStaleDays: INVESTMENT_PRICE_STALE_DAYS,
           maxSeriesPoints: INVESTMENT_MAX_SERIES_POINTS,
           maxCashflows: INVESTMENT_MAX_CASHFLOWS,
+        },
+        simulationLimits: {
+          maxPaths: MONTE_CARLO_MAX_PATHS,
+          defaultPaths: MONTE_CARLO_DEFAULT_PATHS,
+          maxYears: MONTE_CARLO_MAX_YEARS,
+          previewPaths: MONTE_CARLO_PREVIEW_PATHS,
+          previewTimeoutMs: MONTE_CARLO_PREVIEW_TIMEOUT_MS,
+          maxConcurrentRuns: MONTE_CARLO_MAX_CONCURRENT_RUNS,
+          queueLimit: MONTE_CARLO_QUEUE_LIMIT,
+          timeoutSeconds: MONTE_CARLO_TIMEOUT_SECONDS,
         },
       },
       request.id,

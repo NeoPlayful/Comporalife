@@ -3,10 +3,11 @@
   "accounts": "Accounts",
   "transactions": "Transactions",
   "analytics": "Analytics",
-  "budgets": "Budgets",
+  "budgets": "Budget Management",
   "imports": "Imports",
   "categories": "Categories",
   "compound": "Compounding",
+  "monte-carlo": "Risk Simulation",
   "settings": "Settings",
   "profile": "Profile",
   "logout": "Sign out",
@@ -17,5 +18,5 @@
   "theme_to_light": "Switch to light mode",
   "theme_to_dark": "Switch to dark mode",
   "close_menu": "Close menu",
-  "portfolios": "Investments"
+  "portfolios": "Investment Management"
 }

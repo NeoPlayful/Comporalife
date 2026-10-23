@@ -2,6 +2,7 @@ import { useUiStore } from '@/stores/ui-store';
 import {
   ArrowLeftRight,
   BarChart3,
+  Activity,
   Calculator,
   LineChart,
   LayoutDashboard,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { to: '/portfolios', key: 'portfolios', icon: LineChart },
   { to: '/categories', key: 'categories', icon: Tags },
   { to: '/compound', key: 'compound', icon: Calculator },
+  { to: '/monte-carlo', key: 'monte-carlo', icon: Activity },
   { to: '/settings', key: 'settings', icon: Settings },
 ] as const;
 

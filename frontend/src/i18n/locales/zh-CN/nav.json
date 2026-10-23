@@ -3,10 +3,11 @@
   "accounts": "财务账户",
   "transactions": "交易流水",
   "analytics": "收支分析",
-  "budgets": "预算",
+  "budgets": "预算管理",
   "imports": "账单导入",
   "categories": "分类管理",
   "compound": "复利模拟",
+  "monte-carlo": "风险模拟",
   "settings": "设置",
   "profile": "个人资料",
   "logout": "退出登录",
@@ -17,5 +18,5 @@
   "theme_to_light": "切换到浅色模式",
   "theme_to_dark": "切换到深色模式",
   "close_menu": "关闭菜单",
-  "portfolios": "投资"
+  "portfolios": "投资管理"
 }

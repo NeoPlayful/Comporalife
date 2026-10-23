@@ -27,8 +27,18 @@ import matchRoutes from './modules/ledger/match.routes.js';
 import profileRoutes from './modules/profile/profile.routes.js';
 import settingsRoutes from './modules/settings/settings.routes.js';
 import simulationsRoutes from './modules/simulations/simulations.routes.js';
+import monteCarloRoutes from './modules/simulations/monte-carlo/monte-carlo.routes.js';
+import { JobExecutor } from './modules/jobs/job.executor.js';
+import { createMonteCarloHandler } from './modules/simulations/monte-carlo/monte-carlo.handler.js';
 import tagsRoutes from './modules/tags/tags.routes.js';
 import systemRoutes from './routes/system.js';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** 异步作业执行器；仅在启用 prisma 时存在 */
+    jobs: JobExecutor;
+  }
+}
 
 export interface BuildAppOptions {
   /** 测试时可关闭 Redis，避免强依赖外部服务 */
@@ -76,6 +86,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(redisPlugin);
   }
 
+  // 作业执行器依附于 prisma：没有数据库时无法领取与落库，测试可按需关闭
+  if (withPrisma) {
+    const executor = new JobExecutor(app.prisma, app.log);
+    executor.register('monte-carlo', createMonteCarloHandler(app.prisma));
+    app.decorate('jobs', executor);
+    app.addHook('onClose', async () => {
+      executor.stop();
+      await executor.drain(5_000);
+    });
+  }
+
   await app.register(authPlugin);
 
   await app.register(systemRoutes, { prefix: `${API_PREFIX}/system` });
@@ -97,6 +118,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(portfoliosRoutes, { prefix: API_PREFIX });
     await app.register(tradesRoutes, { prefix: API_PREFIX });
     await app.register(simulationsRoutes, { prefix: API_PREFIX });
+    await app.register(monteCarloRoutes, { prefix: API_PREFIX });
     // 模板路由必须先于 /imports/:id 注册，否则会被参数路由吞掉
     await app.register(templatesRoutes, { prefix: API_PREFIX });
     await app.register(importsRoutes, { prefix: API_PREFIX });

@@ -157,6 +157,8 @@ model User {
   portfolioCashflows  PortfolioCashflow[]
   portfolioValuations PortfolioValuation[]
   portfolioTargets    PortfolioTarget[]
+  monteCarloScenarios MonteCarloScenario[]
+  monteCarloRuns      MonteCarloRun[]
 
   @@map("users")
 }
@@ -761,4 +763,97 @@ model PortfolioTarget {
 
   @@unique([portfolioId, dimension, key])
   @@map("portfolio_targets")
+}
+
+// ===== 风险模拟 =====
+
+enum RunStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+// stage 描述「正在做什么」，status 描述「是否结束」，两者不互相推导
+enum RunStage {
+  preparing
+  simulating
+  aggregating
+  finalizing
+}
+
+enum ReturnModel {
+  lognormal
+}
+
+enum RebalanceFrequency {
+  none
+  monthly
+  quarterly
+  annual
+}
+
+model MonteCarloScenario {
+  id           String             @id @default(uuid()) @db.Uuid
+  userId       String             @map("user_id") @db.Uuid
+  name         String
+  currency     String             @db.Char(3)
+  years        Int
+  pathCount    Int                @map("path_count")
+  rebalance    RebalanceFrequency @default(annual)
+  returnModel  ReturnModel        @default(lognormal) @map("return_model")
+  // 资产数量与相关矩阵维度由用户决定，逐列建模会退化成动态列；
+  // 写入前必须经校验归一化，不允许把请求体直接落库
+  assets       Json
+  correlation  Json
+  settings     Json
+  modelVersion String             @default("montecarlo-v1") @map("model_version")
+  note         String?
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs MonteCarloRun[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("monte_carlo_scenarios")
+}
+
+model MonteCarloRun {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  scenarioId        String    @map("scenario_id") @db.Uuid
+  scenarioName      String    @map("scenario_name")
+  status            RunStatus @default(queued)
+  stage             RunStage?
+  // 0.0000–1.0000，应用层保证单调不减
+  progress          Decimal   @default(0) @db.Decimal(5, 4)
+  attempts          Int       @default(0)
+  // 完整不可变参数快照，保证方案被改后历史运行仍可解释与重算
+  assumptions       Json
+  seed              Int
+  modelVersion      String    @map("model_version")
+  pathCount         Int       @map("path_count")
+  years             Int
+  cancelRequestedAt DateTime? @map("cancel_requested_at") @db.Timestamptz(6)
+  heartbeatAt       DateTime? @map("heartbeat_at") @db.Timestamptz(6)
+  startedAt         DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt        DateTime? @map("finished_at") @db.Timestamptz(6)
+  durationMs        Int?      @map("duration_ms")
+  failureCode       String?   @map("failure_code")
+  failureMessage    String?   @map("failure_message")
+  // 聚合结果与少量年度采样路径；全量路径不落库，凭种子按索引再生成
+  result            Json?
+  samplePaths       Json?     @map("sample_paths")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenario MonteCarloScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([scenarioId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("monte_carlo_runs")
 }
