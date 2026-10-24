@@ -1,0 +1,29 @@
+{
+  "title": "Notifications",
+  "subtitle": "{{count}} unread",
+  "mark_read": "Mark read",
+  "mark_all_read": "Mark all read",
+  "unread_only": "Unread only",
+  "view": "View",
+  "kinds": {
+    "export_ready": "Your data export is ready to download.",
+    "backup_ready": "Backup completed and stored encrypted on the server.",
+    "restore_done": "Restore completed, {{rows}} records written.",
+    "job_failed": "Task failed: {{task}}. Check the jobs panel for details and retry.",
+    "email_verified": "Email verified successfully.",
+    "deletion_requested": "Your deletion request was received. You can cancel it during the cooling-off period.",
+    "deletion_approved": "Your deletion request was approved and the account is disabled.",
+    "admin_action": "An administrator performed an action on your account.",
+    "unknown": "You have a new notification."
+  },
+  "admin_actions": {
+    "user_disabled": "An administrator disabled your account.",
+    "user_enabled": "An administrator re-enabled your account.",
+    "deletion_rejected": "An administrator rejected your deletion request."
+  },
+  "empty": {
+    "title": "No notifications",
+    "description": "Exports, backups and job completions will appear here."
+  },
+  "view_all": "View all"
+}

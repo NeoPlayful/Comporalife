@@ -41,6 +41,7 @@
     "day_gap": "相差 {{days}} 天",
     "missing_months_by_account": "{{name}}：{{months}}",
     "stale_portfolio": "{{name}} · 估值 {{date}}（{{days}} 天前）",
+    "stale_asset": "{{name}} · 估值 {{date}}（{{days}} 天前）",
     "never_valued": "从未估值",
     "rate_pair": "{{from}} → {{to}} · {{status}}",
     "rate_missing": "没有汇率",
@@ -86,7 +87,7 @@
     "complete": "数据完整",
     "incomplete": "存在缺失项",
     "missing_months": "缺失月份：{{months}}",
-    "excluded": "未包含：{{items}}"
+    "excluded_title": "未包含的内容"
   },
   "backup": {
     "title": "备份与恢复",

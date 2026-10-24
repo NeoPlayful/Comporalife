@@ -1,0 +1,52 @@
+{
+  "title": "负债",
+  "subtitle": "房贷、消费贷等非账户型负债，按余额快照计入净资产",
+  "new_liability": "登记负债",
+  "show_archived": "显示已归档",
+  "archived_badge": "已归档",
+  "archive": "归档",
+  "archive_confirm": "确认归档「{{name}}」？归档后不再计入净资产，历史余额会保留。",
+  "notice_no_account": "房贷、消费贷请登记在这里；只有会随记账变动的资金账户才应建成账户，否则净资产会重复扣减。",
+  "latest_snapshot": "最新余额 {{balance}} {{currency}}（{{date}}）",
+  "never_snapshotted": "尚未录入余额，不计入净资产",
+  "interest_rate_ref": "年化利率 {{rate}}%（仅供参考，不参与计算）",
+  "kinds": {
+    "mortgage": "房贷",
+    "consumer_loan": "消费贷",
+    "auto_loan": "车贷",
+    "credit_line": "授信额度",
+    "other": "其他"
+  },
+  "form": {
+    "name": "负债名称",
+    "kind": "类别",
+    "currency": "币种",
+    "original_amount": "原始本金",
+    "start_date": "起贷日期",
+    "interest_rate": "年化利率",
+    "reference_only": "仅作参考，不参与任何计算",
+    "note": "备注",
+    "save": "保存",
+    "saving": "保存中…",
+    "cancel": "取消"
+  },
+  "snapshot": {
+    "title": "余额记录（{{count}}）",
+    "date": "余额日期",
+    "balance": "未偿余额",
+    "add": "记录余额",
+    "empty": "暂无余额记录",
+    "remove": "删除余额记录",
+    "overwrite_confirm": "该日期已有余额记录，是否覆盖？"
+  },
+  "summary": {
+    "total": "负债合计",
+    "unpriced": "未录余额、未计入合计：{{names}}",
+    "missing_rate": "缺少汇率、未计入合计的币种：{{currencies}}",
+    "basis": "按 {{date}} 的最新余额折算为 {{currency}}"
+  },
+  "empty": {
+    "title": "还没有登记负债",
+    "description": "如果你有房贷或其他非账户型负债，登记后会计入净资产。"
+  }
+}

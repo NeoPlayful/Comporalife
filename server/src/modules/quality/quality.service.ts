@@ -268,28 +268,37 @@ export async function findMissingMonths(
   return { months: [...allMissing].sort(), accounts: perAccount };
 }
 
-/** 过期估值：组合最新估值日期距今超过阈值，或从未估值 */
+/** 过期估值：组合或资产的最新估值距今超过阈值，或从未估值 */
 export async function findStaleValuations(
   prisma: PrismaClient,
   context: QualityContext,
 ): Promise<{
-  items: Array<{ portfolioId: string; name: string; priceDate: string | null; daysStale: number | null; missingSymbols: string[] }>;
+  items: Array<{
+    targetType: 'portfolio' | 'asset';
+    targetId: string;
+    name: string;
+    priceDate: string | null;
+    daysStale: number | null;
+    missingSymbols: string[];
+  }>;
   total: number;
 }> {
+  const asOf = new Date();
   const summaries = await loadAllPortfolioValuations(prisma, {
     userId: context.userId,
-    asOf: new Date(),
+    asOf,
   });
 
-  const items = summaries
+  const portfolioItems = summaries
     .filter((summary) => summary.stale || summary.missingSymbols.length > 0)
     .map((summary) => {
       const daysStale = summary.priceDate
-        ? Math.floor((Date.now() - new Date(summary.priceDate).getTime()) / DAY_MS)
+        ? Math.floor((asOf.getTime() - new Date(summary.priceDate).getTime()) / DAY_MS)
         : null;
 
       return {
-        portfolioId: summary.portfolioId,
+        targetType: 'portfolio' as const,
+        targetId: summary.portfolioId,
         name: summary.name,
         priceDate: summary.priceDate,
         daysStale,
@@ -297,6 +306,48 @@ export async function findStaleValuations(
       };
     });
 
+  // 非交易型资产同样需要新鲜度提示：未录估值或估值过期都会让人误判净资产
+  const assets = await prisma.asset.findMany({
+    where: { userId: context.userId, status: 'active' },
+    select: {
+      id: true,
+      name: true,
+      valuations: {
+        orderBy: { valuationDate: 'desc' },
+        select: { valuationDate: true },
+      },
+    },
+  });
+
+  const assetItems = assets
+    .map((asset) => {
+      const latest = asset.valuations.find((item) => item.valuationDate.getTime() <= asOf.getTime());
+      if (!latest) {
+        return {
+          targetType: 'asset' as const,
+          targetId: asset.id,
+          name: asset.name,
+          priceDate: null,
+          daysStale: null,
+          missingSymbols: [] as string[],
+        };
+      }
+
+      const daysStale = Math.floor((asOf.getTime() - latest.valuationDate.getTime()) / DAY_MS);
+      if (daysStale <= INVESTMENT_PRICE_STALE_DAYS) return null;
+
+      return {
+        targetType: 'asset' as const,
+        targetId: asset.id,
+        name: asset.name,
+        priceDate: latest.valuationDate.toISOString().slice(0, 10),
+        daysStale,
+        missingSymbols: [] as string[],
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  const items = [...portfolioItems, ...assetItems];
   return { items, total: items.length };
 }
 

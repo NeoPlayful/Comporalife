@@ -71,5 +71,28 @@
     "copy": "复制",
     "delete": "删除"
   },
-  "label_separator": "："
+  "label_separator": "：",
+  "advanced": {
+    "title": "进阶假设（可选）",
+    "increase": "追加额年递增率",
+    "withdrawal": "每期提款额",
+    "withdrawal_frequency": "提款频率",
+    "withdrawal_start": "开始提款年份",
+    "tax": "收益税率",
+    "freq_none": "不提款",
+    "freq_monthly": "每月",
+    "freq_annual": "每年"
+  },
+  "solve": {
+    "title": "目标反推",
+    "target": "目标金额",
+    "solve_for": "反推目标",
+    "for_contribution": "所需每期投入",
+    "for_years": "所需年限",
+    "action": "开始反推",
+    "solving": "计算中…",
+    "required_contribution": "在 {{years}} 年内达成，需每期投入 {{value}}",
+    "required_years": "按当前投入额，需要约 {{years}} 年（每期 {{value}}）",
+    "actual": "实际达成 {{value}}（与目标差 {{diff}}）"
+  }
 }

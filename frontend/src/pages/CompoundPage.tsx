@@ -7,6 +7,7 @@ import {
   type Comparison,
   type Scenario,
 } from '@/lib/simulations';
+import SolvePanel from '@/components/simulations/SolvePanel';
 import CompoundChart from '@/components/charts/CompoundChart';
 import LoadingState from '@/components/ui/LoadingState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -258,6 +259,75 @@ export default function CompoundPage() {
             label={t('compound:params.fee')}
             value={params.feeRate}
             onChange={(value) => setParams({ ...params, feeRate: value })}
+          />
+
+          {/* 进阶假设默认折叠：常用参数在前，避免首屏过载 */}
+          <details className="rounded-lg border border-[var(--color-border-subtle)] p-3">
+            <summary className="cursor-pointer text-sm text-[var(--color-content-muted)]">
+              {t('compound:advanced.title')}
+            </summary>
+
+            <div className="mt-3 space-y-3">
+              <PercentField
+                label={t('compound:advanced.increase')}
+                value={params.annualContributionIncrease ?? '0'}
+                onChange={(value) => setParams({ ...params, annualContributionIncrease: value })}
+              />
+
+              <NumberField
+                label={t('compound:advanced.withdrawal')}
+                value={params.withdrawalAmount ?? ''}
+                onChange={(value) => setParams({ ...params, withdrawalAmount: value })}
+              />
+
+              <label className="block text-sm">
+                {t('compound:advanced.withdrawal_frequency')}
+                <select
+                  className="input mt-1"
+                  value={params.withdrawalFrequency ?? 'none'}
+                  onChange={(event) =>
+                    setParams({
+                      ...params,
+                      withdrawalFrequency: event.target.value as 'none' | 'monthly' | 'annual',
+                    })
+                  }
+                >
+                  <option value="none">{t('compound:advanced.freq_none')}</option>
+                  <option value="monthly">{t('compound:advanced.freq_monthly')}</option>
+                  <option value="annual">{t('compound:advanced.freq_annual')}</option>
+                </select>
+              </label>
+
+              {(params.withdrawalFrequency ?? 'none') !== 'none' && (
+                <label className="block text-sm">
+                  {t('compound:advanced.withdrawal_start')}
+                  <input
+                    type="number"
+                    min={1}
+                    max={params.years}
+                    className="input mt-1"
+                    value={params.withdrawalStartYear ?? 1}
+                    onChange={(event) =>
+                      setParams({
+                        ...params,
+                        withdrawalStartYear: Math.max(1, Number(event.target.value) || 1),
+                      })
+                    }
+                  />
+                </label>
+              )}
+
+              <PercentField
+                label={t('compound:advanced.tax')}
+                value={params.taxRate ?? '0'}
+                onChange={(value) => setParams({ ...params, taxRate: value })}
+              />
+            </div>
+          </details>
+
+          <SolvePanel
+            params={params}
+            renderAmountField={(props) => <NumberField {...props} />}
           />
         </section>
 

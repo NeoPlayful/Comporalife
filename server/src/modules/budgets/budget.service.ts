@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
+import { formatInTimeZone } from 'date-fns-tz';
 import { BUDGET_CARRYOVER_MAX_PERIODS, BUDGET_WARNING_RATIO } from '../../config/constants.js';
 import { errors } from '../../lib/errors.js';
 import { roundMoney, toDecimal } from '../../lib/money.js';
@@ -428,3 +429,81 @@ export async function validateBudgetItems(
 }
 
 export const budgetItemAmount = (value: string): Decimal => roundMoney(toDecimal(value));
+
+export interface BudgetAlert {
+  budgetId: string;
+  periodType: string;
+  scope: 'total' | 'category';
+  categoryId?: string;
+  categoryName?: string;
+  level: string;
+  spent: string;
+  available: string;
+  usageRatio: string | null;
+}
+
+/**
+ * 当前周期的超支与接近超支项。
+ * 抽出为服务函数：预算页与仪表板聚合共用同一口径，避免两处各算一套。
+ */
+export async function computeBudgetAlerts(
+  prisma: PrismaClient,
+  context: { userId: string; timezone: string; baseCurrency: string },
+): Promise<BudgetAlert[]> {
+  const now = new Date();
+  const year = Number(formatInTimeZone(now, context.timezone, 'yyyy'));
+  const month = Number(formatInTimeZone(now, context.timezone, 'MM'));
+
+  const [monthly, yearly] = await Promise.all([
+    prisma.budget.findUnique({
+      where: { userId_periodType_year_month: { userId: context.userId, periodType: 'monthly', year, month } },
+      select: { id: true },
+    }),
+    prisma.budget.findUnique({
+      where: { userId_periodType_year_month: { userId: context.userId, periodType: 'yearly', year, month: 0 } },
+      select: { id: true },
+    }),
+  ]);
+
+  const alerts: BudgetAlert[] = [];
+
+  for (const candidate of [monthly, yearly]) {
+    if (!candidate) continue;
+    const progress = await computeBudgetProgress(prisma, context, candidate.id);
+
+    if (progress.total.level === 'warning' || progress.total.level === 'exceeded') {
+      alerts.push({
+        budgetId: candidate.id,
+        periodType: progress.budget.periodType,
+        scope: 'total',
+        level: progress.total.level,
+        spent: progress.total.spent,
+        available: progress.total.available,
+        usageRatio: progress.total.usageRatio,
+      });
+    }
+
+    for (const item of progress.items) {
+      if (item.level !== 'warning' && item.level !== 'exceeded') continue;
+      alerts.push({
+        budgetId: candidate.id,
+        periodType: progress.budget.periodType,
+        scope: 'category',
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        level: item.level,
+        spent: item.spent,
+        available: item.available,
+        usageRatio: item.usageRatio,
+      });
+    }
+  }
+
+  // 超支优先，其次按使用率降序
+  alerts.sort((a, b) => {
+    if (a.level !== b.level) return a.level === 'exceeded' ? -1 : 1;
+    return Number(b.usageRatio ?? 0) - Number(a.usageRatio ?? 0);
+  });
+
+  return alerts;
+}

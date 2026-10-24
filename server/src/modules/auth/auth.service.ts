@@ -3,14 +3,22 @@ import type { PrismaClient, User } from '@prisma/client';
 import argon2 from 'argon2';
 import type { Redis } from 'ioredis';
 import { env, isProduction } from '../../config/env.js';
-import { PASSWORD_RESET_TTL_SECONDS, SUPPORTED_LANGUAGES } from '../../config/constants.js';
+import {
+  EMAIL_VERIFY_RESEND_WINDOW_SECONDS,
+  EMAIL_VERIFY_TTL_SECONDS,
+  PASSWORD_RESET_TTL_SECONDS,
+  SUPPORTED_LANGUAGES,
+} from '../../config/constants.js';
 import { hashToken, signAccessToken } from '../../lib/auth.js';
 import { errors } from '../../lib/errors.js';
+import { sendMail } from '../../lib/mailer.js';
 import { describeClient, newSessionValues } from '../../lib/session.js';
 import { CATEGORY_TEMPLATE } from '../categories/category-template.js';
 
 const MAX_ACTIVE_SESSIONS = 10;
 const RESET_KEY_PREFIX = 'pwdreset:';
+const VERIFY_KEY_PREFIX = 'verify:';
+const VERIFY_RESEND_PREFIX = 'verify:resend:';
 
 export interface PublicUser {
   id: string;
@@ -295,7 +303,96 @@ export class AuthService {
     return this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
   }
 
-  async requestPasswordReset(email: string): Promise<{ token?: string }> {
+  /**
+   * 签发邮箱验证令牌并发信。
+   * 未验证不阻断任何功能：这里只负责发信与标记状态。
+   */
+  async sendVerificationEmail(
+    userId: string,
+    log?: { info: (obj: object, msg?: string) => void; warn: (obj: object, msg?: string) => void },
+  ): Promise<{ link?: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, nickname: true, emailVerifiedAt: true },
+    });
+
+    if (!user) throw errors.notFound('用户不存在');
+    // 已验证的账号不再重复发信
+    if (user.emailVerifiedAt) return {};
+
+    const token = randomBytes(32).toString('base64url');
+    await this.redis.set(`${VERIFY_KEY_PREFIX}${hashToken(token)}`, user.id, 'EX', EMAIL_VERIFY_TTL_SECONDS);
+
+    const link = `${env.APP_BASE_URL.replace(/\/$/, '')}/verify-email?token=${token}`;
+
+    const delivery = await sendMail(
+      {
+        to: user.email,
+        subject: '验证你的 Comporalife 邮箱',
+        text: [
+          `你好 ${user.nickname}，`,
+          '',
+          '请在 72 小时内打开下面的链接完成邮箱验证：',
+          link,
+          '',
+          '未验证不会影响你使用已有功能；如果这不是你本人的操作，请忽略这封邮件。',
+        ].join('\n'),
+      },
+      log,
+    );
+
+    return delivery.delivered ? {} : { link };
+  }
+
+  /** 重发验证邮件：同一用户在窗口期内只允许一次 */
+  async resendVerification(
+    userId: string,
+    log?: { info: (obj: object, msg?: string) => void; warn: (obj: object, msg?: string) => void },
+  ): Promise<{ link?: string }> {
+    const throttleKey = `${VERIFY_RESEND_PREFIX}${userId}`;
+    const throttled = await this.redis.get(throttleKey);
+    if (throttled) throw errors.emailResendTooFrequent();
+
+    const result = await this.sendVerificationEmail(userId, log);
+    await this.redis.set(throttleKey, '1', 'EX', EMAIL_VERIFY_RESEND_WINDOW_SECONDS);
+    return result;
+  }
+
+  /**
+   * 消费验证令牌。
+   * 令牌一次性：先用后删，避免同一链接被反复使用。
+   */
+  async verifyEmail(token: string): Promise<{ userId: string }> {
+    const key = `${VERIFY_KEY_PREFIX}${hashToken(token)}`;
+    const userId = await this.redis.get(key);
+
+    if (!userId) {
+      throw errors.emailVerificationTokenInvalid();
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailVerifiedAt: new Date() },
+    });
+
+    await this.redis.del(key);
+
+    await this.prisma.auditLog.create({
+      data: { userId, action: 'auth.email_verified', targetType: 'user', targetId: userId },
+    });
+
+    return { userId };
+  }
+
+  /**
+   * 生成重置令牌并发信。
+   * 返回值中的 `link` 只在未投递时给出，供调用方在开发环境打日志；
+   * 生产环境一旦配置了 SMTP，链接不会离开服务端。
+   */
+  async requestPasswordReset(
+    email: string,
+    log?: { info: (obj: object, msg?: string) => void; warn: (obj: object, msg?: string) => void },
+  ): Promise<{ link?: string }> {
     const normalized = email.toLowerCase().trim();
     const user = await this.prisma.user.findUnique({ where: { email: normalized } });
 
@@ -315,8 +412,26 @@ export class AuthService {
       data: { userId: user.id, action: 'auth.password_reset_requested', targetType: 'user', targetId: user.id },
     });
 
-    // 开发环境不发送邮件，由路由层把链接写入日志；生产环境由 SMTP 发送
-    return { token };
+    const link = `${env.APP_BASE_URL.replace(/\/$/, '')}/reset-password?token=${token}`;
+
+    const delivery = await sendMail(
+      {
+        to: user.email,
+        subject: '重置你的 Comporalife 密码',
+        text: [
+          `你好 ${user.nickname}，`,
+          '',
+          '我们收到了重置密码的请求。请在 30 分钟内打开下面的链接完成重置：',
+          link,
+          '',
+          '如果这不是你本人的操作，请忽略这封邮件，密码不会改变。',
+        ].join('\n'),
+      },
+      log,
+    );
+
+    // 只在未真正投递时把链接交给调用方（开发环境写日志用）
+    return delivery.delivered ? {} : { link };
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {

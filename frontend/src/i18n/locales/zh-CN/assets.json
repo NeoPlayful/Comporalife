@@ -1,0 +1,56 @@
+{
+  "title": "资产",
+  "subtitle": "房产、车辆等非交易型资产，按估值快照计入净资产",
+  "new_asset": "登记资产",
+  "show_archived": "显示已归档",
+  "archived_badge": "已归档",
+  "archive": "归档",
+  "archive_confirm": "确认归档「{{name}}」？归档后不再计入净资产，历史估值会保留。",
+  "notice_no_account": "房产、车辆等非交易型资产请登记在这里，不要建成资金账户，否则会在净资产里重复计算。",
+  "latest_valuation": "最新估值 {{value}} {{currency}}（{{date}}）",
+  "never_valued": "尚未录入估值，不计入净资产",
+  "stale_hint": "估值已超过 90 天，建议更新",
+  "kinds": {
+    "property": "房产",
+    "vehicle": "车辆",
+    "collectible": "收藏品",
+    "other": "其他"
+  },
+  "bases": {
+    "manual": "手工录入",
+    "appraised": "评估价",
+    "market": "市场参考价"
+  },
+  "form": {
+    "name": "资产名称",
+    "kind": "类别",
+    "currency": "币种",
+    "purchase_date": "购置日期",
+    "purchase_price": "购置价",
+    "purchase_price_hint": "仅作参考，不参与净资产计算",
+    "note": "备注",
+    "save": "保存",
+    "saving": "保存中…",
+    "cancel": "取消"
+  },
+  "valuation": {
+    "title": "估值记录（{{count}}）",
+    "date": "估值日期",
+    "value": "估值",
+    "basis": "依据",
+    "add": "记录估值",
+    "empty": "暂无估值记录",
+    "remove": "删除估值",
+    "overwrite_confirm": "该日期已有估值，是否覆盖？"
+  },
+  "summary": {
+    "total": "资产合计",
+    "unpriced": "未录估值、未计入合计：{{names}}",
+    "missing_rate": "缺少汇率、未计入合计的币种：{{currencies}}",
+    "basis": "按 {{date}} 的最新估值折算为 {{currency}}"
+  },
+  "empty": {
+    "title": "还没有登记资产",
+    "description": "如果你有房产、车辆等非交易型资产，登记后会计入净资产。"
+  }
+}

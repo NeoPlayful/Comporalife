@@ -23,6 +23,15 @@ export const adminRegistrationSchema = z.object({
   enabled: z.boolean(),
 });
 
+export const adminEmailVerificationSchema = z.object({
+  enabled: z.boolean(),
+});
+
+export const deletionReviewSchema = z.object({
+  decision: z.enum(['approve', 'reject']),
+  note: z.string().trim().max(200).optional(),
+});
+
 export const adminLoginLogSchema = z.object({
   from: dateText.optional(),
   to: dateText.optional(),

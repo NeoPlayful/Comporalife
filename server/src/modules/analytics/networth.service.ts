@@ -12,6 +12,11 @@ export interface NetWorthResult {
   netWorth: Decimal;
   /** 证券市值（已折算基准币种），不含证券账户现金 */
   securitiesValue: Decimal;
+  // ===== 六项分项：三者之和必须严格等于总数，供 UI 分栏展示并自证不重复计数 =====
+  accountAssets: Decimal;
+  otherAssets: Decimal;
+  accountLiabilities: Decimal;
+  otherLiabilities: Decimal;
   baseCurrency: string;
   asOf: Date;
   missingPairs: string[];
@@ -19,9 +24,141 @@ export interface NetWorthResult {
   excludedAccounts: Array<{ id: string; name: string; currency: string; reason: string }>;
   staleValuations: Array<{ portfolioId: string; name: string; priceDate: string | null }>;
   unpriced: Array<{ portfolioId: string; name: string; symbols: string[] }>;
+  /** 未录估值或估值在未来的资产：不计入净资产，但必须显式返回 */
+  unpricedAssets: Array<{ id: string; name: string; reason: string }>;
+  unpricedLiabilities: Array<{ id: string; name: string; reason: string }>;
 }
 
 const LIABILITY_TYPES = new Set<string>(LIABILITY_ACCOUNT_TYPES);
+
+/**
+ * 非交易型资产与负债的折算。
+ *
+ * 规则：
+ * - 取 valuationDate / snapshotDate <= asOf 的最后一条
+ * - 全部在 asOf 之后或从未录入 → 不计入，进 unpriced 列表
+ * - 外币缺汇率 → 不计入，进 unpriced 列表并上报币种对
+ * - 归档的不计入
+ */
+async function computeOtherAssetsAndLiabilities(
+  prisma: PrismaClient,
+  params: { userId: string; baseCurrency: string; asOf: Date },
+): Promise<{
+  otherAssets: Decimal;
+  otherLiabilities: Decimal;
+  unpricedAssets: Array<{ id: string; name: string; reason: string }>;
+  unpricedLiabilities: Array<{ id: string; name: string; reason: string }>;
+  extraMissingPairs: string[];
+}> {
+  const [assets, liabilities] = await Promise.all([
+    prisma.asset.findMany({
+      where: { userId: params.userId, status: 'active' },
+      select: {
+        id: true,
+        name: true,
+        currency: true,
+        valuations: {
+          orderBy: { valuationDate: 'desc' },
+          select: { valuationDate: true, value: true },
+        },
+      },
+    }),
+    prisma.liability.findMany({
+      where: { userId: params.userId, status: 'active' },
+      select: {
+        id: true,
+        name: true,
+        currency: true,
+        snapshots: {
+          orderBy: { snapshotDate: 'desc' },
+          select: { snapshotDate: true, balance: true },
+        },
+      },
+    }),
+  ]);
+
+  const unpricedAssets: Array<{ id: string; name: string; reason: string }> = [];
+  const unpricedLiabilities: Array<{ id: string; name: string; reason: string }> = [];
+  const extraMissingPairs: string[] = [];
+
+  const assetsToConvert: Array<{ amount: Decimal; currency: string }> = [];
+  const liabilitiesToConvert: Array<{ amount: Decimal; currency: string }> = [];
+
+  for (const asset of assets) {
+    const latest = asset.valuations.find((item) => item.valuationDate.getTime() <= params.asOf.getTime());
+    if (!latest) {
+      unpricedAssets.push({
+        id: asset.id,
+        name: asset.name,
+        reason: asset.valuations.length > 0 ? 'future_valuation' : 'no_valuation',
+      });
+      continue;
+    }
+    assetsToConvert.push({ amount: toDecimal(latest.value.toString()), currency: asset.currency });
+  }
+
+  for (const liability of liabilities) {
+    const latest = liability.snapshots.find((item) => item.snapshotDate.getTime() <= params.asOf.getTime());
+    if (!latest) {
+      unpricedLiabilities.push({
+        id: liability.id,
+        name: liability.name,
+        reason: liability.snapshots.length > 0 ? 'future_snapshot' : 'no_snapshot',
+      });
+      continue;
+    }
+    liabilitiesToConvert.push({ amount: toDecimal(latest.balance.toString()), currency: liability.currency });
+  }
+
+  const [assetConversion, liabilityConversion] = await Promise.all([
+    convertMany(prisma, {
+      userId: params.userId,
+      baseCurrency: params.baseCurrency,
+      asOf: params.asOf,
+      items: assetsToConvert,
+    }),
+    convertMany(prisma, {
+      userId: params.userId,
+      baseCurrency: params.baseCurrency,
+      asOf: params.asOf,
+      items: liabilitiesToConvert,
+    }),
+  ]);
+
+  // 缺汇率的条目要按名称列出，只给币种对用户无法定位是哪一项
+  const assetMissing = new Set(assetConversion.missingPairs);
+  const liabilityMissing = new Set(liabilityConversion.missingPairs);
+
+  for (const asset of assets) {
+    const latest = asset.valuations.find((item) => item.valuationDate.getTime() <= params.asOf.getTime());
+    if (!latest) continue;
+    if (asset.currency === params.baseCurrency) continue;
+    const pair = `${asset.currency}->${params.baseCurrency}`;
+    if (assetMissing.has(pair)) {
+      unpricedAssets.push({ id: asset.id, name: asset.name, reason: 'missing_rate' });
+      if (!extraMissingPairs.includes(pair)) extraMissingPairs.push(pair);
+    }
+  }
+
+  for (const liability of liabilities) {
+    const latest = liability.snapshots.find((item) => item.snapshotDate.getTime() <= params.asOf.getTime());
+    if (!latest) continue;
+    if (liability.currency === params.baseCurrency) continue;
+    const pair = `${liability.currency}->${params.baseCurrency}`;
+    if (liabilityMissing.has(pair)) {
+      unpricedLiabilities.push({ id: liability.id, name: liability.name, reason: 'missing_rate' });
+      if (!extraMissingPairs.includes(pair)) extraMissingPairs.push(pair);
+    }
+  }
+
+  return {
+    otherAssets: assetConversion.total,
+    otherLiabilities: liabilityConversion.total,
+    unpricedAssets,
+    unpricedLiabilities,
+    extraMissingPairs,
+  };
+}
 
 /**
  * 净资产 = 资产（非信用卡/贷款账户）− 负债（信用卡/贷款账户余额绝对值）。
@@ -109,18 +246,33 @@ export async function computeNetWorth(
       reason: `缺少 ${account.currency}→${params.baseCurrency} 汇率`,
     }));
 
-  const totalAssets = assetConversion.total.plus(securitiesConversion.total);
+  // ===== 非交易型资产与负债：按最新快照并入净资产 =====
+  const { otherAssets, otherLiabilities, unpricedAssets, unpricedLiabilities, extraMissingPairs } =
+    await computeOtherAssetsAndLiabilities(prisma, params);
+
+  for (const pair of extraMissingPairs) {
+    if (!missingPairs.includes(pair)) missingPairs.push(pair);
+  }
+
+  const totalAssets = assetConversion.total.plus(securitiesConversion.total).plus(otherAssets);
+  const totalLiabilities = liabilityConversion.total.plus(otherLiabilities);
 
   return {
     totalAssets,
-    totalLiabilities: liabilityConversion.total,
-    netWorth: roundMoney(totalAssets.minus(liabilityConversion.total)),
+    totalLiabilities,
+    netWorth: roundMoney(totalAssets.minus(totalLiabilities)),
     securitiesValue: securitiesConversion.total,
+    accountAssets: assetConversion.total,
+    otherAssets,
+    accountLiabilities: liabilityConversion.total,
+    otherLiabilities,
     baseCurrency: params.baseCurrency,
     asOf: params.asOf,
     missingPairs,
     rateDates: [params.asOf.toISOString().slice(0, 10)],
     excludedAccounts,
+    unpricedAssets,
+    unpricedLiabilities,
     // 过期估值与无价标的必须显式暴露，不能让用户以为市值是实时的
     staleValuations: portfolioValuations
       .filter((item) => item.stale && item.marketValue.gt(0))

@@ -75,6 +75,12 @@ export default function BudgetsPage() {
     enabled: editing || creating,
   });
 
+  // 当前周期的超支与接近超支项：接口早已存在，这里补上入口
+  const alertsQuery = useQuery({
+    queryKey: ['budgets', 'alerts'],
+    queryFn: () => budgetsApi.alerts(),
+  });
+
   const expenseCategories: CategoryNode[] = categoriesQuery.data?.flat
     ? categoriesQuery.data.flat
         .filter((item) => !item.archived)
@@ -168,6 +174,7 @@ export default function BudgetsPage() {
 
   const currency = data?.basis.baseCurrency ?? 'CNY';
   const label = periodLabel(period);
+  const alerts = alertsQuery.data?.alerts ?? [];
 
   return (
     <div className="space-y-5">
@@ -214,6 +221,38 @@ export default function BudgetsPage() {
         <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
           {error}
         </p>
+      )}
+
+      {/* 无预警时不渲染整块，避免留下空白占位 */}
+      {alerts.length > 0 && (
+        <section className="card space-y-2 p-4">
+          <h2 className="text-sm font-medium">{t('alerts.title')}</h2>
+          <ul className="space-y-1.5 text-sm">
+            {alerts.map((alert) => (
+              <li
+                key={`${alert.budgetId}:${alert.scope}:${alert.categoryId ?? 'total'}`}
+                className={
+                  alert.level === 'exceeded'
+                    ? 'text-[var(--color-negative)]'
+                    : 'text-amber-600 dark:text-amber-400'
+                }
+              >
+                {alert.scope === 'total'
+                  ? t(alert.level === 'exceeded' ? 'alerts.total_exceeded' : 'alerts.total_warning', {
+                      spent: formatNumber(alert.spent),
+                      available: formatNumber(alert.available),
+                      currency,
+                    })
+                  : t(alert.level === 'exceeded' ? 'alerts.category_exceeded' : 'alerts.category_warning', {
+                      name: alert.categoryName ?? '',
+                      spent: formatNumber(alert.spent),
+                      available: formatNumber(alert.available),
+                      currency,
+                    })}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {isLoading ? (

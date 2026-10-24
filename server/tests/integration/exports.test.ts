@@ -136,7 +136,10 @@ describe('创建导出', () => {
     expect(manifest.schemaVersion).toBe('comporalife-export-v1');
     expect(manifest.scope).toBe('ledger');
     expect(manifest.excluded).toEqual(
-      expect.arrayContaining(['original_statement_files', 'password_hash']),
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'original_statement_files' }),
+        expect.objectContaining({ key: 'password_hash' }),
+      ]),
     );
   });
 

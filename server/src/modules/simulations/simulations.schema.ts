@@ -28,12 +28,29 @@ export const compoundParamsSchema = z.object({
     .default('0'),
 });
 
-export const calculateSchema = compoundParamsSchema.refine(
+
+const optionalSignedDecimal = signedDecimalString.optional();
+
+/** v2 进阶参数：全部可选，缺省为 0/不启用，与 v1 结果一致 */
+const advancedParams = {
+  annualContributionIncrease: optionalSignedDecimal.refine(
+    (value) => value === undefined || (Number(value) > -0.5 && Number(value) <= 1),
+    '追加额递增率应在 -50% 到 100% 之间',
+  ),
+  withdrawalAmount: decimalString.optional(),
+  withdrawalFrequency: z.enum(['none', 'monthly', 'annual']).optional(),
+  withdrawalStartYear: z.number().int().min(1).max(100).optional(),
+  taxRate: decimalString
+    .refine((value) => Number(value) <= 0.5, '税率不能超过 50%')
+    .optional(),
+};
+
+export const calculateSchema = compoundParamsSchema.extend(advancedParams).refine(
   (value) => Number(value.principal) > 0 || Number(value.contributionAmount) > 0,
   '本金与定投至少需要一项大于 0',
 );
 
-export const saveScenarioSchema = compoundParamsSchema.extend({
+export const saveScenarioSchema = compoundParamsSchema.extend({ ...advancedParams,
   name: z.string().trim().min(1, '场景名称不能为空').max(60, '场景名称最多 60 个字符'),
 });
 
@@ -55,3 +72,16 @@ export const compareSchema = z
 export const scenarioIdSchema = z.object({
   id: z.string().uuid('场景 ID 格式不正确'),
 });
+
+export const solveSchema = compoundParamsSchema
+  .omit({ contributionAmount: true })
+  .extend({
+    ...advancedParams,
+    targetAmount: decimalString.refine((value) => Number(value) > 0, '目标金额必须大于 0'),
+    solveFor: z.enum(['contribution', 'years']).default('contribution'),
+    contributionAmount: decimalString.optional(),
+  })
+  .refine(
+    (value) => value.solveFor !== 'years' || value.contributionAmount !== undefined,
+    '按年限反推时必须提供每次投入金额',
+  );

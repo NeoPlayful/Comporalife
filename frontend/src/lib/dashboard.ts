@@ -19,7 +19,50 @@ export interface DashboardOverview {
   monthExpense: string;
   monthNet: string;
   savingsRate: string | null;
+  /** 六项分项：三者之和等于 totalAssets，供界面分栏展示并自证不重复计数 */
+  breakdown?: {
+    accountAssets: string;
+    securitiesValue: string;
+    otherAssets: string;
+    accountLiabilities: string;
+    otherLiabilities: string;
+  };
+  unpricedAssets?: Array<{ id: string; name: string; reason: string }>;
+  unpricedLiabilities?: Array<{ id: string; name: string; reason: string }>;
   basis: OverviewBasis;
+}
+
+export interface BudgetAlertItem {
+  budgetId: string;
+  periodType: string;
+  scope: 'total' | 'category';
+  categoryId?: string;
+  categoryName?: string;
+  level: 'warning' | 'exceeded';
+  spent: string;
+  available: string;
+  usageRatio: string | null;
+}
+
+export interface BudgetAlertsResponse {
+  alerts: BudgetAlertItem[];
+  counts: { total: number; exceeded: number; warning: number };
+}
+
+export interface GoalProgressItem {
+  id: string;
+  name: string;
+  currency: string;
+  targetAmount: string;
+  progress: string | null;
+  isAchieved: boolean;
+  targetDate: string | null;
+  monthsRemaining: number | null;
+}
+
+export interface GoalProgressResponse {
+  goals: GoalProgressItem[];
+  counts: { active: number; achieved: number };
 }
 
 export interface CashflowPoint {
@@ -111,6 +154,8 @@ export const dashboardApi = {
   recentTransactions: (limit = 10) =>
     api.get<{ transactions: RecentTransaction[] }>(`/api/dashboard/recent-transactions?limit=${limit}`),
   dataQuality: () => api.get<DataQuality>('/api/dashboard/data-quality'),
+  budgetAlerts: () => api.get<BudgetAlertsResponse>('/api/dashboard/budget-alerts'),
+  goalProgress: () => api.get<GoalProgressResponse>('/api/dashboard/goal-progress'),
 };
 
 export interface ExchangeRateRecord {

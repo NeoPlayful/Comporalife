@@ -1,0 +1,52 @@
+{
+  "title": "Audit log",
+  "subtitle": "Your sensitive operations. IPs are masked to a network range; amounts and transaction contents are never included.",
+  "filter": {
+    "action": "Filter by action",
+    "action_placeholder": "e.g. auth.login"
+  },
+  "pagination": {
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}"
+  },
+  "actions": {
+    "auth.login": "Signed in",
+    "auth.login_failed": "Failed sign-in",
+    "auth.password_changed": "Password changed",
+    "auth.password_reset": "Password reset",
+    "auth.password_reset_requested": "Password reset requested",
+    "auth.email_verified": "Email verified",
+    "auth.register": "Registered",
+    "account.opening_balance_changed": "Opening balance changed",
+    "import.uploaded": "Statement uploaded",
+    "import.committed": "Import committed",
+    "import.rolled_back": "Import rolled back",
+    "budget.created": "Budget created",
+    "budget.updated": "Budget updated",
+    "budget.deleted": "Budget deleted",
+    "budget.copied": "Budget copied",
+    "goal.created": "Goal created",
+    "goal.updated": "Goal updated",
+    "goal.deleted": "Goal deleted",
+    "portfolio.archived": "Portfolio archived",
+    "export.downloaded": "Export downloaded",
+    "export.deleted": "Export deleted",
+    "backup.downloaded": "Backup downloaded",
+    "backup.deleted": "Backup deleted",
+    "backup.restored": "Backup restored",
+    "backup.restore_failed": "Restore failed",
+    "monte_carlo.scenario.created": "Risk scenario created",
+    "monte_carlo.scenario.updated": "Risk scenario updated",
+    "monte_carlo.scenario.deleted": "Risk scenario deleted",
+    "monte_carlo.run.queued": "Simulation run queued",
+    "monte_carlo.run.cancelled": "Simulation run cancelled",
+    "user.deletion_requested": "Account deletion requested",
+    "user.deletion_cancelled": "Account deletion cancelled"
+  },
+  "empty": {
+    "title": "No audit records",
+    "description": "Password changes, imports and restores will be recorded here.",
+    "no_more": "No more records"
+  }
+}

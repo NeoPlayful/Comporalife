@@ -1,16 +1,27 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { DELETION_COOLING_OFF_DAYS } from '../../config/constants.js';
 import { buildPagination, ok, parsePageParams } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
+import { retryTask } from '../jobs/task.repository.js';
+import { AuthService } from '../auth/auth.service.js';
+import { createNotification } from '../notifications/notification.service.js';
 import { requireAuth, type AuthContext } from '../../plugins/auth.js';
-import { isRegistrationEnabled, setRegistrationEnabled } from '../settings/system-settings.service.js';
+import {
+  isEmailVerificationEnabled,
+  isRegistrationEnabled,
+  setEmailVerificationEnabled,
+  setRegistrationEnabled,
+} from '../settings/system-settings.service.js';
 import {
   adminAuditQuerySchema,
+  adminEmailVerificationSchema,
   adminJobIdSchema,
   adminJobListSchema,
   adminLoginLogSchema,
   adminRegistrationSchema,
+  deletionReviewSchema,
   adminUserDetailSchema,
   adminUserIdSchema,
   adminUserListSchema,
@@ -27,6 +38,8 @@ import {
   listUsers,
   maskIp,
 } from './admin.service.js';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const APP_VERSION = (() => {
   try {
@@ -124,6 +137,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       });
     });
 
+    await createNotification(app.prisma, {
+      userId: id,
+      kind: 'admin_action',
+      metadata: { action: 'user_disabled' },
+      link: null,
+    });
+
     return ok({ id, status: 'disabled' }, request.id);
   });
 
@@ -139,6 +159,13 @@ export default async function adminRoutes(app: FastifyInstance) {
       await tx.auditLog.create({
         data: { userId: actor.userId, action: 'admin.user_enabled', targetType: 'user', targetId: id },
       });
+    });
+
+    await createNotification(app.prisma, {
+      userId: id,
+      kind: 'admin_action',
+      metadata: { action: 'user_enabled' },
+      link: null,
     });
 
     return ok({ id, status: 'active' }, request.id);
@@ -250,17 +277,70 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   /**
-   * 删除申请审批：本阶段只做「禁用」这一种处置。
-   * 物理删除涉及备份与保留规则，属于独立设计。
+   * 注销申请审批。
+   * 批准 = 软删除（禁用 + 记录 deletedAt），绝不物理删除：
+   * 数据行保留，历史审计与备份仍可追溯。
    */
   app.post('/admin/users/:id/deletion-review', { preHandler: app.authenticate }, async (request) => {
     const actor = requireAdmin(request);
     const { id } = adminUserIdSchema.parse(request.params);
+    const body = deletionReviewSchema.parse(request.body ?? {});
+
+    const target = await app.prisma.user.findUnique({
+      where: { id },
+      select: { deletionRequestedAt: true, deletedAt: true },
+    });
+
+    if (!target) throw errors.notFound('用户不存在');
+    if (!target.deletionRequestedAt) {
+      throw errors.deletionNotReviewable('no_pending_request');
+    }
+
+    if (body.decision === 'reject') {
+      await app.prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id },
+          data: { deletionRequestedAt: null, deletionReviewedAt: new Date() },
+        });
+        await tx.auditLog.create({
+          data: {
+            userId: actor.userId,
+            action: 'admin.deletion_rejected',
+            targetType: 'user',
+            targetId: id,
+            metadata: body.note ? { note: body.note } : undefined,
+          },
+        });
+      });
+
+      await createNotification(app.prisma, {
+        userId: id,
+        kind: 'admin_action',
+        metadata: { action: 'deletion_rejected' },
+        link: '/profile',
+      });
+
+      return ok({ id, decision: 'reject', status: 'unchanged' }, request.id);
+    }
+
+    // 冷却期未满不得批准：给用户留出反悔窗口，也防止管理员误操作
+    const coolingOffEndsAt = target.deletionRequestedAt.getTime() + DELETION_COOLING_OFF_DAYS * DAY_MS;
+    if (Date.now() < coolingOffEndsAt) {
+      throw errors.deletionNotReviewable('cooling_off_not_elapsed');
+    }
 
     await assertRoleChangeAllowed(app.prisma, { actorId: actor.userId, targetId: id, action: 'disable' });
 
     await app.prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id }, data: { status: 'disabled', sessionVersion: { increment: 1 } } });
+      await tx.user.update({
+        where: { id },
+        data: {
+          status: 'disabled',
+          deletedAt: new Date(),
+          deletionReviewedAt: new Date(),
+          sessionVersion: { increment: 1 },
+        },
+      });
       await tx.userSession.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
       await tx.auditLog.create({
         data: {
@@ -268,12 +348,19 @@ export default async function adminRoutes(app: FastifyInstance) {
           action: 'admin.deletion_approved',
           targetType: 'user',
           targetId: id,
-          metadata: { disposition: 'disabled_not_deleted' },
+          metadata: { disposition: 'soft_deleted', ...(body.note ? { note: body.note } : {}) },
         },
       });
     });
 
-    return ok({ id, status: 'disabled', disposition: 'disabled_not_deleted' }, request.id);
+    await createNotification(app.prisma, {
+      userId: id,
+      kind: 'deletion_approved',
+      metadata: {},
+      link: null,
+    });
+
+    return ok({ id, decision: 'approve', status: 'disabled', disposition: 'soft_deleted' }, request.id);
   });
 
   // ===== 管理员权限（仅 super_admin） =====
@@ -474,6 +561,66 @@ export default async function adminRoutes(app: FastifyInstance) {
     );
   });
 
+  // 任务重试：仅失败且未达次数上限的任务可重试，复用与用户侧相同的仓储函数
+  app.post('/admin/jobs/:id/retry', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const { id } = adminJobIdSchema.parse(request.params);
+
+    const task = await app.prisma.jobTask.findUnique({
+      where: { id },
+      select: { id: true, kind: true, userId: true, status: true, attempts: true, targetId: true },
+    });
+    if (!task) throw errors.taskNotFound();
+
+    if (task.status !== 'failed') {
+      throw errors.taskNotRetryable(task.status, task.attempts);
+    }
+
+    const retried = await retryTask(app.prisma, task.userId, id);
+    app.tasks.kick();
+
+    await app.prisma.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: 'admin.job_retried',
+        targetType: 'job_task',
+        targetId: id,
+        metadata: { taskKind: task.kind, attempts: retried.attempts },
+      },
+    });
+
+    return ok({ id: retried.id, status: retried.status, attempts: retried.attempts }, request.id);
+  });
+
+  // 重发重置邮件：不返回令牌，只确认已触发
+  app.post('/admin/users/:id/send-password-reset', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const { id } = adminUserIdSchema.parse(request.params);
+
+    const user = await app.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, status: true },
+    });
+    if (!user) throw errors.notFound('用户不存在');
+    if (user.status !== 'active') {
+      throw errors.validation('只能对启用中的账号触发密码重置');
+    }
+
+    const service = new AuthService(app.prisma, app.redis);
+    await service.requestPasswordReset(user.email, request.log);
+
+    await app.prisma.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: 'admin.password_reset_triggered',
+        targetType: 'user',
+        targetId: id,
+      },
+    });
+
+    return ok({ triggered: true }, request.id);
+  });
+
   app.get('/admin/system/info', { preHandler: app.authenticate }, async (request) => {
     requireAdmin(request);
     return ok(await getSystemMetrics(app.prisma, APP_VERSION), request.id);
@@ -514,6 +661,30 @@ export default async function adminRoutes(app: FastifyInstance) {
       data: {
         userId: actor.userId,
         action: 'admin.registration_toggled',
+        targetType: 'system_setting',
+        metadata: { enabled: body.enabled },
+      },
+    });
+
+    return ok({ enabled: body.enabled }, request.id);
+  });
+
+  // ===== 邮箱验证开关 =====
+  app.get('/admin/settings/email-verification', { preHandler: app.authenticate }, async (request) => {
+    requireAdmin(request);
+    return ok({ enabled: await isEmailVerificationEnabled(app.prisma) }, request.id);
+  });
+
+  app.patch('/admin/settings/email-verification', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const body = adminEmailVerificationSchema.parse(request.body);
+
+    await setEmailVerificationEnabled(app.prisma, body.enabled, actor.userId);
+
+    await app.prisma.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: 'admin.email_verification_toggled',
         targetType: 'system_setting',
         metadata: { enabled: body.enabled },
       },

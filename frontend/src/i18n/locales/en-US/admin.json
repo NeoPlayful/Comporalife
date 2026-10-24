@@ -45,7 +45,16 @@
     "audit_logs": "Admin actions",
     "notice_no_financial": "Admin views never include balances, transactions, portfolios or goals",
     "disable_confirm": "Disable this account? All sessions will be revoked immediately.",
-    "revoke_confirm": "Revoke all sessions? Existing tokens stop working immediately."
+    "revoke_confirm": "Revoke all sessions? Existing tokens stop working immediately.",
+    "reset_mail": "Send reset mail",
+    "reset_mail_confirm": "Send a password reset email to {{email}}?",
+    "approve_deletion": "Approve deletion",
+    "approve_deletion_confirm": "Approving disables {{email}} (data is kept). Continue?",
+    "reject_deletion": "Reject deletion",
+    "reject_deletion_confirm": "Reject the deletion request from {{email}}?",
+    "cooling_off_pending": "Cooling-off period not elapsed",
+    "deletion_ready": "Cooling-off period elapsed, approval allowed",
+    "deletion_cooling": "Deletion requested at {{time}}, cooling-off period not elapsed"
   },
   "admins": {
     "title": "Administrators",
@@ -65,7 +74,10 @@
     "registration_off": "Closed",
     "registration_hint": "When closed, the register endpoint returns 403",
     "audit_title": "Admin audit log",
-    "job_status": "Job status"
+    "job_status": "Job status",
+    "email_verification": "Email verification",
+    "email_verification_hint": "When on, a verification email is sent at signup; unverified users can still log in and use the app",
+    "retry": "Retry"
   },
   "roles": {
     "super_admin": "Super admin",

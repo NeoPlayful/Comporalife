@@ -22,5 +22,9 @@
   "close_menu": "关闭菜单",
   "portfolios": "投资管理",
   "data": "我的数据",
+  "assets": "资产管理",
+  "liabilities": "负债管理",
+  "notifications": "通知",
+  "audit": "审计日志",
   "admin": "管理后台"
 }

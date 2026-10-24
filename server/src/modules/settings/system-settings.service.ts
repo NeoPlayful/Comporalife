@@ -1,5 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
-import { SETTING_REGISTRATION_ENABLED } from '../../config/constants.js';
+import {
+  SETTING_EMAIL_VERIFICATION_ENABLED,
+  SETTING_REGISTRATION_ENABLED,
+} from '../../config/constants.js';
 
 /**
  * 部署级配置。
@@ -27,6 +30,29 @@ export async function setRegistrationEnabled(
   await prisma.systemSetting.upsert({
     where: { key: SETTING_REGISTRATION_ENABLED },
     create: { key: SETTING_REGISTRATION_ENABLED, value: enabled, updatedBy },
+    update: { value: enabled, updatedBy },
+  });
+}
+
+/** 邮箱验证默认关闭：没有配置就视为不要求验证 */
+export async function isEmailVerificationEnabled(prisma: PrismaClient): Promise<boolean> {
+  const row = await prisma.systemSetting.findUnique({
+    where: { key: SETTING_EMAIL_VERIFICATION_ENABLED },
+    select: { value: true },
+  });
+
+  if (!row) return false;
+  return row.value === true || row.value === 'true';
+}
+
+export async function setEmailVerificationEnabled(
+  prisma: PrismaClient,
+  enabled: boolean,
+  updatedBy: string,
+): Promise<void> {
+  await prisma.systemSetting.upsert({
+    where: { key: SETTING_EMAIL_VERIFICATION_ENABLED },
+    create: { key: SETTING_EMAIL_VERIFICATION_ENABLED, value: enabled, updatedBy },
     update: { value: enabled, updatedBy },
   });
 }

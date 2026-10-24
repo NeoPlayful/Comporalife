@@ -60,5 +60,24 @@
     "compound_principal": "累计本金",
     "compound_interest": "复利收益",
     "year": "年"
+  },
+  "breakdown": {
+    "account_assets": "账户资产",
+    "securities": "证券市值",
+    "other_assets": "其他资产",
+    "account_liabilities": "账户负债",
+    "other_liabilities": "其他负债"
+  },
+  "unpriced_assets": "未录估值、未计入净资产的资产：{{names}}",
+  "go_assets": "去补录",
+  "budget_alerts": {
+    "summary": "{{exceeded}} 项预算已超支，{{warning}} 项接近上限",
+    "action": "查看预算"
+  },
+  "goal_progress": {
+    "title": "目标进度",
+    "action": "查看全部",
+    "achieved": "已达成",
+    "percent": "{{value}}%"
   }
 }

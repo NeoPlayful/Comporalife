@@ -45,7 +45,16 @@
     "audit_logs": "管理操作",
     "notice_no_financial": "管理视图不包含余额、流水、持仓与目标",
     "disable_confirm": "禁用该账号？全部会话会立即失效。",
-    "revoke_confirm": "撤销全部会话？已签发的令牌会立即失效。"
+    "revoke_confirm": "撤销全部会话？已签发的令牌会立即失效。",
+    "reset_mail": "重发重置邮件",
+    "reset_mail_confirm": "向 {{email}} 发送密码重置邮件？",
+    "approve_deletion": "批准注销",
+    "approve_deletion_confirm": "批准后 {{email}} 将被停用（数据保留），确认？",
+    "reject_deletion": "驳回注销",
+    "reject_deletion_confirm": "驳回 {{email}} 的注销申请？",
+    "cooling_off_pending": "冷却期未满，不能批准",
+    "deletion_ready": "冷却期已满，可以批准",
+    "deletion_cooling": "注销申请于 {{time}} 提交，冷却期未满"
   },
   "admins": {
     "title": "管理员",
@@ -65,7 +74,10 @@
     "registration_off": "关闭",
     "registration_hint": "关闭后注册接口返回 403",
     "audit_title": "管理操作审计",
-    "job_status": "任务状态"
+    "job_status": "任务状态",
+    "email_verification": "邮箱验证",
+    "email_verification_hint": "开启后注册时会发送验证邮件；未验证不影响登录与记账",
+    "retry": "重试"
   },
   "roles": {
     "super_admin": "超级管理员",

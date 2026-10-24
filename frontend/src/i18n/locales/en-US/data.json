@@ -41,6 +41,7 @@
     "day_gap": "{{days}} day(s) apart",
     "missing_months_by_account": "{{name}}: {{months}}",
     "stale_portfolio": "{{name}} · valued {{date}} ({{days}} days ago)",
+    "stale_asset": "{{name}} · valued {{date}} ({{days}} days ago)",
     "never_valued": "Never valued",
     "rate_pair": "{{from}} → {{to}} · {{status}}",
     "rate_missing": "No rate",
@@ -86,7 +87,7 @@
     "complete": "Data complete",
     "incomplete": "Missing items",
     "missing_months": "Missing months: {{months}}",
-    "excluded": "Not included: {{items}}"
+    "excluded_title": "Not included"
   },
   "backup": {
     "title": "Backup & Restore",

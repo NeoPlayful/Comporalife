@@ -29,22 +29,38 @@ const SCOPE_DATASETS: Record<ExportScope, string[]> = {
     'tags',
     'transactions',
     'entries',
+    'transaction_tags',
     'budgets',
     'instruments',
+    'instrument_prices',
     'portfolios',
+    'portfolio_targets',
     'trades',
     'portfolio_cashflows',
     'valuations',
+    'classification_rules',
+    'import_templates',
+    'reconciliations',
     'simulation_scenarios',
     'goals',
     'reports',
+    'exchange_rates',
     'settings',
   ],
-  ledger: ['accounts', 'categories', 'tags', 'transactions', 'entries'],
-  investments: ['accounts', 'instruments', 'portfolios', 'trades', 'portfolio_cashflows', 'valuations'],
+  ledger: ['accounts', 'categories', 'tags', 'transactions', 'entries', 'transaction_tags', 'reconciliations'],
+  investments: [
+    'accounts',
+    'instruments',
+    'instrument_prices',
+    'portfolios',
+    'portfolio_targets',
+    'trades',
+    'portfolio_cashflows',
+    'valuations',
+  ],
   simulations: ['simulation_scenarios'],
   planning: ['goals', 'reports'],
-  settings: ['settings'],
+  settings: ['settings', 'exchange_rates'],
 };
 
 export function datasetsForScope(scope: ExportScope): string[] {
@@ -327,6 +343,164 @@ export async function loadDataset(
         name: 'portfolio_cashflows.csv',
         header: ['id', 'portfolioId', 'kind', 'amount', 'flowDate', 'note'],
         rows: rows.map((row) => [row.id, row.portfolioId, row.kind, moneyToString(row.amount), iso(row.flowDate), row.note]),
+      };
+    }
+
+    case 'instrument_prices': {
+      const rows = await prisma.instrumentPrice.findMany({
+        where: {
+          userId: context.userId,
+          ...(context.from || context.to
+            ? { priceDate: { ...(context.from ? { gte: context.from } : {}), ...(context.to ? { lte: context.to } : {}) } }
+            : {}),
+        },
+        orderBy: [{ instrumentId: 'asc' }, { priceDate: 'asc' }],
+        select: { id: true, instrumentId: true, priceDate: true, price: true, source: true, note: true },
+      });
+
+      return {
+        name: 'instrument_prices.csv',
+        header: ['id', 'instrumentId', 'priceDate', 'price', 'source', 'note'],
+        rows: rows.map((row) => [
+          row.id,
+          row.instrumentId,
+          dateOnly(row.priceDate, context.timezone),
+          moneyToString(row.price),
+          row.source,
+          row.note,
+        ]),
+      };
+    }
+
+    case 'portfolio_targets': {
+      const rows = await prisma.portfolioTarget.findMany({
+        where: { userId: context.userId },
+        orderBy: [{ portfolioId: 'asc' }, { dimension: 'asc' }, { key: 'asc' }],
+        select: { id: true, portfolioId: true, dimension: true, key: true, targetWeight: true },
+      });
+
+      return {
+        name: 'portfolio_targets.csv',
+        header: ['id', 'portfolioId', 'dimension', 'key', 'targetWeight'],
+        rows: rows.map((row) => [row.id, row.portfolioId, row.dimension, row.key, moneyToString(row.targetWeight)]),
+      };
+    }
+
+    case 'transaction_tags': {
+      const rows = await prisma.transactionTag.findMany({
+        where: { transaction: { userId: context.userId } },
+        orderBy: [{ transactionId: 'asc' }, { tagId: 'asc' }],
+        select: { transactionId: true, tagId: true },
+      });
+
+      return {
+        name: 'transaction_tags.csv',
+        header: ['transactionId', 'tagId'],
+        rows: rows.map((row) => [row.transactionId, row.tagId]),
+      };
+    }
+
+    case 'classification_rules': {
+      const rows = await prisma.classificationRule.findMany({
+        where: { userId: context.userId },
+        orderBy: [{ priority: 'asc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          name: true,
+          priority: true,
+          enabled: true,
+          conditions: true,
+          actions: true,
+          matchCount: true,
+          lastAppliedAt: true,
+        },
+      });
+
+      return {
+        name: 'classification_rules.csv',
+        header: ['id', 'name', 'priority', 'enabled', 'conditionsJson', 'actionsJson', 'matchCount', 'lastAppliedAt'],
+        rows: rows.map((row) => [
+          row.id,
+          row.name,
+          row.priority,
+          row.enabled,
+          JSON.stringify(row.conditions),
+          JSON.stringify(row.actions),
+          row.matchCount,
+          iso(row.lastAppliedAt),
+        ]),
+      };
+    }
+
+    case 'import_templates': {
+      const rows = await prisma.importTemplate.findMany({
+        where: { userId: context.userId },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true, bankName: true, format: true, headerSignature: true, mapping: true },
+      });
+
+      return {
+        name: 'import_templates.csv',
+        header: ['id', 'name', 'bankName', 'format', 'headerSignature', 'mappingJson'],
+        rows: rows.map((row) => [
+          row.id,
+          row.name,
+          row.bankName,
+          row.format,
+          row.headerSignature,
+          JSON.stringify(row.mapping),
+        ]),
+      };
+    }
+
+    case 'reconciliations': {
+      const rows = await prisma.accountReconciliation.findMany({
+        where: { userId: context.userId },
+        orderBy: [{ accountId: 'asc' }, { reconciledAt: 'asc' }],
+        select: {
+          id: true,
+          accountId: true,
+          statementBalance: true,
+          computedBalance: true,
+          difference: true,
+          reconciledAt: true,
+          note: true,
+        },
+      });
+
+      return {
+        name: 'account_reconciliations.csv',
+        header: ['id', 'accountId', 'statementBalance', 'computedBalance', 'difference', 'reconciledAt', 'note'],
+        rows: rows.map((row) => [
+          row.id,
+          row.accountId,
+          moneyToString(row.statementBalance),
+          moneyToString(row.computedBalance),
+          moneyToString(row.difference),
+          dateOnly(row.reconciledAt, context.timezone),
+          row.note,
+        ]),
+      };
+    }
+
+    case 'exchange_rates': {
+      const rows = await prisma.exchangeRate.findMany({
+        where: { userId: context.userId },
+        orderBy: [{ baseCurrency: 'asc' }, { quoteCurrency: 'asc' }, { rateDate: 'asc' }],
+        select: { id: true, baseCurrency: true, quoteCurrency: true, rate: true, rateDate: true, source: true },
+      });
+
+      return {
+        name: 'exchange_rates.csv',
+        header: ['id', 'baseCurrency', 'quoteCurrency', 'rate', 'rateDate', 'source'],
+        rows: rows.map((row) => [
+          row.id,
+          row.baseCurrency,
+          row.quoteCurrency,
+          moneyToString(row.rate),
+          dateOnly(row.rateDate, context.timezone),
+          row.source,
+        ]),
       };
     }
 

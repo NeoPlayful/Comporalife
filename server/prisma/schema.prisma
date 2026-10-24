@@ -128,6 +128,10 @@ model User {
   role            UserRole   @default(user)
   status          UserStatus @default(active)
   emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  // 注销生命周期：申请 → 冷却期满 → 管理员批准后软删除；任何一步都不物理删除
+  deletionRequestedAt DateTime? @map("deletion_requested_at") @db.Timestamptz(6)
+  deletionReviewedAt  DateTime? @map("deletion_reviewed_at") @db.Timestamptz(6)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(6)
   lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(6)
   lastLoginIp     String?    @map("last_login_ip")
   sessionVersion  Int        @default(1) @map("session_version")
@@ -164,6 +168,11 @@ model User {
   dataExports         DataExport[]
   backups             Backup[]
   jobTasks            JobTask[]
+  assets              Asset[]
+  assetValuations     AssetValuation[]
+  liabilities         Liability[]
+  liabilitySnapshots  LiabilitySnapshot[]
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -361,7 +370,13 @@ model SimulationScenario {
   years                 Int
   inflationRate         Decimal               @default(0) @map("inflation_rate") @db.Decimal(10, 6)
   feeRate               Decimal               @default(0) @map("fee_rate") @db.Decimal(10, 6)
-  modelVersion          String                @default("compound-v1") @map("model_version")
+  // v2 进阶参数：旧场景保持默认值，按 modelVersion 用 v1 口径重算
+  annualContributionIncrease Decimal         @default(0) @map("annual_contribution_increase") @db.Decimal(10, 6)
+  withdrawalAmount      Decimal               @default(0) @map("withdrawal_amount") @db.Decimal(20, 6)
+  withdrawalFrequency   ContributionFrequency @default(none) @map("withdrawal_frequency")
+  withdrawalStartYear   Int                   @default(1) @map("withdrawal_start_year")
+  taxRate               Decimal               @default(0) @map("tax_rate") @db.Decimal(10, 6)
+  modelVersion          String                @default("compound-v2") @map("model_version")
   createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1088,4 +1103,156 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("system_settings")
+}
+
+// ===== Phase 8：非交易型资产与负债 =====
+// 与 Account 分表：账户余额由复式分录推导，资产价值由估值快照表达，
+// 两类实体的生命周期与校验规则不同，混用会破坏「余额 = 分录之和」。
+
+enum AssetKind {
+  property
+  vehicle
+  collectible
+  other
+}
+
+enum AssetStatus {
+  active
+  archived
+}
+
+enum LiabilityKind {
+  mortgage
+  consumer_loan
+  auto_loan
+  credit_line
+  other
+}
+
+enum LiabilityStatus {
+  active
+  archived
+}
+
+enum ValuationBasis {
+  manual
+  appraised
+  market
+}
+
+model Asset {
+  id            String      @id @default(uuid()) @db.Uuid
+  userId        String      @map("user_id") @db.Uuid
+  name          String
+  kind          AssetKind   @default(other)
+  currency      String      @db.Char(3)
+  purchaseDate  DateTime?   @map("purchase_date") @db.Date
+  // 购置价仅作参考，不参与净资产计算
+  purchasePrice Decimal?    @map("purchase_price") @db.Decimal(20, 6)
+  note          String?
+  status        AssetStatus @default(active)
+  archivedAt    DateTime?   @map("archived_at") @db.Timestamptz(6)
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  valuations AssetValuation[]
+
+  @@unique([userId, name])
+  @@index([userId, status])
+  @@index([userId, kind])
+  @@map("assets")
+}
+
+model AssetValuation {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  assetId       String         @map("asset_id") @db.Uuid
+  valuationDate DateTime       @map("valuation_date") @db.Date
+  value         Decimal        @db.Decimal(20, 6)
+  basis         ValuationBasis @default(manual)
+  note          String?
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, valuationDate])
+  @@index([userId, valuationDate(sort: Desc)])
+  @@map("asset_valuations")
+}
+
+model Liability {
+  id             String          @id @default(uuid()) @db.Uuid
+  userId         String          @map("user_id") @db.Uuid
+  name           String
+  kind           LiabilityKind   @default(other)
+  currency       String          @db.Char(3)
+  // 原始本金与利率仅作参考，不参与任何计算
+  originalAmount Decimal?        @map("original_amount") @db.Decimal(20, 6)
+  startDate      DateTime?       @map("start_date") @db.Date
+  interestRate   Decimal?        @map("interest_rate") @db.Decimal(10, 6)
+  note           String?
+  status         LiabilityStatus @default(active)
+  archivedAt     DateTime?       @map("archived_at") @db.Timestamptz(6)
+  version        Int             @default(1)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots LiabilitySnapshot[]
+
+  @@unique([userId, name])
+  @@index([userId, status])
+  @@index([userId, kind])
+  @@map("liabilities")
+}
+
+model LiabilitySnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  liabilityId String   @map("liability_id") @db.Uuid
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+  balance     Decimal  @db.Decimal(20, 6)
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  liability Liability @relation(fields: [liabilityId], references: [id], onDelete: Cascade)
+
+  @@unique([liabilityId, snapshotDate])
+  @@index([userId, snapshotDate(sort: Desc)])
+  @@map("liability_snapshots")
+}
+
+// ===== Phase 8：站内通知 =====
+// 文案不落库为最终文本：存 kind 与渲染参数，前端按当前语言渲染，
+// 这样切换语言时历史通知不会停留在旧语言。
+
+enum NotificationKind {
+  export_ready
+  backup_ready
+  restore_done
+  job_failed
+  email_verified
+  deletion_requested
+  deletion_approved
+  admin_action
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  kind      NotificationKind
+  metadata  Json?
+  link      String?
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

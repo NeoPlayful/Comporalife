@@ -15,8 +15,31 @@ export default function AdminSystemPage() {
   const jobs = useQuery({ queryKey: ['admin', 'job-list'], queryFn: () => adminApi.jobs(1) });
   const audit = useQuery({ queryKey: ['admin', 'audit'], queryFn: () => adminApi.auditLogs(1) });
 
+  const emailVerification = useQuery({
+    queryKey: ['admin', 'email-verification'],
+    queryFn: () => adminApi.emailVerification(),
+  });
+
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => adminApi.setRegistration(enabled),
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+  });
+
+  const toggleVerification = useMutation({
+    mutationFn: (enabled: boolean) => adminApi.setEmailVerification(enabled),
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+  });
+
+  const retryJob = useMutation({
+    mutationFn: (id: string) => adminApi.retryJob(id),
     onSuccess: () => {
       setError(null);
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
@@ -51,6 +74,29 @@ export default function AdminSystemPage() {
         {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
       </section>
 
+      <section className="card p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="font-medium">{t('system.email_verification')}</p>
+            <p className="text-xs text-[var(--color-content-muted)]">
+              {t('system.email_verification_hint')}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleVerification.mutate(!emailVerification.data?.enabled)}
+            disabled={emailVerification.isLoading || toggleVerification.isPending}
+            className={`rounded-lg px-3 py-1.5 text-xs text-white ${
+              emailVerification.data?.enabled ? 'bg-emerald-600' : 'bg-red-600'
+            }`}
+          >
+            {emailVerification.data?.enabled
+              ? t('system.registration_on')
+              : t('system.registration_off')}
+          </button>
+        </div>
+      </section>
+
       <section>
         <h2 className="mb-2 text-sm font-semibold">{t('system.jobs')}</h2>
         <ul className="divide-y divide-[var(--color-border-subtle)] rounded-xl border border-[var(--color-border-subtle)] text-sm">
@@ -63,7 +109,22 @@ export default function AdminSystemPage() {
                 {job.kind} · {job.status}
                 {job.failureCode && ` · ${job.failureCode}`}
               </span>
-              <span className="text-xs text-[var(--color-content-muted)]">{formatDateTime(job.createdAt)}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-[var(--color-content-muted)]">
+                  {formatDateTime(job.createdAt)}
+                </span>
+                {/* 只有失败任务可重试，其余状态不显示按钮 */}
+                {job.status === 'failed' && (
+                  <button
+                    type="button"
+                    onClick={() => retryJob.mutate(job.id)}
+                    disabled={retryJob.isPending}
+                    className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs"
+                  >
+                    {t('system.retry')}
+                  </button>
+                )}
+              </span>
             </li>
           ))}
         </ul>

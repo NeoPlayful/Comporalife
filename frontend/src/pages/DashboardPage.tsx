@@ -25,6 +25,14 @@ export default function DashboardPage() {
   const allocationQuery = useQuery({ queryKey: ['dashboard', 'allocation'], queryFn: dashboardApi.assetAllocation });
   const recentQuery = useQuery({ queryKey: ['dashboard', 'recent'], queryFn: () => dashboardApi.recentTransactions() });
   const qualityQuery = useQuery({ queryKey: ['dashboard', 'quality'], queryFn: dashboardApi.dataQuality });
+  const budgetAlertsQuery = useQuery({
+    queryKey: ['dashboard', 'budget-alerts'],
+    queryFn: () => dashboardApi.budgetAlerts(),
+  });
+  const goalQuery = useQuery({
+    queryKey: ['dashboard', 'goal-progress'],
+    queryFn: () => dashboardApi.goalProgress(),
+  });
 
   if (overviewQuery.isLoading) return <LoadingState />;
   if (overviewQuery.isError) {
@@ -106,6 +114,80 @@ export default function DashboardPage() {
           }
         />
       </div>
+
+      {/* 净值分项：让用户看清钱落在哪一栏，建成重复账户时能自己发现 */}
+      {overview.breakdown && (
+        <div className="card grid gap-3 p-4 text-xs sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <p className="text-[var(--color-content-muted)]">{t('dashboard:breakdown.account_assets')}</p>
+            <MoneyDisplay amount={overview.breakdown.accountAssets} currency={overview.baseCurrency} className="text-sm" />
+          </div>
+          <div>
+            <p className="text-[var(--color-content-muted)]">{t('dashboard:breakdown.securities')}</p>
+            <MoneyDisplay amount={overview.breakdown.securitiesValue} currency={overview.baseCurrency} className="text-sm" />
+          </div>
+          <div>
+            <p className="text-[var(--color-content-muted)]">{t('dashboard:breakdown.other_assets')}</p>
+            <MoneyDisplay amount={overview.breakdown.otherAssets} currency={overview.baseCurrency} className="text-sm" />
+          </div>
+          <div>
+            <p className="text-[var(--color-content-muted)]">{t('dashboard:breakdown.account_liabilities')}</p>
+            <MoneyDisplay amount={overview.breakdown.accountLiabilities} currency={overview.baseCurrency} className="text-sm" />
+          </div>
+          <div>
+            <p className="text-[var(--color-content-muted)]">{t('dashboard:breakdown.other_liabilities')}</p>
+            <MoneyDisplay amount={overview.breakdown.otherLiabilities} currency={overview.baseCurrency} className="text-sm" />
+          </div>
+        </div>
+      )}
+
+      {(overview.unpricedAssets?.length ?? 0) > 0 && (
+        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          {t('dashboard:unpriced_assets', {
+            names: overview.unpricedAssets!.map((item) => item.name).join(listSeparator),
+          })}
+          <Link to="/assets" className="mx-1 underline">
+            {t('dashboard:go_assets')}
+          </Link>
+        </p>
+      )}
+
+      {(budgetAlertsQuery.data?.counts.total ?? 0) > 0 && (
+        <Link to="/budgets" className="card flex items-center justify-between p-4 text-sm">
+          <span>
+            {t('dashboard:budget_alerts.summary', {
+              exceeded: budgetAlertsQuery.data!.counts.exceeded,
+              warning: budgetAlertsQuery.data!.counts.warning,
+            })}
+          </span>
+          <span className="text-[var(--color-accent)]">{t('dashboard:budget_alerts.action')}</span>
+        </Link>
+      )}
+
+      {(goalQuery.data?.counts.active ?? 0) > 0 && (
+        <section className="card space-y-2 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium">{t('dashboard:goal_progress.title')}</h2>
+            <Link to="/goals" className="text-xs text-[var(--color-accent)]">
+              {t('dashboard:goal_progress.action')}
+            </Link>
+          </div>
+          <ul className="space-y-1.5 text-xs">
+            {goalQuery.data!.goals.slice(0, 3).map((goal) => (
+              <li key={goal.id} className="flex items-center justify-between gap-2">
+                <span className="truncate">{goal.name}</span>
+                <span className="shrink-0 text-[var(--color-content-muted)]">
+                  {goal.isAchieved
+                    ? t('dashboard:goal_progress.achieved')
+                    : t('dashboard:goal_progress.percent', {
+                        value: goal.progress ? (Number(goal.progress) * 100).toFixed(1) : '—',
+                      })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {overview.basis.missingRates.length > 0 && (
         <div className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">

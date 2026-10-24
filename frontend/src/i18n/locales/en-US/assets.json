@@ -1,0 +1,56 @@
+{
+  "title": "Assets",
+  "subtitle": "Non-trading assets such as property and vehicles, counted into net worth by valuation snapshot",
+  "new_asset": "Add asset",
+  "show_archived": "Show archived",
+  "archived_badge": "Archived",
+  "archive": "Archive",
+  "archive_confirm": "Archive \"{{name}}\"? It will no longer count toward net worth; valuation history is kept.",
+  "notice_no_account": "Register property, vehicles and other non-trading assets here rather than as cash accounts, otherwise net worth will be double counted.",
+  "latest_valuation": "Latest valuation {{value}} {{currency}} ({{date}})",
+  "never_valued": "No valuation yet — not counted in net worth",
+  "stale_hint": "Valuation is over 90 days old, consider updating",
+  "kinds": {
+    "property": "Property",
+    "vehicle": "Vehicle",
+    "collectible": "Collectible",
+    "other": "Other"
+  },
+  "bases": {
+    "manual": "Manual",
+    "appraised": "Appraised",
+    "market": "Market reference"
+  },
+  "form": {
+    "name": "Asset name",
+    "kind": "Category",
+    "currency": "Currency",
+    "purchase_date": "Purchase date",
+    "purchase_price": "Purchase price",
+    "purchase_price_hint": "Reference only, not used in net worth",
+    "note": "Note",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "valuation": {
+    "title": "Valuations ({{count}})",
+    "date": "Valuation date",
+    "value": "Value",
+    "basis": "Basis",
+    "add": "Add valuation",
+    "empty": "No valuations yet",
+    "remove": "Delete valuation",
+    "overwrite_confirm": "A valuation already exists for this date. Overwrite it?"
+  },
+  "summary": {
+    "total": "Total assets",
+    "unpriced": "No valuation, excluded from total: {{names}}",
+    "missing_rate": "Missing exchange rate, excluded from total: {{currencies}}",
+    "basis": "Based on valuations as of {{date}}, converted to {{currency}}"
+  },
+  "empty": {
+    "title": "No assets yet",
+    "description": "Register property, vehicles and other non-trading assets to include them in net worth."
+  }
+}

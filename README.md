@@ -6,7 +6,7 @@
 
 ## 当前进度
 
-**Phase 1 至 Phase 7 已完成** —— 个人财务主链路、银行账单导入、收支分析与预算、投资组合与收益、风险模拟、财富目标与财务报表，以及数据管理、备份恢复与管理后台。
+**Phase 1 至 Phase 8 已完成** —— 个人财务主链路、银行账单导入、收支分析与预算、投资组合与收益、风险模拟、财富目标与财务报表、数据管理与备份恢复、管理后台，以及非交易型资产与负债、账户生命周期与站内通知。
 
 | 已交付 | 说明 |
 |---|---|
@@ -33,10 +33,14 @@
 | 备份与恢复 | 加密逻辑备份包、解密后校验校验和与结构版本、两段式预览恢复、单事务原子回滚 |
 | 任务面板 | 通用任务与蒙特卡罗运行统一列表、进度、取消与失败重试 |
 | 管理后台 | 账号与运维视图：仪表板聚合、启用/禁用/撤会话、管理员授权、注册开关；不接触财务数据 |
+| 资产与负债 | 房产/车辆等非交易型资产与房贷等负债、估值与余额快照、并入净资产六项分项 |
+| 账户生命周期 | 站内通知、可选邮箱验证、注销申请与冷却期、管理员审批后软删除 |
+| 备份完整性 | 标的计价、标签关联、目标权重、分类规则、导入模板、对账记录与汇率全部纳入备份与导出 |
+| 复利 v2 | 递增定投、提款阶段、收益税、目标反推；旧场景按 v1 口径重算，结果不变 |
 
-尚未交付（后续阶段）：行情自动接入、报表 PDF、云端同步、备份异地存储。
+尚未交付（后续阶段）：行情自动接入、报表 PDF、云端同步、备份异地存储、凭证附件与交易拆分、用户物理删除、OFX/PDF 账单解析。
 
-详见 [Phase 1](docs/plan-phase1.md)、[Phase 2](docs/plan-phase2.md)、[Phase 3](docs/plan-phase3.md)、[Phase 4](docs/plan-phase4.md)、[Phase 5](docs/plan-phase5.md)、[Phase 6](docs/plan-phase6.md)、[Phase 7](docs/plan-phase7.md) 开发计划。
+详见 [Phase 1](docs/plan-phase1.md)、[Phase 2](docs/plan-phase2.md)、[Phase 3](docs/plan-phase3.md)、[Phase 4](docs/plan-phase4.md)、[Phase 5](docs/plan-phase5.md)、[Phase 6](docs/plan-phase6.md)、[Phase 7](docs/plan-phase7.md)、[Phase 8](docs/plan-phase8.md) 开发计划。
 
 ## 账单导入
 
@@ -274,6 +278,7 @@ npm run build
 - [Phase 5 开发计划](docs/plan-phase5.md)
 - [Phase 6 开发计划](docs/plan-phase6.md)
 - [Phase 7 开发计划](docs/plan-phase7.md)
+- [Phase 8 开发计划](docs/plan-phase8.md)
 
 ## 安全说明
 

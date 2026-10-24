@@ -15,6 +15,7 @@ import {
   updateBudgetSchema,
 } from './budgets.schema.js';
 import {
+  computeBudgetAlerts,
   computeBudgetProgress,
   validateBudgetItems,
   type BudgetProgressResponse,
@@ -96,73 +97,8 @@ export default async function budgetsRoutes(app: FastifyInstance) {
   app.get('/budgets/alerts', { preHandler: app.authenticate }, async (request) => {
     const { userId } = requireAuth(request);
     const context = await getUserAnalyticsContext(app.prisma, userId);
-    const now = new Date();
 
-    const year = Number(formatInTimeZone(now, context.timezone, 'yyyy'));
-    const month = Number(formatInTimeZone(now, context.timezone, 'MM'));
-
-    const [monthly, yearly] = await Promise.all([
-      app.prisma.budget.findUnique({
-        where: { userId_periodType_year_month: { userId, periodType: 'monthly', year, month } },
-        select: { id: true },
-      }),
-      app.prisma.budget.findUnique({
-        where: { userId_periodType_year_month: { userId, periodType: 'yearly', year, month: 0 } },
-        select: { id: true },
-      }),
-    ]);
-
-    const alerts: Array<{
-      budgetId: string;
-      periodType: string;
-      scope: 'total' | 'category';
-      categoryId?: string;
-      categoryName?: string;
-      level: string;
-      spent: string;
-      available: string;
-      usageRatio: string | null;
-    }> = [];
-
-    for (const candidate of [monthly, yearly]) {
-      if (!candidate) continue;
-      const progress = await computeBudgetProgress(app.prisma, context, candidate.id);
-
-      if (progress.total.level === 'warning' || progress.total.level === 'exceeded') {
-        alerts.push({
-          budgetId: candidate.id,
-          periodType: progress.budget.periodType,
-          scope: 'total',
-          level: progress.total.level,
-          spent: progress.total.spent,
-          available: progress.total.available,
-          usageRatio: progress.total.usageRatio,
-        });
-      }
-
-      for (const item of progress.items) {
-        if (item.level !== 'warning' && item.level !== 'exceeded') continue;
-        alerts.push({
-          budgetId: candidate.id,
-          periodType: progress.budget.periodType,
-          scope: 'category',
-          categoryId: item.categoryId,
-          categoryName: item.categoryName,
-          level: item.level,
-          spent: item.spent,
-          available: item.available,
-          usageRatio: item.usageRatio,
-        });
-      }
-    }
-
-    // 超支优先，其次按使用率降序
-    alerts.sort((a, b) => {
-      if (a.level !== b.level) return a.level === 'exceeded' ? -1 : 1;
-      return Number(b.usageRatio ?? 0) - Number(a.usageRatio ?? 0);
-    });
-
-    return ok({ alerts }, request.id);
+    return ok({ alerts: await computeBudgetAlerts(app.prisma, context) }, request.id);
   });
 
   app.get('/budgets/:id', { preHandler: app.authenticate }, async (request) => {

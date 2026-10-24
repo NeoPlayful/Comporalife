@@ -60,5 +60,24 @@
     "compound_principal": "Contributed principal",
     "compound_interest": "Compound gains",
     "year": "Year"
+  },
+  "breakdown": {
+    "account_assets": "Account assets",
+    "securities": "Securities",
+    "other_assets": "Other assets",
+    "account_liabilities": "Account liabilities",
+    "other_liabilities": "Other liabilities"
+  },
+  "unpriced_assets": "Assets without valuation, excluded from net worth: {{names}}",
+  "go_assets": "Add valuation",
+  "budget_alerts": {
+    "summary": "{{exceeded}} budget(s) exceeded, {{warning}} approaching limit",
+    "action": "View budgets"
+  },
+  "goal_progress": {
+    "title": "Goal progress",
+    "action": "View all",
+    "achieved": "Achieved",
+    "percent": "{{value}}%"
   }
 }
