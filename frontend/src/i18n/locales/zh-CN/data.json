@@ -1,11 +1,11 @@
 {
-  "title": "数据管理",
+  "title": "我的数据",
   "subtitle": "检查数据质量、导出明文数据、创建可还原的加密备份",
   "tabs": {
     "quality": "数据质量",
     "export": "数据导出",
     "backup": "备份与恢复",
-    "jobs": "任务"
+    "jobs": "我的任务"
   },
   "quality": {
     "title": "数据质量",

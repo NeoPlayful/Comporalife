@@ -1,8 +1,8 @@
-import { authApi } from '@/lib/auth';
+import { authApi, isAdminRole } from '@/lib/auth';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '@/i18n';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
-import { Languages, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Sun, User } from 'lucide-react';
+import { Languages, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, ShieldCheck, Sun, User } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -145,6 +145,20 @@ export default function TopBar({ onOpenMobileNav }: { onOpenMobileNav: () => voi
                 <User className="size-4" />
                 {t('nav:profile')}
               </Link>
+
+              {isAdminRole(user?.role) && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <ShieldCheck className="size-4" />
+                  {t('nav:admin')}
+                </Link>
+              )}
+
+              <div className="my-1 border-t border-[var(--color-border-subtle)]" />
+
               <button
                 type="button"
                 onClick={handleLogout}

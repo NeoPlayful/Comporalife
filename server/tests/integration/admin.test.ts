@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '@/app';
@@ -12,6 +13,7 @@ let adminToken: string;
 let adminId: string;
 let userToken: string;
 let userId: string;
+let originalRegistration: { key: string; value: Prisma.JsonValue } | null = null;
 
 /** 直接改库提权：测试注册接口只能创建 user，管理员必须另行设置 */
 async function promote(id: string, role: 'admin' | 'super_admin') {
@@ -28,10 +30,25 @@ async function promote(id: string, role: 'admin' | 'super_admin') {
 
 beforeAll(async () => {
   app = await buildApp();
+  // 注册开关是全局配置，测试结束后要还原成本地原值而不是一律删除
+  originalRegistration = await app.prisma.systemSetting.findUnique({
+    where: { key: 'registration.enabled' },
+  });
 });
 
 afterAll(async () => {
-  await app.prisma.systemSetting.deleteMany({ where: { key: 'registration.enabled' } });
+  if (originalRegistration) {
+    await app.prisma.systemSetting.upsert({
+      where: { key: 'registration.enabled' },
+      create: {
+        key: originalRegistration.key,
+        value: originalRegistration.value as Prisma.InputJsonValue,
+      },
+      update: { value: originalRegistration.value as Prisma.InputJsonValue },
+    });
+  } else {
+    await app.prisma.systemSetting.deleteMany({ where: { key: 'registration.enabled' } });
+  }
   await cleanupUsers(app, DOMAIN);
   await app.close();
 });
@@ -315,22 +332,33 @@ describe('权限保护', () => {
   });
 
   it('管理员不能禁用唯一的超级管理员', async () => {
-    // 把其他超管降级，只留 superId 一个活跃超管
-    await app.prisma.user.updateMany({
+    // 开发库里可能存在真实超管，降级范围必须可回滚，否则跑测试会破坏本地账号
+    const others = await app.prisma.user.findMany({
       where: { role: 'super_admin', id: { not: superId } },
-      data: { role: 'user' },
+      select: { id: true },
     });
+    const otherIds = others.map((item) => item.id);
 
-    // admin 有禁用账号的权限，但目标是最后一位超管时必须被拦住
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/admin/users/${superId}/disable`,
-      headers: auth(adminToken),
-    });
+    try {
+      if (otherIds.length > 0) {
+        await app.prisma.user.updateMany({ where: { id: { in: otherIds } }, data: { role: 'user' } });
+      }
 
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error.code).toBe('ADMIN_LAST_SUPER_ADMIN');
-    expect((await app.prisma.user.findUniqueOrThrow({ where: { id: superId } })).status).toBe('active');
+      // admin 有禁用账号的权限，但目标是最后一位超管时必须被拦住
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/admin/users/${superId}/disable`,
+        headers: auth(adminToken),
+      });
+
+      expect(res.statusCode).toBe(422);
+      expect(res.json().error.code).toBe('ADMIN_LAST_SUPER_ADMIN');
+      expect((await app.prisma.user.findUniqueOrThrow({ where: { id: superId } })).status).toBe('active');
+    } finally {
+      if (otherIds.length > 0) {
+        await app.prisma.user.updateMany({ where: { id: { in: otherIds } }, data: { role: 'super_admin' } });
+      }
+    }
   });
 
   it('存在多个超管时可以正常降级其中一个', async () => {

@@ -14,6 +14,11 @@ export interface LoginResult {
   accessToken: string;
 }
 
+/** 仅用于隐藏入口；权限判定始终由服务端完成 */
+export function isAdminRole(role: string | null | undefined): boolean {
+  return role === 'admin' || role === 'super_admin';
+}
+
 export interface SessionInfo {
   id: string;
   userAgent: string | null;

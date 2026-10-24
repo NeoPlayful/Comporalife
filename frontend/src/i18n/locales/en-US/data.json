@@ -1,11 +1,11 @@
 {
-  "title": "Data Management",
+  "title": "My Data",
   "subtitle": "Check data quality, export plain data, and create restorable encrypted backups",
   "tabs": {
     "quality": "Quality",
     "export": "Export",
     "backup": "Backup & Restore",
-    "jobs": "Jobs"
+    "jobs": "My Jobs"
   },
   "quality": {
     "title": "Data quality",
