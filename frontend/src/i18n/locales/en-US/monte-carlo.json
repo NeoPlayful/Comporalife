@@ -1,0 +1,211 @@
+{
+  "title": "Risk Simulation",
+  "description": "Estimate outcome ranges and probabilities with random market paths instead of a single assumed return.",
+  "tab": {
+    "params": "Parameters",
+    "assets": "Assets",
+    "correlation": "Correlation",
+    "runs": "Runs",
+    "result": "Results"
+  },
+  "list": {
+    "create": "New scenario",
+    "empty": "No scenarios yet. Create one to get started.",
+    "meta": "{{years}} yrs · {{paths}} paths",
+    "duplicate": "Duplicate",
+    "duplicate_prompt": "New scenario name",
+    "duplicate_default": "Scenario copy",
+    "delete": "Delete",
+    "delete_confirm": "Deleting this scenario also removes all its runs. Continue?"
+  },
+  "empty": {
+    "title": "Select or create a scenario",
+    "description": "Simulations never touch the ledger and never affect net worth or spending statistics."
+  },
+  "form": {
+    "name": "Scenario name",
+    "save": "Save",
+    "saving": "Saving",
+    "years": "Horizon (years)",
+    "path_count": "Path count",
+    "rebalance": "Rebalance frequency",
+    "initial": "Initial capital",
+    "contribution": "Recurring contribution",
+    "contribution_frequency": "Contribution frequency",
+    "timing": "Contribution timing",
+    "withdrawal": "Recurring withdrawal",
+    "withdrawal_frequency": "Withdrawal frequency",
+    "withdrawal_start": "Withdrawal start year",
+    "inflation": "Inflation rate",
+    "fee": "Annual fee rate",
+    "target": "Target amount",
+    "target_placeholder": "Optional, used for target probability",
+    "ratio_hint": "Enter rates as decimals, e.g. 7% is 0.07."
+  },
+  "frequency": {
+    "none": "None",
+    "monthly": "Monthly",
+    "annual": "Annually"
+  },
+  "timing": {
+    "begin": "Beginning",
+    "end": "End"
+  },
+  "rebalance": {
+    "none": "Never",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "annual": "Annually"
+  },
+  "asset": {
+    "name": "Asset",
+    "weight": "Weight",
+    "return": "Expected return",
+    "volatility": "Volatility",
+    "add": "Add asset",
+    "remove": "Remove asset",
+    "new_label": "Asset {{index}}",
+    "total": "Total weight {{total}}",
+    "total_invalid": "Weights must sum to 1"
+  },
+  "correlation": {
+    "hint": "The matrix must be symmetric with 1 on the diagonal and positive definite; editing one side updates the other.",
+    "reset": "Reset to identity",
+    "single_asset": "Correlation is not needed for a single asset.",
+    "summary_hint": "Correlation summary for narrow screens:",
+    "issue": {
+      "out_of_range": "Correlations must be between -1 and 1.",
+      "not_positive_definite": "These correlations cannot hold simultaneously (the matrix is not positive definite). Please adjust."
+    }
+  },
+  "run": {
+    "start": "Run simulation",
+    "cancel": "Cancel run",
+    "empty": "No runs yet.",
+    "save_first": "Save the scenario before running a simulation.",
+    "queued_position": "Queued, position {{position}}",
+    "seed": "seed {{seed}}",
+    "paths": "{{count}} paths",
+    "years": "{{years}} yrs",
+    "duration": "{{ms}} ms",
+    "failed_hint": "Run failed ({{code}})",
+    "cancelled_hint": "Run cancelled; results were not saved."
+  },
+  "stage": {
+    "preparing": "Preparing parameters",
+    "simulating": "Simulating paths",
+    "aggregating": "Aggregating results",
+    "finalizing": "Writing results"
+  },
+  "status": {
+    "queued": "Queued",
+    "running": "Running",
+    "succeeded": "Done",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "result": {
+    "empty": "No results",
+    "no_run": "No results to show yet",
+    "no_run_hint": "Start a simulation from the Runs tab.",
+    "waiting": "Simulation in progress; results appear automatically when done",
+    "unavailable": "This run has no results",
+    "unavailable_hint": "Go back to Runs and start a new simulation.",
+    "refresh": "Refresh"
+  },
+  "metric": {
+    "median": "Median terminal value",
+    "median_hint": "Half of the paths end above this",
+    "median_precise": "Exact value {{value}}",
+    "range": "P10 – P90",
+    "range_hint": "80% of paths fall in this range",
+    "loss": "Nominal loss probability",
+    "loss_hint": "Share of paths ending below total contributions",
+    "loss_precise": "Exact value {{value}}",
+    "real_loss": "Real loss probability",
+    "real_loss_hint": "Share still below contributions after inflation",
+    "real_loss_precise": "Exact value {{value}}",
+    "target": "Target probability",
+    "target_hint": "Share of paths reaching the target amount",
+    "target_unset": "No target amount set",
+    "target_precise": "Exact value {{value}}",
+    "drawdown": "Max drawdown P90",
+    "drawdown_hint": "90% of paths draw down no more than this",
+    "drawdown_precise": "Exact value {{value}}"
+  },
+  "chart": {
+    "fan_title": "Wealth bands by year",
+    "show_samples": "Show sample paths",
+    "histogram_title": "Terminal value distribution",
+    "band_outer": "P10 – P90",
+    "band_inner": "P25 – P75",
+    "median": "Median",
+    "median_short": "Median",
+    "sample": "Sample path",
+    "year": "Year {{year}}",
+    "paths": "{{count}} paths",
+    "share": "{{share}}% of paths"
+  },
+  "drawdown": {
+    "title": "Maximum drawdown distribution",
+    "p50": "P50",
+    "p90": "P90",
+    "p99": "P99",
+    "mean": "Mean",
+    "note": "Drawdown is measured on the investment growth index, excluding contributions, so steady investing cannot mask it."
+  },
+  "notice": {
+    "title": "Assumptions and precision",
+    "model_version": "Model {{version}}",
+    "seed": "Seed {{seed}}",
+    "paths": "{{count}} paths",
+    "standard_error": "Std. error {{value}} {{currency}}",
+    "assumptions_title": "Full assumptions",
+    "field": {
+      "years": "Horizon",
+      "initial": "Initial",
+      "contribution": "Contribution",
+      "withdrawal": "Withdrawal",
+      "inflation": "Inflation",
+      "fee": "Fee",
+      "weight": "Weight",
+      "return": "Return",
+      "volatility": "Volatility"
+    },
+    "small_sample": "Only {{count}} paths; percentiles are noisy. Consider increasing the path count.",
+    "stress_note": "This is a deterministic stress scenario: {{preset}}. It is not a probability distribution.",
+    "disclaimer_model": "Returns follow a lognormal model; historical means and the normal distribution cannot fully cover tail risk.",
+    "disclaimer_not_promise": "The result is a probability distribution, not a promise of returns.",
+    "disclaimer_costs": "Apart from the fee rate you entered, taxes and your actual trading costs are not included.",
+    "disclaimer_sampling": "Sampling introduces error; larger path counts are more stable.",
+    "disclaimer_deterministic": "A deterministic scenario has a single path, so percentiles and probabilities do not apply."
+  },
+  "stress": {
+    "hint": "Stress scenarios are deterministic extreme paths, shown separately from random results.",
+    "none": "No stress scenario",
+    "preset": {
+      "crash": {
+        "label": "Market crash",
+        "description": "A 35% single-month drop, recovering over two years"
+      },
+      "stagflation": {
+        "label": "Stagflation",
+        "description": "Five years of low returns and high inflation"
+      },
+      "lost_decade": {
+        "label": "Lost decade",
+        "description": "Ten years flat in nominal terms"
+      }
+    }
+  },
+  "suggestion": {
+    "pick_portfolio": "Fill from portfolio",
+    "applied": "Asset weights filled from the portfolio holdings",
+    "note_low": "History is too short, so return and volatility were left blank. Please set them manually."
+  },
+  "confidence": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  }
+}

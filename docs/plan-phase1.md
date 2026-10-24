@@ -1344,7 +1344,7 @@ frontend/
 | Phase 2 账单导入 | CSV/XLSX 解析、字段映射、预览、去重、批次撤销 | 依赖 S4 账本与 S3 账户/分类；导入结果复用 `transactions` + `entries` |
 | Phase 3 分析与预算 | 分类趋势、商户排行、预算执行、异常支出 | 依赖 S5 聚合层 |
 | Phase 4 投资 | 组合、证券、成本基础、TWR/XIRR、再平衡 | 依赖 S3 的 `brokerage` 账户与 S4 账本 |
-| Phase 5 风险模拟 | 蒙特卡罗、Worker Threads、BullMQ、任务进度 | 依赖 S6 参数模型与 `modelVersion` 机制 |
+| Phase 5 风险模拟 | 蒙特卡罗、分片异步执行、任务进度 | 依赖 S6 参数模型与 `modelVersion` 机制。**注**：Phase 5 计划已改为进程内分片执行器，不使用 BullMQ 与 Worker Threads，理由见 `docs/plan-phase5.md` 第 5.1 节 |
 | Phase 6 目标与报告 | 财富目标、财务独立、报表导出 | 依赖 S5 与投资结果 |
 | Phase 7 数据管理与运维 | 备份恢复、导出、管理后台、审计扩展 | 依赖 S1 的基础设施与 `audit_logs` |
 

@@ -61,5 +61,20 @@
   "ALLOCATION_TARGETS_INVALID": "Invalid target weights",
   "ALLOCATION_TARGETS_MISMATCH": "Target weights in one dimension must sum to 1",
   "PORTFOLIO_RANGE_INVALID": "Invalid date range",
-  "PORTFOLIO_TOO_MANY_CASHFLOWS": "Too many cashflows in this range; narrow it down"
+  "PORTFOLIO_TOO_MANY_CASHFLOWS": "Too many cashflows in this range; narrow it down",
+  "MC_SCENARIO_NOT_FOUND": "Simulation scenario not found",
+  "MC_SCENARIO_NAME_EXISTS": "A scenario with this name already exists",
+  "MC_PARAMETERS_INVALID": "Invalid simulation parameters",
+  "MC_WEIGHTS_INVALID": "Asset weights must be non-negative and sum to 1",
+  "MC_CORRELATION_INVALID": "Invalid correlation matrix",
+  "MC_RUN_NOT_FOUND": "Simulation run not found",
+  "MC_RUN_NOT_READY": "The simulation has not finished yet",
+  "MC_RUN_FAILED": "The run failed or was cancelled; no results",
+  "MC_RUN_ALREADY_FINISHED": "This run has already finished and cannot be cancelled",
+  "MC_QUEUE_FULL": "The simulation queue is full; please try again later",
+  "MC_PREVIEW_LIMIT_EXCEEDED": "Too many paths for a preview; use a full simulation instead",
+  "MC_PATH_INDEX_INVALID": "Path index out of range",
+  "MC_COMPARE_INCOMPATIBLE": "The selected runs cannot be compared",
+  "MC_STRESS_PRESET_UNKNOWN": "Unknown stress scenario",
+  "MC_RANGE_INVALID": "Invalid range"
 }

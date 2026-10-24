@@ -42,5 +42,12 @@ export function useEnumLabels() {
       t(`allocation_dimension.${value}`, { defaultValue: value }),
     performanceReason: (value: string) =>
       t(`performance_reason.${value}`, { defaultValue: value }),
+    runStatus: (value: string) => t(`run_status.${value}`, { defaultValue: value }),
+    runStage: (value: string) => t(`run_stage.${value}`, { defaultValue: value }),
+    returnModel: (value: string) => t(`return_model.${value}`, { defaultValue: value }),
+    rebalanceFrequency: (value: string) =>
+      t(`rebalance_frequency.${value}`, { defaultValue: value }),
+    stressPreset: (value: string) => t(`stress_preset.${value}`, { defaultValue: value }),
+    confidenceLevel: (value: string) => t(`confidence_level.${value}`, { defaultValue: value }),
   };
 }

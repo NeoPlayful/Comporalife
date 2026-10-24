@@ -18,6 +18,7 @@ const PortfolioDetailPage = lazy(() => import('./pages/PortfolioDetailPage'));
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CompoundPage = lazy(() => import('./pages/CompoundPage'));
+const MonteCarloPage = lazy(() => import('./pages/MonteCarloPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="imports/:id" element={<ImportWorkbenchPage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="compound" element={<CompoundPage />} />
+          <Route path="monte-carlo" element={<MonteCarloPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />

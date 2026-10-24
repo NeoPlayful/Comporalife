@@ -181,3 +181,69 @@ export const CASHFLOW_KINDS = ['deposit', 'withdraw'] as const;
 export const COST_BASIS_METHODS = ['average'] as const;
 export const PORTFOLIO_STATUSES = ['active', 'archived'] as const;
 export const ALLOCATION_DIMENSIONS = ['asset_class', 'instrument', 'currency'] as const;
+
+// ===== 风险模拟 =====
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+/** 单次运行路径上限 */
+export const MONTE_CARLO_MAX_PATHS = envInt('MONTE_CARLO_MAX_PATHS', 20_000);
+
+/** 新建方案的默认路径数 */
+export const MONTE_CARLO_DEFAULT_PATHS = envInt('MONTE_CARLO_DEFAULT_PATHS', 5_000);
+
+/** 模拟年限上限：逐年存采样点，取值比复利引擎更保守 */
+export const MONTE_CARLO_MAX_YEARS = envInt('MONTE_CARLO_MAX_YEARS', 50);
+
+/** 同步预览的路径上限与时限 */
+export const MONTE_CARLO_PREVIEW_PATHS = envInt('MONTE_CARLO_PREVIEW_PATHS', 500);
+export const MONTE_CARLO_PREVIEW_TIMEOUT_MS = envInt('MONTE_CARLO_PREVIEW_TIMEOUT_MS', 3_000);
+
+/** 并发执行槽与「排队 + 运行中」总上限 */
+export const MONTE_CARLO_MAX_CONCURRENT_RUNS = envInt('MONTE_CARLO_MAX_CONCURRENT_RUNS', 2);
+export const MONTE_CARLO_QUEUE_LIMIT = envInt('MONTE_CARLO_QUEUE_LIMIT', 10);
+
+/** 单次运行总时限与心跳超时 */
+export const MONTE_CARLO_TIMEOUT_SECONDS = envInt('MONTE_CARLO_TIMEOUT_SECONDS', 120);
+export const MONTE_CARLO_HEARTBEAT_TIMEOUT_SECONDS = envInt('MONTE_CARLO_HEARTBEAT_TIMEOUT_SECONDS', 30);
+
+/** 单次分片的时间预算：到点立即让出事件循环，小机器上也不会长时间占用 */
+export const MONTE_CARLO_CHUNK_MS = envInt('MONTE_CARLO_CHUNK_MS', 15);
+
+/** 进度与心跳的写入节流间隔 */
+export const MONTE_CARLO_PROGRESS_INTERVAL_MS = envInt('MONTE_CARLO_PROGRESS_INTERVAL_MS', 400);
+
+/** 取消标记的轮询间隔 */
+export const MONTE_CARLO_CANCEL_POLL_MS = 500;
+
+/** 每个方案保留的终态运行数 */
+export const MONTE_CARLO_RUN_RETENTION = envInt('MONTE_CARLO_RUN_RETENTION', 30);
+
+/** 落库的样本路径数与直方图桶数 */
+export const MONTE_CARLO_SAMPLE_PATHS = envInt('MONTE_CARLO_SAMPLE_PATHS', 20);
+export const MONTE_CARLO_HISTOGRAM_BINS = envInt('MONTE_CARLO_HISTOGRAM_BINS', 20);
+
+/** 中断恢复的最大尝试次数，超出直接置 failed */
+export const MONTE_CARLO_MAX_ATTEMPTS = 2;
+
+/** 连通性估计所需的最少价格点数与覆盖天数 */
+export const MONTE_CARLO_MIN_SAMPLES = 250;
+export const MONTE_CARLO_HIGH_CONFIDENCE_SAMPLES = 750;
+
+/** 单个方案允许的最大资产数 */
+export const MONTE_CARLO_MAX_ASSETS = 10;
+
+/** 随机种子上限（含），落在 32 位有符号正整数范围 */
+export const MONTE_CARLO_SEED_MAX = 2_147_483_647;
+
+export const RUN_STATUSES = ['queued', 'running', 'succeeded', 'failed', 'cancelled'] as const;
+export const RUN_STAGES = ['preparing', 'simulating', 'aggregating', 'finalizing'] as const;
+export const RETURN_MODELS = ['lognormal'] as const;
+export const REBALANCE_FREQUENCIES = ['none', 'monthly', 'quarterly', 'annual'] as const;
+export const STRESS_PRESETS = ['crash', 'stagflation', 'lost_decade'] as const;
+export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;

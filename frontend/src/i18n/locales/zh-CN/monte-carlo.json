@@ -1,0 +1,211 @@
+{
+  "title": "风险模拟",
+  "description": "用随机市场路径估计结果区间与概率，而不是一个确定的收益率。",
+  "tab": {
+    "params": "参数",
+    "assets": "资产",
+    "correlation": "相关性",
+    "runs": "运行",
+    "result": "结果"
+  },
+  "list": {
+    "create": "新建方案",
+    "empty": "还没有模拟方案，先创建一个。",
+    "meta": "{{years}} 年 · {{paths}} 条路径",
+    "duplicate": "复制",
+    "duplicate_prompt": "新方案名称",
+    "duplicate_default": "方案副本",
+    "delete": "删除",
+    "delete_confirm": "删除后该方案的全部运行记录也会一并删除，确定吗？"
+  },
+  "empty": {
+    "title": "选择或新建一个方案",
+    "description": "模拟不会写进账本，也不会影响净资产与收支统计。"
+  },
+  "form": {
+    "name": "方案名称",
+    "save": "保存",
+    "saving": "保存中",
+    "years": "模拟年限（年）",
+    "path_count": "路径数",
+    "rebalance": "再平衡频率",
+    "initial": "初始本金",
+    "contribution": "定期投入",
+    "contribution_frequency": "投入频率",
+    "timing": "投入时点",
+    "withdrawal": "定期提款",
+    "withdrawal_frequency": "提款频率",
+    "withdrawal_start": "提款起始年",
+    "inflation": "通胀率",
+    "fee": "年费率",
+    "target": "目标金额",
+    "target_placeholder": "可选，用于计算达标概率",
+    "ratio_hint": "收益率、通胀率与费用率填写小数，例如 7% 输入 0.07。"
+  },
+  "frequency": {
+    "none": "不投入",
+    "monthly": "每月",
+    "annual": "每年"
+  },
+  "timing": {
+    "begin": "期初",
+    "end": "期末"
+  },
+  "rebalance": {
+    "none": "不再平衡",
+    "monthly": "每月",
+    "quarterly": "每季度",
+    "annual": "每年"
+  },
+  "asset": {
+    "name": "资产",
+    "weight": "权重",
+    "return": "预期年化收益",
+    "volatility": "年化波动率",
+    "add": "添加资产",
+    "remove": "移除资产",
+    "new_label": "资产 {{index}}",
+    "total": "权重合计 {{total}}",
+    "total_invalid": "权重合计必须为 1"
+  },
+  "correlation": {
+    "hint": "矩阵必须对称，对角为 1，且整体正定；改一侧会自动同步另一侧。",
+    "reset": "重置为单位矩阵",
+    "single_asset": "只有一项资产时不需要设置相关性。",
+    "summary_hint": "窄屏下的相关系数摘要：",
+    "issue": {
+      "out_of_range": "相关系数必须在 -1 到 1 之间。",
+      "not_positive_definite": "这组相关性在数学上无法同时成立（矩阵非正定），请调整。"
+    }
+  },
+  "run": {
+    "start": "开始模拟",
+    "cancel": "取消运行",
+    "empty": "还没有运行记录。",
+    "save_first": "请先保存方案，再开始模拟。",
+    "queued_position": "排队中，第 {{position}} 位",
+    "seed": "种子 {{seed}}",
+    "paths": "{{count}} 条路径",
+    "years": "{{years}} 年",
+    "duration": "耗时 {{ms}} ms",
+    "failed_hint": "运行失败（{{code}}）",
+    "cancelled_hint": "运行已取消，结果未保存。"
+  },
+  "stage": {
+    "preparing": "准备参数",
+    "simulating": "模拟路径",
+    "aggregating": "汇总结果",
+    "finalizing": "写入结果"
+  },
+  "status": {
+    "queued": "排队中",
+    "running": "运行中",
+    "succeeded": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消"
+  },
+  "result": {
+    "empty": "暂无结果",
+    "no_run": "还没有可查看的结果",
+    "no_run_hint": "先在「运行」里发起一次模拟。",
+    "waiting": "模拟进行中，完成后会自动显示结果",
+    "unavailable": "本次运行没有结果",
+    "unavailable_hint": "可以回到「运行」重新发起一次。",
+    "refresh": "刷新"
+  },
+  "metric": {
+    "median": "中位数终值",
+    "median_hint": "一半路径高于该值",
+    "median_precise": "精确值 {{value}}",
+    "range": "P10 – P90",
+    "range_hint": "80% 的路径落在这个区间",
+    "loss": "名义亏损概率",
+    "loss_hint": "终值低于累计投入的路径占比",
+    "loss_precise": "精确值 {{value}}",
+    "real_loss": "实际亏损概率",
+    "real_loss_hint": "扣除通胀后仍低于投入的占比",
+    "real_loss_precise": "精确值 {{value}}",
+    "target": "达标概率",
+    "target_hint": "终值达到目标金额的路径占比",
+    "target_unset": "未设置目标金额",
+    "target_precise": "精确值 {{value}}",
+    "drawdown": "最大回撤 P90",
+    "drawdown_hint": "90% 的路径回撤不超过该值",
+    "drawdown_precise": "精确值 {{value}}"
+  },
+  "chart": {
+    "fan_title": "年度财富区间",
+    "show_samples": "显示抽样路径",
+    "histogram_title": "终值分布",
+    "band_outer": "P10 – P90",
+    "band_inner": "P25 – P75",
+    "median": "中位数",
+    "median_short": "中位数",
+    "sample": "抽样路径",
+    "year": "第 {{year}} 年",
+    "paths": "{{count}} 条路径",
+    "share": "占比 {{share}}%"
+  },
+  "drawdown": {
+    "title": "最大回撤分布",
+    "p50": "P50",
+    "p90": "P90",
+    "p99": "P99",
+    "mean": "均值",
+    "note": "回撤基于投资增长指数计算，不含追加投入，因此不会因为持续定投而被低估。"
+  },
+  "notice": {
+    "title": "假设与精度",
+    "model_version": "模型 {{version}}",
+    "seed": "种子 {{seed}}",
+    "paths": "{{count}} 条路径",
+    "standard_error": "标准误 {{value}} {{currency}}",
+    "assumptions_title": "完整假设",
+    "field": {
+      "years": "年限",
+      "initial": "初始本金",
+      "contribution": "定期投入",
+      "withdrawal": "定期提款",
+      "inflation": "通胀率",
+      "fee": "年费率",
+      "weight": "权重",
+      "return": "收益",
+      "volatility": "波动"
+    },
+    "small_sample": "样本量仅 {{count}} 条，分位数波动较大，建议提高路径数。",
+    "stress_note": "本次为确定性压力情景：{{preset}}，不代表概率分布。",
+    "disclaimer_model": "收益模型为对数正态，历史均值与正态分布无法完整覆盖尾部风险。",
+    "disclaimer_not_promise": "结果是概率分布，不是收益承诺。",
+    "disclaimer_costs": "除显式填写的费率外，未计入税费与个人实际交易成本。",
+    "disclaimer_sampling": "抽样存在误差，样本量越大越稳定。",
+    "disclaimer_deterministic": "确定性情景只有一条路径，因此没有分位数与概率的含义。"
+  },
+  "stress": {
+    "hint": "压力情景是确定性的极端路径，与随机模拟结果分开呈现。",
+    "none": "不使用压力情景",
+    "preset": {
+      "crash": {
+        "label": "市场崩盘",
+        "description": "首年单月下跌 35%，随后两年逐步恢复"
+      },
+      "stagflation": {
+        "label": "滞胀",
+        "description": "连续五年低收益、高通胀"
+      },
+      "lost_decade": {
+        "label": "失去的十年",
+        "description": "连续十年名义持平"
+      }
+    }
+  },
+  "suggestion": {
+    "pick_portfolio": "从投资组合反填",
+    "applied": "已按组合持仓填入资产权重",
+    "note_low": "历史样本不足，收益与波动未自动填写，请自行设定。"
+  },
+  "confidence": {
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "title": "预算",
+  "title": "预算管理",
   "description": "给每个周期设定支出上限，并跟踪执行进度",
   "period": {
     "label": "预算周期",

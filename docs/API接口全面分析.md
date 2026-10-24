@@ -330,25 +330,36 @@
 **模拟参数：** 初始本金、周期投入、收益率、复利频率、期限、通胀率、费用率、税费假设、提款方式；返回名义/实际购买力、累计投入、累计收益、逐期明细；模拟结果不得被误认为实际账户余额。
 
 
-## 17、蒙特卡罗模拟 (Monte Carlo)
+## 17、蒙特卡罗模拟 (Monte Carlo) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/simulations/monte-carlo` | 模拟方案列表 |
+| GET | `/api/simulations/monte-carlo` | 模拟方案列表（含最近一次运行摘要） |
 | POST | `/api/simulations/monte-carlo` | 创建模拟方案及假设 |
-| GET | `/api/simulations/monte-carlo/:id` | 方案详情 |
-| PATCH | `/api/simulations/monte-carlo/:id` | 更新模型假设 |
-| DELETE | `/api/simulations/monte-carlo/:id` | 删除方案 |
-| POST | `/api/simulations/monte-carlo/:id/run` | 异步启动模拟任务 |
+| GET | `/api/simulations/monte-carlo/:id` | 方案详情（含最近运行） |
+| PATCH | `/api/simulations/monte-carlo/:id` | 更新模型假设（不影响历史运行快照） |
+| DELETE | `/api/simulations/monte-carlo/:id` | 删除方案及其全部运行 |
+| POST | `/api/simulations/monte-carlo/:id/duplicate` | 复制方案 |
+| POST | `/api/simulations/monte-carlo/calculate` | 同步预览（≤500 路径，不走队列） |
+| POST | `/api/simulations/monte-carlo/:id/runs` | 异步发起运行，返回 `runId` 与队列位置 |
 | GET | `/api/simulations/monte-carlo/:id/runs` | 历史运行列表 |
-| GET | `/api/simulations/monte-carlo/:id/runs/:runId` | 运行状态与假设快照 |
-| GET | `/api/simulations/monte-carlo/:id/runs/:runId/results` | 分位数、亏损概率、尾部风险 |
-| GET | `/api/simulations/monte-carlo/:id/runs/:runId/paths` | 抽样路径与置信区间 |
-| POST | `/api/simulations/monte-carlo/:id/runs/:runId/cancel` | 取消运行任务 |
-| POST | `/api/simulations/monte-carlo/compare` | 比较不同资产配置和假设 |
-| GET | `/api/simulations/monte-carlo/:id/runs/:runId/export` | 导出模拟结果 |
+| GET | `/api/simulations/monte-carlo/:id/runs/:runId` | 运行状态与参数快照 |
+| GET | `/api/simulations/monte-carlo/:id/runs/:runId/results` | 分位数、概率、回撤、扇形带、直方图 |
+| GET | `/api/simulations/monte-carlo/:id/runs/:runId/paths` | 按索引再生成的抽样路径 |
+| POST | `/api/simulations/monte-carlo/:id/runs/:runId/cancel` | 取消运行（幂等） |
+| POST | `/api/simulations/monte-carlo/compare` | 比较 2–4 个运行或方案（须同年限） |
+| GET | `/api/simulations/monte-carlo/presets` | 压力情景预设清单 |
+| GET | `/api/simulations/monte-carlo/suggestions` | 从真实组合反填资产权重与统计建议 |
 
-**模拟参数：** 资产权重、预期收益、波动率、相关矩阵、分布假设、模拟路径数、随机种子、投入/提款与再平衡策略；输出中位数、P5/P25/P75/P95、亏损概率、目标达成概率、最大回撤及尾部风险。结果附模型版本与假设快照，避免将模拟当作收益承诺。
+> 固定的 `calculate` / `compare` / `presets` / `suggestions` 必须注册在 `/:id` 之前，否则会被参数路由吞掉。
+
+**模拟参数：** 资产权重、预期收益、年化波动率、相关矩阵、模拟年限、路径数、随机种子、本金、定投、提款、通胀、费用与再平衡频率。
+
+**输出：** 终值 P5/P10/P25/P50/P75/P90/P95（名义与实际各一套）、均值与标准误、名义/实际亏损概率、达标概率（未设目标为 `null`）、破产概率、最大回撤分位数、年度扇形带、终值直方图。结果附完整 `assumptions` 快照与模型版本，可复现。
+
+**异步执行：** 作业状态以数据库为唯一权威；分片执行不阻塞事件循环；进度单调；取消在片间生效；进程重启后中断运行按固定种子重算；每个方案保留最新 30 条终态运行。
+
+**导出：** 本阶段不提供 `export` 接口，报表导出归 Phase 6。
 
 
 ## 18、财富目标与财务自由 (Financial Goals)

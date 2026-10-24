@@ -65,6 +65,22 @@ export const ErrorCode = {
   ALLOCATION_TARGETS_MISMATCH: 'ALLOCATION_TARGETS_MISMATCH',
   PORTFOLIO_RANGE_INVALID: 'PORTFOLIO_RANGE_INVALID',
   PORTFOLIO_TOO_MANY_CASHFLOWS: 'PORTFOLIO_TOO_MANY_CASHFLOWS',
+  // ===== 风险模拟 =====
+  MC_SCENARIO_NOT_FOUND: 'MC_SCENARIO_NOT_FOUND',
+  MC_SCENARIO_NAME_EXISTS: 'MC_SCENARIO_NAME_EXISTS',
+  MC_PARAMETERS_INVALID: 'MC_PARAMETERS_INVALID',
+  MC_WEIGHTS_INVALID: 'MC_WEIGHTS_INVALID',
+  MC_CORRELATION_INVALID: 'MC_CORRELATION_INVALID',
+  MC_RUN_NOT_FOUND: 'MC_RUN_NOT_FOUND',
+  MC_RUN_NOT_READY: 'MC_RUN_NOT_READY',
+  MC_RUN_FAILED: 'MC_RUN_FAILED',
+  MC_RUN_ALREADY_FINISHED: 'MC_RUN_ALREADY_FINISHED',
+  MC_QUEUE_FULL: 'MC_QUEUE_FULL',
+  MC_PREVIEW_LIMIT_EXCEEDED: 'MC_PREVIEW_LIMIT_EXCEEDED',
+  MC_PATH_INDEX_INVALID: 'MC_PATH_INDEX_INVALID',
+  MC_COMPARE_INCOMPATIBLE: 'MC_COMPARE_INCOMPATIBLE',
+  MC_STRESS_PRESET_UNKNOWN: 'MC_STRESS_PRESET_UNKNOWN',
+  MC_RANGE_INVALID: 'MC_RANGE_INVALID',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -133,6 +149,21 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   ALLOCATION_TARGETS_MISMATCH: 422,
   PORTFOLIO_RANGE_INVALID: 400,
   PORTFOLIO_TOO_MANY_CASHFLOWS: 400,
+  MC_SCENARIO_NOT_FOUND: 404,
+  MC_SCENARIO_NAME_EXISTS: 409,
+  MC_PARAMETERS_INVALID: 422,
+  MC_WEIGHTS_INVALID: 422,
+  MC_CORRELATION_INVALID: 422,
+  MC_RUN_NOT_FOUND: 404,
+  MC_RUN_NOT_READY: 409,
+  MC_RUN_FAILED: 409,
+  MC_RUN_ALREADY_FINISHED: 409,
+  MC_QUEUE_FULL: 429,
+  MC_PREVIEW_LIMIT_EXCEEDED: 422,
+  MC_PATH_INDEX_INVALID: 422,
+  MC_COMPARE_INCOMPATIBLE: 422,
+  MC_STRESS_PRESET_UNKNOWN: 422,
+  MC_RANGE_INVALID: 400,
 };
 
 export class AppError extends Error {
@@ -291,4 +322,38 @@ export const errors = {
       undefined,
       { max },
     ),
+
+  mcScenarioNotFound: () => new AppError(ErrorCode.MC_SCENARIO_NOT_FOUND, '模拟方案不存在'),
+  mcScenarioNameExists: () => new AppError(ErrorCode.MC_SCENARIO_NAME_EXISTS, '该方案名称已存在'),
+  mcParametersInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.MC_PARAMETERS_INVALID, message, details),
+  mcWeightsInvalid: (total: string) =>
+    new AppError(ErrorCode.MC_WEIGHTS_INVALID, '资产权重必须为非负数且合计为 1', { total }),
+  mcCorrelationInvalid: (reason: string, message = '相关系数矩阵不合法') =>
+    new AppError(ErrorCode.MC_CORRELATION_INVALID, message, { reason }),
+  mcRunNotFound: () => new AppError(ErrorCode.MC_RUN_NOT_FOUND, '模拟运行不存在'),
+  mcRunNotReady: () => new AppError(ErrorCode.MC_RUN_NOT_READY, '模拟尚未完成，结果不可用'),
+  mcRunFailed: () => new AppError(ErrorCode.MC_RUN_FAILED, '模拟已失败或已取消，无结果'),
+  mcRunAlreadyFinished: () => new AppError(ErrorCode.MC_RUN_ALREADY_FINISHED, '该运行已结束，无法取消'),
+  mcQueueFull: (limit: number) =>
+    new AppError(
+      ErrorCode.MC_QUEUE_FULL,
+      `当前排队与运行中的模拟已达 ${limit} 个上限，请稍后再试`,
+      undefined,
+      { limit },
+    ),
+  mcPreviewLimitExceeded: (limit: number) =>
+    new AppError(
+      ErrorCode.MC_PREVIEW_LIMIT_EXCEEDED,
+      `同步预览最多 ${limit} 条路径，请改用完整模拟`,
+      undefined,
+      { limit },
+    ),
+  mcPathIndexInvalid: (pathCount: number) =>
+    new AppError(ErrorCode.MC_PATH_INDEX_INVALID, '路径索引越界', { pathCount }),
+  mcCompareIncompatible: (reason: string) =>
+    new AppError(ErrorCode.MC_COMPARE_INCOMPATIBLE, '所选运行无法直接对比', { reason }),
+  mcStressPresetUnknown: (key: string) =>
+    new AppError(ErrorCode.MC_STRESS_PRESET_UNKNOWN, '未知的压力情景', { key }),
+  mcRangeInvalid: (message: string) => new AppError(ErrorCode.MC_RANGE_INVALID, message),
 };

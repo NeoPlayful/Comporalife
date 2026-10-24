@@ -24,6 +24,7 @@ const NAMESPACES = [
   'categories',
   'imports',
   'compound',
+  'monte-carlo',
   'settings',
   'enums',
   'errors',

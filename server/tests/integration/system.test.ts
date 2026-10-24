@@ -43,14 +43,17 @@ describe('系统接口', () => {
     try {
       const res = await app.inject({ method: 'GET', url: '/api/system/capabilities' });
       const body = res.json();
-      expect(body.data.phase).toBe('phase-4');
+      expect(body.data.phase).toBe('phase-5');
       expect(body.data.available).toContain('transactions');
       expect(body.data.available).toContain('analytics');
       expect(body.data.available).toContain('budgets');
       expect(body.data.available).toContain('portfolios');
+      expect(body.data.available).toContain('monte-carlo');
       expect(body.data.planned).not.toContain('portfolios');
-      expect(body.data.planned).toContain('monte-carlo');
+      expect(body.data.planned).not.toContain('monte-carlo');
+      expect(body.data.planned).toContain('goals');
       expect(body.data.planned).not.toContain('budgets');
+      expect(body.data.simulationLimits.maxPaths).toBeGreaterThan(0);
     } finally {
       await app.close();
     }
