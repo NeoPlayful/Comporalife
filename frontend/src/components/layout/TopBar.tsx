@@ -1,16 +1,130 @@
 import { authApi, isAdminRole } from '@/lib/auth';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from '@/i18n';
+import { formatDateTime } from '@/lib/format';
+import { notificationsApi } from '@/lib/notifications';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
-import { ArrowLeft, Languages, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, ShieldCheck, Sun, User } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  Bell,
+  Languages,
+  LogOut,
+  Menu,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ShieldCheck,
+  Sun,
+  User,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { useNotificationText } from '@/pages/NotificationsPage';
 
 const LANGUAGE_LABEL_KEYS: Record<SupportedLanguage, string> = {
   'zh-CN': 'language.zh_CN',
   'en-US': 'language.en_US',
 };
+
+/** 顶栏通知入口：未读数角标 + 最近 10 条，完整列表在 /notifications */
+function NotificationBell() {
+  const { t } = useTranslation('notifications');
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const text = useNotificationText();
+
+  const listQuery = useQuery({
+    queryKey: ['notifications', 'bell'],
+    queryFn: () => notificationsApi.list({ pageSize: 10 }),
+  });
+
+  const markRead = useMutation({
+    mutationFn: (id: string) => notificationsApi.markRead(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+
+  const unread = listQuery.data?.unreadCount ?? 0;
+  const items = listQuery.data?.notifications ?? [];
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="relative grid size-9 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+        aria-label={t('title')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Bell className="size-5" />
+        {unread > 0 && (
+          <span className="absolute right-1 top-1 grid min-w-4 place-items-center rounded-full bg-[var(--color-negative)] px-1 text-[10px] font-medium leading-4 text-white">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-10 cursor-default"
+            onClick={() => setOpen(false)}
+            aria-label={t('common:actions.close')}
+          />
+          <div role="menu" className="card absolute right-0 z-20 mt-1 w-80 overflow-hidden p-1 shadow-lg">
+            <div className="flex items-center justify-between px-3 py-2">
+              <span className="text-sm font-medium">{t('title')}</span>
+              <span className="text-xs text-[var(--color-content-muted)]">
+                {t('subtitle', { count: unread })}
+              </span>
+            </div>
+
+            {items.length === 0 ? (
+              <p className="px-3 py-6 text-center text-xs text-[var(--color-content-muted)]">
+                {t('empty.title')}
+              </p>
+            ) : (
+              <ul className="max-h-80 overflow-y-auto">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <div className="flex items-start gap-2 px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5">
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs ${item.readAt ? 'opacity-60' : ''}`}>{text(item)}</p>
+                        <p className="mt-0.5 text-[10px] text-[var(--color-content-muted)]">
+                          {formatDateTime(item.createdAt)}
+                        </p>
+                      </div>
+                      {!item.readAt && (
+                        <button
+                          type="button"
+                          className="shrink-0 text-[10px] text-[var(--color-accent)]"
+                          onClick={() => markRead.mutate(item.id)}
+                        >
+                          {t('mark_read')}
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <Link
+              to="/notifications"
+              onClick={() => setOpen(false)}
+              className="block border-t border-[var(--color-border-subtle)] px-3 py-2 text-center text-xs text-[var(--color-accent)]"
+            >
+              {t('view_all')}
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function TopBar({
   onOpenMobileNav,
@@ -107,6 +221,8 @@ export default function TopBar({
           </>
         )}
       </div>
+
+      <NotificationBell />
 
       <button
         type="button"

@@ -1,0 +1,29 @@
+{
+  "title": "通知",
+  "subtitle": "{{count}} 条未读",
+  "mark_read": "标记已读",
+  "mark_all_read": "全部已读",
+  "unread_only": "只看未读",
+  "view": "查看",
+  "kinds": {
+    "export_ready": "数据导出已完成，可以下载了。",
+    "backup_ready": "备份已完成，文件已加密保存在服务端。",
+    "restore_done": "恢复已完成，共写入 {{rows}} 条记录。",
+    "job_failed": "任务失败：{{task}}。可在任务面板查看原因并重试。",
+    "email_verified": "邮箱验证成功。",
+    "deletion_requested": "已收到你的注销申请，冷却期内可随时撤销。",
+    "deletion_approved": "注销申请已被批准，账号已停用。",
+    "admin_action": "管理员对你执行了一项操作。",
+    "unknown": "有一条新通知。"
+  },
+  "admin_actions": {
+    "user_disabled": "管理员停用了你的账号。",
+    "user_enabled": "管理员重新启用了你的账号。",
+    "deletion_rejected": "管理员驳回了你的注销申请。"
+  },
+  "empty": {
+    "title": "暂无通知",
+    "description": "导出、备份、任务完成等事件会出现在这里。"
+  },
+  "view_all": "查看全部"
+}

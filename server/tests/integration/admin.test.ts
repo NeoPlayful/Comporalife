@@ -283,18 +283,89 @@ describe('用户管理', () => {
     expect(logs.every((item) => item.ip === null || item.ip.includes('x'))).toBe(true);
   });
 
-  it('删除申请审批只做禁用，不物理删除', async () => {
-    const target = await createUser(app, DOMAIN, 'deletion');
+  it('没有申请时不能批准注销', async () => {
+    const target = await createUser(app, DOMAIN, 'no-request');
 
     const res = await app.inject({
       method: 'POST',
       url: `/api/admin/users/${target.userId}/deletion-review`,
       headers: auth(adminToken),
+      payload: { decision: 'approve' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.code).toBe('DELETION_NOT_REVIEWABLE');
+  });
+
+  it('冷却期未满时不能批准注销', async () => {
+    const target = await createUser(app, DOMAIN, 'cooling');
+    await app.inject({
+      method: 'POST',
+      url: '/api/profile/delete-request',
+      headers: auth(target.token),
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${target.userId}/deletion-review`,
+      headers: auth(adminToken),
+      payload: { decision: 'approve' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.details.reason).toBe('cooling_off_not_elapsed');
+  });
+
+  it('冷却期满后批准为软删除，不物理删除', async () => {
+    const target = await createUser(app, DOMAIN, 'deletion');
+    await app.inject({
+      method: 'POST',
+      url: '/api/profile/delete-request',
+      headers: auth(target.token),
+    });
+
+    // 把申请时间回拨到冷却期之前，模拟已满 7 天
+    await app.prisma.user.update({
+      where: { id: target.userId },
+      data: { deletionRequestedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${target.userId}/deletion-review`,
+      headers: auth(adminToken),
+      payload: { decision: 'approve' },
     });
 
     expect(res.statusCode).toBe(200);
-    expect(res.json().data.disposition).toBe('disabled_not_deleted');
-    expect(await app.prisma.user.count({ where: { id: target.userId } })).toBe(1);
+    expect(res.json().data.disposition).toBe('soft_deleted');
+
+    const row = await app.prisma.user.findUniqueOrThrow({ where: { id: target.userId } });
+    expect(row.status).toBe('disabled');
+    expect(row.deletedAt).not.toBeNull();
+  });
+
+  it('驳回注销申请会清空申请时间', async () => {
+    const target = await createUser(app, DOMAIN, 'reject');
+    await app.inject({
+      method: 'POST',
+      url: '/api/profile/delete-request',
+      headers: auth(target.token),
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${target.userId}/deletion-review`,
+      headers: auth(adminToken),
+      payload: { decision: 'reject' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.decision).toBe('reject');
+
+    const row = await app.prisma.user.findUniqueOrThrow({ where: { id: target.userId } });
+    expect(row.deletionRequestedAt).toBeNull();
+    expect(row.status).toBe('active');
   });
 });
 

@@ -3,9 +3,10 @@ import type { FastifyInstance } from 'fastify';
 import { ok } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
 import { requireAuth } from '../../plugins/auth.js';
-import { simulate, type CompoundInput, type CompoundResult } from './compound.engine.js';
+import { simulate, type CompoundResult, type CompoundV2Input } from './compound.engine.js';
 import {
   calculateSchema,
+  solveSchema,
   compareSchema,
   saveScenarioSchema,
   scenarioIdSchema,
@@ -23,6 +24,11 @@ type ScenarioRow = {
   years: number;
   inflationRate: { toString(): string };
   feeRate: { toString(): string };
+  annualContributionIncrease: { toString(): string };
+  withdrawalAmount: { toString(): string };
+  withdrawalFrequency: string;
+  withdrawalStartYear: number;
+  taxRate: { toString(): string };
   modelVersion: string;
   createdAt: Date;
   updatedAt: Date;
@@ -39,21 +45,50 @@ const scenarioSelect = {
   years: true,
   inflationRate: true,
   feeRate: true,
+  annualContributionIncrease: true,
+  withdrawalAmount: true,
+  withdrawalFrequency: true,
+  withdrawalStartYear: true,
+  taxRate: true,
   modelVersion: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
-function toEngineInput(row: ScenarioRow): CompoundInput {
+function toEngineInput(row: ScenarioRow): CompoundV2Input {
   return {
     principal: row.principal.toString(),
     contributionAmount: row.contributionAmount.toString(),
-    contributionFrequency: row.contributionFrequency as CompoundInput['contributionFrequency'],
-    contributionTiming: row.contributionTiming as CompoundInput['contributionTiming'],
+    contributionFrequency: row.contributionFrequency as CompoundV2Input['contributionFrequency'],
+    contributionTiming: row.contributionTiming as CompoundV2Input['contributionTiming'],
     annualReturnRate: row.annualReturnRate.toString(),
     years: row.years,
     inflationRate: row.inflationRate.toString(),
     feeRate: row.feeRate.toString(),
+    annualContributionIncrease: row.annualContributionIncrease.toString(),
+    withdrawalAmount: row.withdrawalAmount.toString(),
+    withdrawalFrequency: row.withdrawalFrequency as CompoundV2Input['withdrawalFrequency'],
+    withdrawalStartYear: row.withdrawalStartYear,
+    taxRate: row.taxRate.toString(),
+  };
+}
+
+/** 只透传用户实际提供的进阶参数，缺省交给引擎默认值 */
+function advancedFields(body: {
+  annualContributionIncrease?: string;
+  withdrawalAmount?: string;
+  withdrawalFrequency?: 'none' | 'monthly' | 'annual';
+  withdrawalStartYear?: number;
+  taxRate?: string;
+}): Partial<CompoundV2Input> {
+  return {
+    ...(body.annualContributionIncrease !== undefined
+      ? { annualContributionIncrease: body.annualContributionIncrease }
+      : {}),
+    ...(body.withdrawalAmount !== undefined ? { withdrawalAmount: body.withdrawalAmount } : {}),
+    ...(body.withdrawalFrequency !== undefined ? { withdrawalFrequency: body.withdrawalFrequency } : {}),
+    ...(body.withdrawalStartYear !== undefined ? { withdrawalStartYear: body.withdrawalStartYear } : {}),
+    ...(body.taxRate !== undefined ? { taxRate: body.taxRate } : {}),
   };
 }
 
@@ -69,6 +104,11 @@ function serializeScenario(row: ScenarioRow) {
     years: row.years,
     inflationRate: row.inflationRate.toString(),
     feeRate: row.feeRate.toString(),
+    annualContributionIncrease: row.annualContributionIncrease.toString(),
+    withdrawalAmount: row.withdrawalAmount.toString(),
+    withdrawalFrequency: row.withdrawalFrequency,
+    withdrawalStartYear: row.withdrawalStartYear,
+    taxRate: row.taxRate.toString(),
     modelVersion: row.modelVersion,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -121,16 +161,115 @@ export default async function simulationsRoutes(app: FastifyInstance) {
       years: body.years,
       inflationRate: body.inflationRate,
       feeRate: body.feeRate,
+      ...advancedFields(body),
     });
 
     return ok({ result: serializeResult(result), input: body }, request.id);
+  });
+
+  /**
+   * 目标反推：给定目标金额，二分求所需定期投入额或所需年限。
+   * 迭代上限 60 次，精度按求解维度决定；不可达时返回 422 而不是无限循环。
+   */
+  app.post('/simulations/compound/solve', { preHandler: app.authenticate }, async (request) => {
+    const body = solveSchema.parse(request.body);
+    const advanced = advancedFields(body);
+
+    const evaluate = (contributionAmount: string, years: number) =>
+      simulate({
+        principal: body.principal,
+        contributionAmount,
+        contributionFrequency: body.contributionFrequency,
+        contributionTiming: body.contributionTiming,
+        annualReturnRate: body.annualReturnRate,
+        years,
+        inflationRate: body.inflationRate,
+        feeRate: body.feeRate,
+        ...advanced,
+      });
+
+    const target = Number(body.targetAmount);
+    const MAX_ITERATIONS = 60;
+
+    if (body.solveFor === 'contribution') {
+      const years = body.years;
+      let low = 0;
+      let high = Math.max(target, 1) * 2;
+      let iterations = 0;
+
+      // 先确认上界可达，否则无论投多少都到不了
+      while (Number(evaluate(String(high), years).finalNominalValue) < target && iterations < MAX_ITERATIONS) {
+        high *= 2;
+        iterations += 1;
+        if (high > 1e12) throw errors.solveUnreachable('在给定年限与收益率下，目标金额不可达');
+      }
+
+      for (; iterations < MAX_ITERATIONS; iterations += 1) {
+        const mid = (low + high) / 2;
+        const reached = Number(evaluate(mid.toFixed(2), years).finalNominalValue);
+        if (reached >= target) high = mid;
+        else low = mid;
+        if (Math.abs(reached - target) < 0.01) break;
+      }
+
+      const required = high.toFixed(2);
+      const actual = Number(evaluate(required, years).finalNominalValue);
+
+      return ok(
+        {
+          solveFor: 'contribution',
+          requiredContribution: required,
+          years,
+          targetAmount: body.targetAmount,
+          actualValue: actual.toFixed(6),
+          difference: (actual - target).toFixed(6),
+          iterations: iterations + 1,
+        },
+        request.id,
+      );
+    }
+
+    // 按年限反推：投入额固定，二分所需年数
+    const contributionAmount = body.contributionAmount!;
+    let low = 1;
+    let high = Math.max(body.years, 1);
+    let iterations = 0;
+
+    while (Number(evaluate(contributionAmount, high).finalNominalValue) < target && iterations < MAX_ITERATIONS) {
+      high *= 2;
+      iterations += 1;
+      if (high >= 100) throw errors.solveUnreachable('在给定投入下，100 年内目标不可达');
+    }
+
+    for (; iterations < MAX_ITERATIONS; iterations += 1) {
+      const mid = Math.floor((low + high) / 2);
+      const reached = Number(evaluate(contributionAmount, mid).finalNominalValue);
+      if (reached >= target) high = mid;
+      else low = mid;
+      if (high - low <= 1) break;
+    }
+
+    const actual = Number(evaluate(contributionAmount, high).finalNominalValue);
+
+    return ok(
+      {
+        solveFor: 'years',
+        requiredYears: high,
+        contributionAmount,
+        targetAmount: body.targetAmount,
+        actualValue: actual.toFixed(6),
+        difference: (actual - target).toFixed(6),
+        iterations: iterations + 1,
+      },
+      request.id,
+    );
   });
 
   app.post('/simulations/compound/compare', { preHandler: app.authenticate }, async (request) => {
     const { userId } = requireAuth(request);
     const body = compareSchema.parse(request.body);
 
-    const entries: Array<{ label: string; input: CompoundInput }> = [];
+    const entries: Array<{ label: string; input: CompoundV2Input }> = [];
 
     if (body.scenarioIds) {
       const scenarios = await app.prisma.simulationScenario.findMany({
@@ -204,6 +343,11 @@ export default async function simulationsRoutes(app: FastifyInstance) {
         years: body.years,
         inflationRate: body.inflationRate,
         feeRate: body.feeRate,
+        annualContributionIncrease: body.annualContributionIncrease ?? '0',
+        withdrawalAmount: body.withdrawalAmount ?? '0',
+        withdrawalFrequency: body.withdrawalFrequency ?? 'none',
+        withdrawalStartYear: body.withdrawalStartYear ?? 1,
+        taxRate: body.taxRate ?? '0',
       },
       select: scenarioSelect,
     });
@@ -222,7 +366,8 @@ export default async function simulationsRoutes(app: FastifyInstance) {
     if (!scenario) throw errors.notFound('场景不存在');
 
     // 结果不落库：参数确定则结果确定，读取时实时计算避免两者不一致
-    const result = simulate(toEngineInput(scenario));
+    // 按场景记录的版本重算：旧场景结果不得因引擎升级而改变
+    const result = simulate(toEngineInput(scenario), scenario.modelVersion);
 
     return ok({ scenario: serializeScenario(scenario), result: serializeResult(result) }, request.id);
   });
@@ -260,7 +405,8 @@ export default async function simulationsRoutes(app: FastifyInstance) {
       select: scenarioSelect,
     });
 
-    const result = simulate(toEngineInput(scenario));
+    // 按场景记录的版本重算：旧场景结果不得因引擎升级而改变
+    const result = simulate(toEngineInput(scenario), scenario.modelVersion);
 
     return ok({ scenario: serializeScenario(scenario), result: serializeResult(result) }, request.id);
   });

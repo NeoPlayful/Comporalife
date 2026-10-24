@@ -119,7 +119,7 @@ describe('报表生成', () => {
     const report = res.json().data.report;
     expect(report.basis.range).toEqual({ from: '2026-01-01', to: '2026-12-31' });
     expect(report.basis.completeness).toBeTruthy();
-    expect(report.modelVersions.compound).toBe('compound-v1');
+    expect(report.modelVersions.compound).toBe('compound-v2');
     expect(report.modelVersions.monteCarlo).toBe('montecarlo-v1');
   });
 
@@ -410,7 +410,7 @@ describe('模拟与复利导出', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toContain('text/csv');
-    expect(res.body).toContain('compound-v1');
+    expect(res.body).toContain('compound-v2');
     expect(res.body).toContain('年度明细');
   });
 

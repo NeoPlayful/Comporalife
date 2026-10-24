@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient, UserRole } from '@prisma/client';
+import { DELETION_COOLING_OFF_DAYS } from '../../config/constants.js';
 import { errors } from '../../lib/errors.js';
 
 /**
@@ -20,6 +21,10 @@ export interface AdminUserListItem {
   lastLoginAt: string | null;
   lastLoginIp: string | null;
   createdAt: string;
+  /** 注销申请时间：管理端据此显示冷却期与审批按钮 */
+  deletionRequestedAt: string | null;
+  /** 冷却期是否已满，由服务端算好，避免前后端各算一套 */
+  coolingOffElapsed: boolean;
 }
 
 /** 邮箱与昵称默认脱敏：管理后台的常见操作不需要看到完整值 */
@@ -57,9 +62,14 @@ export function toAdminUser(
     lastLoginAt: Date | null;
     lastLoginIp: string | null;
     createdAt: Date;
+    deletionRequestedAt: Date | null;
   },
   options: { reveal?: boolean } = {},
 ): AdminUserListItem {
+  const coolingOffEndsAt = user.deletionRequestedAt
+    ? user.deletionRequestedAt.getTime() + DELETION_COOLING_OFF_DAYS * DAY_MS
+    : null;
+
   return {
     id: user.id,
     email: options.reveal ? user.email : maskEmail(user.email),
@@ -70,6 +80,8 @@ export function toAdminUser(
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     lastLoginIp: maskIp(user.lastLoginIp),
     createdAt: user.createdAt.toISOString(),
+    deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
+    coolingOffElapsed: coolingOffEndsAt ? coolingOffEndsAt <= Date.now() : false,
   };
 }
 
@@ -114,6 +126,7 @@ export async function listUsers(
         lastLoginAt: true,
         lastLoginIp: true,
         createdAt: true,
+        deletionRequestedAt: true,
       },
     }),
   ]);
@@ -142,6 +155,7 @@ export async function getUserDetail(
       lastLoginAt: true,
       lastLoginIp: true,
       createdAt: true,
+      deletionRequestedAt: true,
     },
   });
 

@@ -28,6 +28,10 @@ const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage')
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminSystemPage = lazy(() => import('./pages/admin/AdminSystemPage'));
+const AssetsPage = lazy(() => import('./pages/AssetsPage'));
+const LiabilitiesPage = lazy(() => import('./pages/LiabilitiesPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const AuditPage = lazy(() => import('./pages/AuditPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
@@ -57,6 +61,10 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="accounts" element={<AccountsPage />} />
           <Route path="accounts/:id" element={<AccountDetailPage />} />
+          <Route path="assets" element={<AssetsPage />} />
+          <Route path="liabilities" element={<LiabilitiesPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="audit" element={<AuditPage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="budgets" element={<BudgetsPage />} />

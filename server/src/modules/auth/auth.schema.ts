@@ -38,3 +38,7 @@ export const resetPasswordSchema = z.object({
 export const sessionIdSchema = z.object({
   id: z.string().uuid('会话 ID 格式不正确'),
 });
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, '令牌不能为空'),
+});

@@ -22,5 +22,9 @@
   "close_menu": "Close menu",
   "portfolios": "Investment Management",
   "data": "My Data",
+  "assets": "Assets",
+  "liabilities": "Liabilities",
+  "notifications": "Notifications",
+  "audit": "Audit log",
   "admin": "Admin"
 }

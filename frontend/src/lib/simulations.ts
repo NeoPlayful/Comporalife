@@ -9,6 +9,24 @@ export interface CompoundParams {
   years: number;
   inflationRate: string;
   feeRate: string;
+  // v2 进阶参数：全部可选，缺省与旧口径一致
+  annualContributionIncrease?: string;
+  withdrawalAmount?: string;
+  withdrawalFrequency?: 'none' | 'monthly' | 'annual';
+  withdrawalStartYear?: number;
+  taxRate?: string;
+}
+
+export interface SolveResult {
+  solveFor: 'contribution' | 'years';
+  requiredContribution?: string;
+  requiredYears?: number;
+  contributionAmount?: string;
+  years?: number;
+  targetAmount: string;
+  actualValue: string;
+  difference: string;
+  iterations: number;
 }
 
 export interface YearlyRow {
@@ -70,6 +88,8 @@ export const simulationsApi = {
   duplicate: (id: string) =>
     api.post<{ scenario: Scenario }>(`/api/simulations/compound/${id}/duplicate`),
 
+  solve: (body: CompoundParams & { targetAmount: string; solveFor: 'contribution' | 'years' }) =>
+    api.post<SolveResult>('/api/simulations/compound/solve', body),
   compare: (body: { scenarioIds?: string[]; params?: CompoundParams[] }) =>
     api.post<{ comparisons: Comparison[] }>('/api/simulations/compound/compare', body),
 };

@@ -71,5 +71,28 @@
     "copy": "Duplicate",
     "delete": "Delete"
   },
-  "label_separator": ": "
+  "label_separator": ": ",
+  "advanced": {
+    "title": "Advanced assumptions (optional)",
+    "increase": "Annual contribution increase",
+    "withdrawal": "Withdrawal per period",
+    "withdrawal_frequency": "Withdrawal frequency",
+    "withdrawal_start": "Withdrawal start year",
+    "tax": "Tax on gains",
+    "freq_none": "No withdrawal",
+    "freq_monthly": "Monthly",
+    "freq_annual": "Annually"
+  },
+  "solve": {
+    "title": "Solve for a target",
+    "target": "Target amount",
+    "solve_for": "Solve for",
+    "for_contribution": "Required contribution",
+    "for_years": "Required years",
+    "action": "Solve",
+    "solving": "Solving…",
+    "required_contribution": "To reach it in {{years}} years, contribute {{value}} per period",
+    "required_years": "At the current contribution, about {{years}} years are needed ({{value}} per period)",
+    "actual": "Achieves {{value}} (off by {{diff}})"
+  }
 }

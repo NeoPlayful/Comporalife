@@ -1,0 +1,52 @@
+{
+  "title": "审计日志",
+  "subtitle": "你的敏感操作记录，IP 已脱敏到网段，不包含金额与流水内容",
+  "filter": {
+    "action": "按动作类型筛选",
+    "action_placeholder": "例如 auth.login"
+  },
+  "pagination": {
+    "prev": "上一页",
+    "next": "下一页",
+    "page": "第 {{page}} 页"
+  },
+  "actions": {
+    "auth.login": "登录",
+    "auth.login_failed": "登录失败",
+    "auth.password_changed": "修改密码",
+    "auth.password_reset": "重置密码",
+    "auth.password_reset_requested": "请求重置密码",
+    "auth.email_verified": "邮箱验证",
+    "auth.register": "注册",
+    "account.opening_balance_changed": "修改账户期初余额",
+    "import.uploaded": "上传账单",
+    "import.committed": "提交导入",
+    "import.rolled_back": "撤销导入",
+    "budget.created": "创建预算",
+    "budget.updated": "修改预算",
+    "budget.deleted": "删除预算",
+    "budget.copied": "复制预算",
+    "goal.created": "创建目标",
+    "goal.updated": "修改目标",
+    "goal.deleted": "删除目标",
+    "portfolio.archived": "归档组合",
+    "export.downloaded": "下载导出包",
+    "export.deleted": "删除导出包",
+    "backup.downloaded": "下载备份",
+    "backup.deleted": "删除备份",
+    "backup.restored": "恢复备份",
+    "backup.restore_failed": "恢复失败",
+    "monte_carlo.scenario.created": "创建风险模拟方案",
+    "monte_carlo.scenario.updated": "修改风险模拟方案",
+    "monte_carlo.scenario.deleted": "删除风险模拟方案",
+    "monte_carlo.run.queued": "发起模拟运行",
+    "monte_carlo.run.cancelled": "取消模拟运行",
+    "user.deletion_requested": "申请注销账号",
+    "user.deletion_cancelled": "撤销注销申请"
+  },
+  "empty": {
+    "title": "暂无审计记录",
+    "description": "修改密码、导入账单、恢复备份等操作会记录在这里。",
+    "no_more": "没有更多记录了"
+  }
+}

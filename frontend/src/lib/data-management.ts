@@ -49,7 +49,9 @@ export interface MissingMonthsData {
 }
 
 export interface StaleValuationItem {
-  portfolioId: string;
+  /** 组合与资产共用同一指标，用 targetType 区分，避免前端把资产当成组合 */
+  targetType: 'portfolio' | 'asset';
+  targetId: string;
   name: string;
   priceDate: string | null;
   daysStale: number | null;
@@ -137,7 +139,7 @@ export interface ExportDetail extends ExportRecord {
       rateLagPairs: string[];
       unpricedSymbols: string[];
     };
-    excluded: string[];
+    excluded: Array<{ key: string; reason: string }>;
     notes: string[];
   } | null;
 }

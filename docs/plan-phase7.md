@@ -4,7 +4,7 @@
 > **上游计划**：`docs/plan-phase1.md`（S1–S7，v0.1.0）、`docs/plan-phase2.md`（P1–P8，v0.1.1）、`docs/plan-phase3.md`（A1–A7，v0.1.4）、`docs/plan-phase4.md`（B1–B7，v0.1.5）、`docs/plan-phase5.md`（C1–C7，v0.1.6）、`docs/plan-phase6.md`（D1–D7，v0.1.7）
 > **技术栈**：沿用前六阶段：Fastify 5 + TypeScript + Prisma 6 + PostgreSQL 16 + Redis 7 + React 19 + Vite + Tailwind CSS 4 + ECharts 6
 > **文档版本**：v7.0-plan
-> **计划交付版本**：v0.1.8
+> **计划交付版本**：v0.1.8（实际已发布至 v0.1.10，见 README）
 > **范围决策**：个人数据整体导出 + 加密备份与恢复向导 + 数据质量检查 + 后台任务面板（个人视角）+ 平台管理后台（账号与运维视角，不触财务内容）+ 异步导出任务；不做多用户租户体系、不做云端同步、不做备份自动上传对象存储
 
 ---
@@ -335,7 +335,7 @@ comporalife-export-<scope>-<yyyyMMdd-HHmmss>.zip
 ```jsonc
 {
   "schemaVersion": "comporalife-export-v1",
-  "appVersion": "0.1.8",
+  "appVersion": "0.1.10",
   "generatedAt": "2026-10-24T09:30:00.000Z",
   "scope": "full",
   "currency": "CNY",

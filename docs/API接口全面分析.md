@@ -2,7 +2,7 @@
 
 > 项目名称：Comporalife（复利人生）  
 > 产品版本：Personal 开源个人版（完整功能范围）  
-> 技术栈：React 19 + TypeScript + Vite 8 + Tailwind CSS 4 + ECharts 6 + Fastify 5 + Prisma + PostgreSQL 16 + Redis 7  
+> 技术栈：React 19 + TypeScript + Vite 6 + Tailwind CSS 4 + ECharts 6 + Fastify 5 + Prisma + PostgreSQL 16 + Redis 7  
 > 设计目标：账户与资产管理、银行账单导入、收支预算、投资管理、复利与蒙特卡罗模拟、财富目标、财务报告  
 > 范围约束：本文不按 MVP、P0/P1/P2 或阶段划分；闭源商业 SaaS 接口不混入个人开源版。
 
@@ -69,6 +69,8 @@
 | GET | `/api/auth/sessions` | 查询个人登录会话 |
 | DELETE | `/api/auth/sessions/:id` | 撤销指定会话 |
 | DELETE | `/api/auth/sessions` | 撤销其他全部会话 |
+| POST | `/api/auth/verify-email` | 使用一次性令牌验证邮箱（需开关开启） |
+| POST | `/api/auth/resend-verification` | 重发验证邮件（10 分钟节流） |
 
 
 ## 2、个人资料与偏好 (Profile)
@@ -79,10 +81,12 @@
 | PATCH | `/api/profile` | 更新昵称、时区等 |
 | GET | `/api/profile/preferences` | 用户偏好 |
 | PATCH | `/api/profile/preferences` | 更新基础币种、日期格式、主题 |
-| POST | `/api/profile/avatar` | 上传头像 |
-| DELETE | `/api/profile/avatar` | 删除头像 |
-| POST | `/api/profile/delete-request` | 申请删除账号与个人数据 |
-| POST | `/api/profile/delete-confirm` | 确认账号注销 |
+| POST | `/api/profile/avatar` | 上传头像（未实现） |
+| DELETE | `/api/profile/avatar` | 删除头像（未实现） |
+| POST | `/api/profile/delete-request` | 申请注销：记录申请时间，进入 7 天冷却期 |
+| POST | `/api/profile/delete-cancel` | 撤销注销申请（冷却期内） |
+
+> 注销为软删除：管理员批准后置 `deletedAt` 并禁用，数据行保留。头像上传仍属后续阶段。
 
 
 ## 3、个人仪表板 (Dashboard)
@@ -119,24 +123,38 @@
 | GET | `/api/accounts/:id/reconciliations/:reconciliationId` | 对账详情 |
 
 
-## 5、资产与负债 (Assets & Liabilities)
+## 5、资产与负债 (Assets & Liabilities) — 已实现
+
+> 非交易型资产与负债不进入复式记账：余额账户由分录推导，而房产、房贷由「估值快照」表达价值与欠款。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/assets` | 非交易型资产列表 |
-| POST | `/api/assets` | 登记房产、车辆、其他资产 |
-| GET | `/api/assets/:id` | 资产详情 |
-| PATCH | `/api/assets/:id` | 更新资产资料 |
-| DELETE | `/api/assets/:id` | 删除资产登记 |
-| POST | `/api/assets/:id/valuations` | 记录资产估值快照 |
-| GET | `/api/assets/:id/valuations` | 资产估值历史 |
+| GET | `/api/assets` | 资产列表，支持 status / kind 筛选 |
+| GET | `/api/assets/summary` | 资产汇总（按类别、按币种折算基准币种；未估值与缺汇率单独列出） |
+| POST | `/api/assets` | 登记房产、车辆、其他资产（名称用户内唯一） |
+| GET | `/api/assets/:id` | 资产详情（含最新估值与估值历史） |
+| PATCH | `/api/assets/:id` | 更新资产资料（乐观锁 version） |
+| DELETE | `/api/assets/:id` | 归档；有估值记录时拒绝硬删 |
+| POST | `/api/assets/:id/valuations` | 记录估值快照；同日冲突需 `overwrite: true` |
+| GET | `/api/assets/:id/valuations` | 估值历史 |
+| DELETE | `/api/assets/:id/valuations/:valuationId` | 删除错误估值 |
 | GET | `/api/liabilities` | 负债列表 |
-| POST | `/api/liabilities` | 登记贷款或其他负债 |
+| GET | `/api/liabilities/summary` | 负债汇总 |
+| POST | `/api/liabilities` | 登记房贷、消费贷或其他负债 |
 | GET | `/api/liabilities/:id` | 负债详情 |
-| PATCH | `/api/liabilities/:id` | 修改负债资料 |
-| DELETE | `/api/liabilities/:id` | 删除负债登记 |
-| POST | `/api/liabilities/:id/balance-snapshots` | 记录负债余额 |
-| GET | `/api/liabilities/:id/balance-snapshots` | 负债余额历史 |
+| PATCH | `/api/liabilities/:id` | 修改负债资料（乐观锁 version） |
+| DELETE | `/api/liabilities/:id` | 归档；有快照时拒绝硬删 |
+| POST | `/api/liabilities/:id/balance-snapshots` | 记录未偿余额；同日冲突需 `overwrite: true` |
+| GET | `/api/liabilities/:id/balance-snapshots` | 余额历史 |
+| DELETE | `/api/liabilities/:id/balance-snapshots/:snapshotId` | 删除错误快照 |
+
+**口径约束：**
+
+- 净资产 = 账户资产 + 证券市值 + 其他资产 − 账户负债 − 其他负债，六项分项之和必须等于总数。
+- 未录估值或估值日期在未来的资产不计入，并在 `unpricedAssets` 中显式返回。
+- 外币资产缺汇率时不计入，并在 `missingRate` 中列出。
+- `purchasePrice` / `originalAmount` / `interestRate` 仅作参考，不参与任何计算。
+- 路由顺序：`/assets/summary` 与 `/liabilities/summary` 必须在 `/:id` 之前注册。
 
 
 ## 6、账单导入 (Statement Imports)
@@ -323,6 +341,7 @@
 | DELETE | `/api/simulations/compound/:id` | 删除场景 |
 | POST | `/api/simulations/compound/calculate` | 即时计算本金、定投、复利、通胀、提取 |
 | POST | `/api/simulations/compound/compare` | 比较多个场景 |
+| POST | `/api/simulations/compound/solve` | 目标反推：给定目标金额求所需每期投入或所需年限 |
 | GET | `/api/simulations/compound/:id/results` | 获取已保存结果 |
 | POST | `/api/simulations/compound/:id/duplicate` | 复制场景 |
 | GET | `/api/simulations/compound/:id/export` | 导出模拟数据 |
@@ -466,17 +485,18 @@
 > 任务列表用读模型合并 `job_tasks` 与 `monte_carlo_runs`；写操作按 `kind` 分派到各自实现。
 
 
-## 23、通知与审计 (Notifications & Audit) — 审计已实现
+## 23、通知与审计 (Notifications & Audit) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/notifications` | 个人通知列表 |
+| GET | `/api/notifications` | 个人通知列表，支持 `unreadOnly`，响应含 `unreadCount` |
 | PATCH | `/api/notifications/:id/read` | 标记通知已读 |
 | POST | `/api/notifications/read-all` | 全部标记已读 |
 | GET | `/api/audit-logs` | 查询个人敏感操作日志 |
 | GET | `/api/audit-logs/:id` | 审计事件详情 |
 
 > 审计查询只返回白名单字段，IP 脱敏到网段，不返回金额与流水内容。
+> 通知文案不落库为最终文本：存 `kind` 与渲染参数，由前端按当前语言渲染；保留 90 天，每用户上限 500 条。
 
 
 ## 24、系统设置 (Settings)
@@ -688,11 +708,11 @@ GET /api/analytics/income-expense?from=2026-01-01&to=2026-12-31&currency=USD
 
 | 模块 | 接口数量 |
 |---|---:|
-| 认证与会话 (Auth) | 11 |
-| 个人资料与偏好 (Profile) | 8 |
+| 认证与会话 (Auth) | 13 |
+| 个人资料与偏好 (Profile) | 10 |
 | 个人仪表板 (Dashboard) | 9 |
 | 财务账户 (Accounts) | 13 |
-| 资产与负债 (Assets & Liabilities) | 14 |
+| 资产与负债 (Assets & Liabilities) | 18 |
 | 账单导入 (Statement Imports) | 17 |
 | 交易流水与分录 (Transactions & Ledger) | 18 |
 | 分类与标签 (Categories & Tags) | 12 |
@@ -703,8 +723,7 @@ GET /api/analytics/income-expense?from=2026-01-01&to=2026-12-31&currency=USD
 | 投资组合与持仓 (Portfolios & Holdings) | 10 |
 | 投资交易与现金流 (Trades & Cashflows) | 9 |
 | 资产配置与再平衡 (Allocation) | 9 |
-| 资产配置与再平衡 (Allocation) | 5 |
-| 复利与定投模拟 (Compound Simulations) | 10 |
+| 复利与定投模拟 (Compound Simulations) | 11 |
 | 蒙特卡罗模拟 (Monte Carlo) | 16 |
 | 财富目标与财务自由 (Financial Goals) | 11 |
 | 财务报告 (Reports) | 13 |
@@ -713,9 +732,9 @@ GET /api/analytics/income-expense?from=2026-01-01&to=2026-12-31&currency=USD
 | 后台任务 (Jobs) | 4 |
 | 通知与审计 (Notifications & Audit) | 5 |
 | 系统设置 (Settings) | 10 |
-| 最小平台管理 (Admin) | 8 |
+| 最小平台管理 (Admin) | 11 |
 | 系统维护 (System) | 4 |
-| **合计** | **260** |
+| **合计** | **279** |
 
 ## 总结
 

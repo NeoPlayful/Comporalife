@@ -58,7 +58,7 @@ describe('即时计算', () => {
 
     const result = res.json().data.result;
     expect(result.yearlySchedule).toHaveLength(20);
-    expect(result.modelVersion).toBe('compound-v1');
+    expect(result.modelVersion).toBe('compound-v2');
     expect(result.assumptions.disclaimer).toContain('不代表实际投资收益');
   });
 

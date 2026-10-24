@@ -11,10 +11,11 @@ build/
 .env.*
 !.env.example
 
-# 运行时数据
-uploads/
-backups/
-data/
+# 运行时数据（限定根目录与 server 下的运行时目录，避免误伤 modules/backups 等源码）
+/uploads/
+/backups/
+/data/
+server/data/
 *.log
 
 # 测试与工具

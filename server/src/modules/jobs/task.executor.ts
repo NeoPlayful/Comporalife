@@ -7,6 +7,7 @@ import {
   TASK_PROGRESS_INTERVAL_MS,
   TASK_TIMEOUT_SECONDS,
 } from '../../config/constants.js';
+import { createNotification } from '../notifications/notification.service.js';
 import type { JobFailureCodeValue } from './job.types.js';
 
 /**
@@ -205,13 +206,63 @@ export class TaskExecutor {
           heartbeatAt: new Date(this.now()),
         },
       });
+
+      await this.notifyTerminal(claimed.id, claimed.kind, 'succeeded');
     } catch (err) {
       if (hooks.isExpired()) {
         await handler.fail(claimed.id, 'TASK_TIMEOUT', '任务超过时限');
+        await this.notifyTerminal(claimed.id, claimed.kind, 'failed');
       } else {
         this.log.error({ err, taskId: claimed.id }, '任务执行失败');
         await handler.fail(claimed.id, 'TASK_INTERNAL', '任务执行过程中发生错误');
+        await this.notifyTerminal(claimed.id, claimed.kind, 'failed');
       }
+    }
+  }
+
+  /**
+   * 任务终态通知。
+   * 导出与备份各自有专属 kind；其余任务失败统一走 job_failed。
+   * 通知失败不影响任务状态，只记一条 warn。
+   */
+  private async notifyTerminal(taskId: string, kind: TaskKind, outcome: 'succeeded' | 'failed'): Promise<void> {
+    try {
+      const task = await this.prisma.jobTask.findUnique({
+        where: { id: taskId },
+        select: { userId: true, targetId: true, failureMessage: true },
+      });
+      if (!task) return;
+
+      if (outcome === 'failed') {
+        await createNotification(this.prisma, {
+          userId: task.userId,
+          kind: 'job_failed',
+          metadata: { taskId, taskKind: kind, reason: task.failureMessage ?? null },
+          link: '/data?tab=jobs',
+        });
+        return;
+      }
+
+      if (kind === 'export') {
+        await createNotification(this.prisma, {
+          userId: task.userId,
+          kind: 'export_ready',
+          metadata: { exportId: task.targetId },
+          link: '/data?tab=export',
+        });
+        return;
+      }
+
+      if (kind === 'backup') {
+        await createNotification(this.prisma, {
+          userId: task.userId,
+          kind: 'backup_ready',
+          metadata: { backupId: task.targetId },
+          link: '/data?tab=backup',
+        });
+      }
+    } catch (err) {
+      this.log.warn({ err, taskId }, '任务终态通知写入失败');
     }
   }
 

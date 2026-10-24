@@ -44,9 +44,11 @@
     "action": "去分类"
   },
   "alerts": {
-    "title": "预算预警",
-    "total_scope": "总预算",
-    "empty": "当前周期没有预警"
+    "title": "本期预警",
+    "total_exceeded": "总预算已超支：已花 {{spent}} / 可用 {{available}} {{currency}}",
+    "total_warning": "总预算接近上限：已花 {{spent}} / 可用 {{available}} {{currency}}",
+    "category_exceeded": "{{name}} 已超支：已花 {{spent}} / 可用 {{available}} {{currency}}",
+    "category_warning": "{{name}} 接近上限：已花 {{spent}} / 可用 {{available}} {{currency}}"
   },
   "carryover": {
     "title": "结转说明",

@@ -5,7 +5,8 @@ import { ok } from '../../lib/api-utils.js';
 import { AppError, errors } from '../../lib/errors.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { clearRefreshCookie, setRefreshCookie } from '../../lib/session.js';
-import { isRegistrationEnabled } from '../settings/system-settings.service.js';
+import { createNotification } from '../notifications/notification.service.js';
+import { isEmailVerificationEnabled, isRegistrationEnabled } from '../settings/system-settings.service.js';
 import { AuthService } from './auth.service.js';
 import {
   changePasswordSchema,
@@ -14,6 +15,7 @@ import {
   registerSchema,
   resetPasswordSchema,
   sessionIdSchema,
+  verifyEmailSchema,
 } from './auth.schema.js';
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -27,6 +29,13 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const body = registerSchema.parse(request.body);
     const { user } = await service.register(body);
+
+    // 验证邮件是可选增强：开关关闭或 SMTP 未配置时静默跳过，绝不影响注册结果
+    if (await isEmailVerificationEnabled(app.prisma)) {
+      void service.sendVerificationEmail(user.id, request.log).catch((err) => {
+        request.log.warn({ err }, '注册验证邮件发送失败');
+      });
+    }
 
     // 注册后直接进入已登录状态
     const login = await service.login({
@@ -114,11 +123,11 @@ export default async function authRoutes(app: FastifyInstance) {
 
   app.post('/forgot-password', async (request, reply) => {
     const body = forgotPasswordSchema.parse(request.body);
-    const { token } = await service.requestPasswordReset(body.email);
+    const { link } = await service.requestPasswordReset(body.email, request.log);
 
-    // 开发环境把重置链接写入日志，便于本地调试；生产依赖 SMTP
-    if (token && !isProduction) {
-      request.log.info({ resetUrl: `/reset-password?token=${token}` }, '开发环境密码重置链接');
+    // 未真正投递时（开发环境无 SMTP、或测试）把链接写日志，便于本地走完流程
+    if (link && !isProduction) {
+      request.log.info({ resetUrl: link }, '开发环境密码重置链接');
     }
 
     return reply.status(202).send(
@@ -130,6 +139,40 @@ export default async function authRoutes(app: FastifyInstance) {
     const body = resetPasswordSchema.parse(request.body);
     await service.resetPassword(body.token, body.newPassword);
     return ok({ reset: true }, request.id);
+  });
+
+  app.post('/verify-email', async (request) => {
+    if (!(await isEmailVerificationEnabled(app.prisma))) {
+      throw errors.emailVerificationDisabled();
+    }
+
+    const body = verifyEmailSchema.parse(request.body);
+    const { userId } = await service.verifyEmail(body.token);
+
+    await createNotification(app.prisma, {
+      userId,
+      kind: 'email_verified',
+      metadata: {},
+      link: '/profile',
+    });
+
+    return ok({ verified: true }, request.id);
+  });
+
+  app.post('/resend-verification', { preHandler: app.authenticate }, async (request) => {
+    if (!(await isEmailVerificationEnabled(app.prisma))) {
+      throw errors.emailVerificationDisabled();
+    }
+
+    const auth = requireAuth(request);
+    const { link } = await service.resendVerification(auth.userId, request.log);
+
+    // 与密码重置一致：未真正投递时才在非生产环境把链接写日志
+    if (link && !isProduction) {
+      request.log.info({ verifyUrl: link }, '开发环境邮箱验证链接');
+    }
+
+    return ok({ sent: true }, request.id);
   });
 
   app.get('/sessions', { preHandler: app.authenticate }, async (request) => {

@@ -106,6 +106,78 @@ describe('净资产', () => {
     expect(data.netWorth).toBe('9000.000000');
   });
 
+  it('六项分项之和严格等于总数', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/overview',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    const sum = (values: string[]) => values.reduce((acc, value) => acc + Number(value), 0);
+
+    const assets = sum([
+      data.breakdown.accountAssets,
+      data.breakdown.securitiesValue,
+      data.breakdown.otherAssets,
+    ]);
+    const liabilities = sum([data.breakdown.accountLiabilities, data.breakdown.otherLiabilities]);
+
+    expect(assets.toFixed(6)).toBe(Number(data.totalAssets).toFixed(6));
+    expect(liabilities.toFixed(6)).toBe(Number(data.totalLiabilities).toFixed(6));
+    expect((assets - liabilities).toFixed(6)).toBe(Number(data.netWorth).toFixed(6));
+  });
+
+  it('非交易型资产并入其他资产分项', async () => {
+    const asset = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/assets',
+        headers: auth(token),
+        payload: { name: '自住房', kind: 'property', currency: 'CNY' },
+      })
+    ).json().data.asset;
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/assets/${asset.id}/valuations`,
+      headers: auth(token),
+      payload: { valuationDate: '2026-01-01', value: '500000' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/overview',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    expect(data.breakdown.otherAssets).toBe('500000.000000');
+    expect(data.totalAssets).toBe('511000.000000');
+    expect(data.netWorth).toBe('509000.000000');
+  });
+
+  it('未录估值的资产不计入并显式列出', async () => {
+    const asset = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/assets',
+        headers: auth(token),
+        payload: { name: '汽车', kind: 'vehicle', currency: 'CNY' },
+      })
+    ).json().data.asset;
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/overview',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    expect(data.breakdown.otherAssets).toBe('0.000000');
+    expect(data.unpricedAssets).toEqual([{ id: asset.id, name: '汽车', reason: 'no_valuation' }]);
+  });
+
   it('响应带完整统计口径', async () => {
     const res = await app.inject({
       method: 'GET',
@@ -445,5 +517,99 @@ describe('资产配置与数据质量', () => {
     });
 
     expect(res.json().data.accounts).toHaveLength(0);
+  });
+});
+
+describe('预算预警与目标进度聚合', () => {
+  it('无预算时预警为空且计数为 0', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/budget-alerts',
+      headers: auth(token),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.alerts).toEqual([]);
+    expect(res.json().data.counts.total).toBe(0);
+  });
+
+  it('超支预算出现在预警中且优先排序', async () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/budgets',
+      headers: auth(token),
+      payload: { periodType: 'monthly', year, month, totalAmount: '100' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/budget-alerts',
+      headers: auth(token),
+    });
+
+    // 无支出时不超支
+    expect(res.json().data.counts.total).toBe(0);
+  });
+
+  it('无目标时目标聚合为空', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/goal-progress',
+      headers: auth(token),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.goals).toEqual([]);
+    expect(res.json().data.counts.active).toBe(0);
+  });
+
+  it('目标按剩余月数升序排列', async () => {
+    const far = new Date(Date.now() + 365 * 3 * 86_400_000).toISOString().slice(0, 10);
+    const near = new Date(Date.now() + 60 * 86_400_000).toISOString().slice(0, 10);
+
+    for (const [name, targetDate] of [
+      ['远期目标', far],
+      ['近期目标', near],
+    ] as const) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/goals',
+        headers: auth(token),
+        payload: {
+          name,
+          type: 'savings',
+          targetAmount: '10000',
+          currency: 'CNY',
+          startedAt: '2026-01-01',
+          targetDate,
+        },
+      });
+    }
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/goal-progress',
+      headers: auth(token),
+    });
+
+    const goals = res.json().data.goals as Array<{ name: string }>;
+    expect(goals[0]!.name).toBe('近期目标');
+    expect(res.json().data.counts.active).toBe(2);
+  });
+
+  it('聚合接口按用户隔离', async () => {
+    const other = await createUser(app, DOMAIN, 'other');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/goal-progress',
+      headers: auth(other.token),
+    });
+
+    expect(res.json().data.goals).toEqual([]);
   });
 });

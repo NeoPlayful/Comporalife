@@ -2,10 +2,13 @@ import {
   Activity,
   ArrowLeftRight,
   BarChart3,
+  Building2,
   Calculator,
   Database,
   FileText,
   Goal as GoalIcon,
+  History,
+  Landmark,
   LayoutDashboard,
   LineChart,
   Settings,
@@ -21,6 +24,8 @@ import type { NavItem } from './Sidebar';
 const NAV_KEYS = [
   { to: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
   { to: '/accounts', key: 'accounts', icon: Wallet },
+  { to: '/assets', key: 'assets', icon: Building2 },
+  { to: '/liabilities', key: 'liabilities', icon: Landmark },
   { to: '/transactions', key: 'transactions', icon: ArrowLeftRight },
   { to: '/imports', key: 'imports', icon: Upload },
   { to: '/analytics', key: 'analytics', icon: BarChart3 },
@@ -32,6 +37,8 @@ const NAV_KEYS = [
   { to: '/goals', key: 'goals', icon: GoalIcon },
   { to: '/reports', key: 'reports', icon: FileText },
   { to: '/data', key: 'data', icon: Database },
+  // 通知不占侧边栏：入口在顶栏铃铛，避免与菜单重复
+  { to: '/audit', key: 'audit', icon: History },
   { to: '/settings', key: 'settings', icon: Settings },
 ] as const;
 

@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { MODEL_VERSION, simulate, type CompoundInput } from '@/modules/simulations/compound.engine';
+import { MODEL_VERSION, simulate, simulateV1, simulateV2, type CompoundInput } from '@/modules/simulations/compound.engine';
 
 const BASE: CompoundInput = {
   principal: 0,
@@ -210,5 +210,127 @@ describe('确定性与结果结构', () => {
   it('零本金与零投入返回零', () => {
     const result = run({ principal: 0, contributions: undefined } as Partial<CompoundInput>);
     expect(result.finalNominalValue.toString()).toBe('0');
+  });
+});
+
+describe('v1 与 v2 版本兼容', () => {
+  it('场景标注 v1 时按 v1 口径重算，结果与旧实现一致', () => {
+    const input = {
+      principal: 10000,
+      contributionAmount: 500,
+      contributionFrequency: 'monthly' as const,
+      contributionTiming: 'end' as const,
+      annualReturnRate: 0.07,
+      years: 20,
+      inflationRate: 0.02,
+      feeRate: 0.005,
+    };
+
+    const v1 = simulate(input, 'compound-v1');
+    const legacy = simulateV1(input);
+
+    expect(v1.modelVersion).toBe('compound-v1');
+    expect(v1.finalNominalValue.toString()).toBe(legacy.finalNominalValue.toString());
+  });
+
+  it('进阶参数全为 0 时 v2 与 v1 结果完全一致', () => {
+    const input = {
+      principal: 10000,
+      contributionAmount: 500,
+      contributionFrequency: 'monthly' as const,
+      contributionTiming: 'end' as const,
+      annualReturnRate: 0.07,
+      years: 15,
+      inflationRate: 0.02,
+      feeRate: 0.005,
+    };
+
+    const v1 = simulateV1(input);
+    const v2 = simulateV2({ ...input, annualContributionIncrease: 0, taxRate: 0 });
+
+    expect(v2.finalNominalValue.toString()).toBe(v1.finalNominalValue.toString());
+    expect(v2.totalContributed.toString()).toBe(v1.totalContributed.toString());
+  });
+
+  it('默认版本为 compound-v2', () => {
+    expect(MODEL_VERSION).toBe('compound-v2');
+    expect(simulate(BASE).modelVersion).toBe('compound-v2');
+  });
+});
+
+describe('v2 进阶参数', () => {
+  it('递增定投使总投入上升', () => {
+    const flat = simulateV2({
+      ...BASE,
+      contributionAmount: 1000,
+      contributionFrequency: 'annual',
+      annualReturnRate: 0,
+      years: 3,
+      annualContributionIncrease: 0,
+    });
+    const rising = simulateV2({
+      ...BASE,
+      contributionAmount: 1000,
+      contributionFrequency: 'annual',
+      annualReturnRate: 0,
+      years: 3,
+      annualContributionIncrease: 0.1,
+    });
+
+    expect(Number(rising.totalContributed)).toBeGreaterThan(Number(flat.totalContributed));
+    // 1000 + 1100 + 1210 = 3310
+    expect(rising.totalContributed.toNumber()).toBeCloseTo(3310, 2);
+  });
+
+  it('提款使终值下降且不会把余额扣成负数', () => {
+    const base = { ...BASE, principal: 100000, annualReturnRate: 0, years: 5 };
+    const noWithdrawal = simulateV2(base);
+    const withWithdrawal = simulateV2({
+      ...base,
+      withdrawalAmount: 1000,
+      withdrawalFrequency: 'monthly' as const,
+      withdrawalStartYear: 1,
+    });
+
+    expect(Number(withWithdrawal.finalNominalValue)).toBeLessThan(Number(noWithdrawal.finalNominalValue));
+    expect(Number(withWithdrawal.finalNominalValue)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('提款起始年之前不提款', () => {
+    const result = simulateV2({
+      ...BASE,
+      principal: 100000,
+      annualReturnRate: 0,
+      years: 3,
+      withdrawalAmount: 1000,
+      withdrawalFrequency: 'annual',
+      withdrawalStartYear: 3,
+    });
+
+    // 前两年不动，第三年提 1000
+    expect(result.finalNominalValue.toNumber()).toBeCloseTo(99000, 0);
+  });
+
+  it('税费降低终值，税率 0 时不产生税费', () => {
+    const base = { ...BASE, principal: 100000, annualReturnRate: 0.1, years: 5 };
+    const noTax = simulateV2({ ...base, taxRate: 0 });
+    const withTax = simulateV2({ ...base, taxRate: 0.2 });
+
+    expect(Number(withTax.finalNominalValue)).toBeLessThan(Number(noTax.finalNominalValue));
+    expect(noTax.assumptions.totalTax).toBe('0');
+  });
+
+  it('余额不足以提款时最多扣到 0', () => {
+    const result = simulateV2({
+      ...BASE,
+      principal: 1000,
+      annualReturnRate: 0,
+      years: 2,
+      withdrawalAmount: 5000,
+      withdrawalFrequency: 'monthly',
+      withdrawalStartYear: 1,
+    });
+
+    expect(result.finalNominalValue.toNumber()).toBe(0);
   });
 });

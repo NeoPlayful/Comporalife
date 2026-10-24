@@ -326,8 +326,18 @@ export const BACKUP_RETENTION_COUNT = envInt('BACKUP_RETENTION_COUNT', 10);
 /** 备份文件保留天数 */
 export const BACKUP_RETENTION_DAYS = envInt('BACKUP_RETENTION_DAYS', 90);
 
-/** 备份包结构版本，恢复时校验 */
-export const BACKUP_SCHEMA_VERSION = 'comporalife-backup-v1';
+/** 备份包结构版本：新建包一律写当前版本 */
+export const BACKUP_SCHEMA_VERSION = 'comporalife-backup-v2';
+
+/**
+ * 可读取的备份结构版本。
+ * v1 不含标的计价、标签关联、目标权重、分类规则、导入模板、对账记录与汇率；
+ * 读取时按缺域处理并告警，而不是拒绝恢复。
+ */
+export const BACKUP_SUPPORTED_VERSIONS = [
+  'comporalife-backup-v1',
+  'comporalife-backup-v2',
+] as const;
 
 /** 导出包结构版本 */
 export const EXPORT_SCHEMA_VERSION = 'comporalife-export-v1';
@@ -376,6 +386,24 @@ export const AUDIT_LOG_PAGE_SIZE = envInt('AUDIT_LOG_PAGE_SIZE', 50);
 
 /** 注册开关在 system_settings 中的键 */
 export const SETTING_REGISTRATION_ENABLED = 'registration.enabled';
+
+/** 邮箱验证开关：默认关闭，自部署单用户场景下强制验证只会抬高门槛 */
+export const SETTING_EMAIL_VERIFICATION_ENABLED = 'auth.email_verification_enabled';
+
+/** 邮箱验证令牌有效期：72 小时，给用户跨天打开邮件留足窗口 */
+export const EMAIL_VERIFY_TTL_SECONDS = 72 * 60 * 60;
+
+/** 重发验证邮件的节流窗口 */
+export const EMAIL_VERIFY_RESEND_WINDOW_SECONDS = 10 * 60;
+
+/** 注销申请的冷却期：期间用户可撤销，管理员也不能提前批准 */
+export const DELETION_COOLING_OFF_DAYS = envInt('DELETION_COOLING_OFF_DAYS', 7);
+
+/** 站内通知保留天数 */
+export const NOTIFICATION_RETENTION_DAYS = envInt('NOTIFICATION_RETENTION_DAYS', 90);
+
+/** 每用户通知条数上限，超出按时间删除最旧的 */
+export const NOTIFICATION_MAX_PER_USER = envInt('NOTIFICATION_MAX_PER_USER', 500);
 
 export const EXPORT_STATUSES = ['queued', 'running', 'ready', 'failed', 'expired'] as const;
 export const EXPORT_SCOPES = ['full', 'ledger', 'investments', 'simulations', 'planning', 'settings'] as const;

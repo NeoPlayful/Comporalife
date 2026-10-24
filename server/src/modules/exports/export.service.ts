@@ -31,7 +31,8 @@ export interface ExportManifest {
   files: Array<{ name: string; rows: number; bytes: number; sha256: string }>;
   totals: Record<string, number>;
   completeness: Record<string, unknown>;
-  excluded: string[];
+  // 声明「没导什么」以及原因：只给键名会让人误以为是遗漏而非设计取舍
+  excluded: Array<{ key: string; reason: string }>;
   notes: string[];
 }
 
@@ -173,7 +174,14 @@ export async function buildExportPackage(
     files: files.map(({ name, rows, bytes, sha256: hash }) => ({ name, rows, bytes, sha256: hash })),
     totals,
     completeness,
-    excluded: ['original_statement_files', 'password_hash', 'refresh_tokens', 'sessions', 'audit_logs'],
+    excluded: [
+      { key: 'original_statement_files', reason: '原始账单文件体积大且含银行原文，仅保存在服务端加密存储' },
+      { key: 'password_hash', reason: '凭据不属于业务数据' },
+      { key: 'refresh_tokens', reason: '凭据不属于业务数据' },
+      { key: 'sessions', reason: '会话是有时效的运行态' },
+      { key: 'audit_logs', reason: '审计日志属于安全记录，不随个人数据导出' },
+      { key: 'monte_carlo_results', reason: '结果可按种子与模型版本重算' },
+    ],
     notes: ['导出为明文数据，不包含原始账单文件与登录凭据', '区间仅作用于账户、流水、投资交易与估值'],
   };
 

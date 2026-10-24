@@ -26,12 +26,18 @@ export default function AdminUsersPage() {
       }),
   });
 
-  const act = useMutation<unknown, Error, { id: string; action: 'disable' | 'enable' | 'revoke' | 'deletion' }>({
+  const act = useMutation<
+    unknown,
+    Error,
+    { id: string; action: 'disable' | 'enable' | 'revoke' | 'deletion' | 'reject-deletion' | 'reset-mail' }
+  >({
     mutationFn: (input) => {
       if (input.action === 'disable') return adminApi.disableUser(input.id);
       if (input.action === 'enable') return adminApi.enableUser(input.id);
       if (input.action === 'revoke') return adminApi.revokeSessions(input.id);
-      return adminApi.reviewDeletion(input.id);
+      if (input.action === 'reset-mail') return adminApi.sendPasswordReset(input.id);
+      if (input.action === 'reject-deletion') return adminApi.reviewDeletion(input.id, 'reject');
+      return adminApi.reviewDeletion(input.id, 'approve');
     },
     onSuccess: () => {
       setError(null);
@@ -39,6 +45,8 @@ export default function AdminUsersPage() {
     },
     onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
+
+  // 冷却期是否已满由服务端算好（coolingOffElapsed），前端只按该字段禁用按钮
 
   const loginLogs = useQuery({
     queryKey: ['admin', 'login-logs', expanded],
@@ -144,8 +152,57 @@ export default function AdminUsersPage() {
                   >
                     {t('users.revoke_sessions')}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm(t('users.reset_mail_confirm', { email: user.email }))) {
+                        act.mutate({ id: user.id, action: 'reset-mail' });
+                      }
+                    }}
+                    className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs"
+                  >
+                    {t('users.reset_mail')}
+                  </button>
+
+                  {user.deletionRequestedAt ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={!user.coolingOffElapsed}
+                        title={user.coolingOffElapsed ? undefined : t('users.cooling_off_pending')}
+                        onClick={() => {
+                          if (window.confirm(t('users.approve_deletion_confirm', { email: user.email }))) {
+                            act.mutate({ id: user.id, action: 'deletion' });
+                          }
+                        }}
+                        className="rounded-lg border border-red-500/40 px-2 py-1 text-xs text-red-600 disabled:opacity-40 dark:text-red-400"
+                      >
+                        {t('users.approve_deletion')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(t('users.reject_deletion_confirm', { email: user.email }))) {
+                            act.mutate({ id: user.id, action: 'reject-deletion' });
+                          }
+                        }}
+                        className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs"
+                      >
+                        {t('users.reject_deletion')}
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
+
+              {user.deletionRequestedAt && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  {user.coolingOffElapsed
+                    ? t('users.deletion_ready')
+                    : t('users.deletion_cooling', { time: formatDateTime(user.deletionRequestedAt) })}
+                </p>
+              )}
 
               {expanded === user.id && loginLogs.data && (
                 <ul className="mt-2 space-y-1 rounded-lg bg-black/5 p-2 text-xs dark:bg-white/5">

@@ -10,7 +10,9 @@ import { moneyToString, rateToString, roundMoney, toDecimal } from '../../lib/mo
 import { ok } from '../../lib/api-utils.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { computeBalances } from '../accounts/balance.service.js';
+import { computeBudgetAlerts } from '../budgets/budget.service.js';
 import { convertMany } from '../currencies/currency.service.js';
+import { computeGoalProgress } from '../goals/goal.service.js';
 import { computeCashflow } from './cashflow.service.js';
 import { computeNetWorth } from './networth.service.js';
 
@@ -68,6 +70,16 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         monthExpense: moneyToString(cashflow.totalExpense),
         monthNet: moneyToString(cashflow.totalNet),
         savingsRate: cashflow.savingsRate === null ? null : cashflow.savingsRate.toFixed(4),
+        // 六项分项：让用户看到钱落在哪一栏，发现重复建账可自行纠正
+        breakdown: {
+          accountAssets: moneyToString(netWorth.accountAssets),
+          securitiesValue: moneyToString(netWorth.securitiesValue),
+          otherAssets: moneyToString(netWorth.otherAssets),
+          accountLiabilities: moneyToString(netWorth.accountLiabilities),
+          otherLiabilities: moneyToString(netWorth.otherLiabilities),
+        },
+        unpricedAssets: netWorth.unpricedAssets,
+        unpricedLiabilities: netWorth.unpricedLiabilities,
         // 口径必须随数值返回
         basis: {
           asOf: asOf.toISOString(),
@@ -239,6 +251,37 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       converted.push({ type, amount: result.total });
     }
 
+    // 非交易型资产单列为 other 维度：它们不进账户体系，但同样是资产配置的一部分
+    const assets = await app.prisma.asset.findMany({
+      where: { userId, status: 'active' },
+      select: {
+        currency: true,
+        valuations: {
+          orderBy: { valuationDate: 'desc' },
+          select: { valuationDate: true, value: true },
+        },
+      },
+    });
+
+    const assetItems: Array<{ amount: Decimal; currency: string }> = [];
+    for (const asset of assets) {
+      const latest = asset.valuations.find((item) => item.valuationDate.getTime() <= asOf.getTime());
+      if (!latest) continue;
+      assetItems.push({ amount: toDecimal(latest.value.toString()), currency: asset.currency });
+    }
+
+    if (assetItems.length > 0) {
+      const result = await convertMany(app.prisma, {
+        userId,
+        baseCurrency: settings.baseCurrency,
+        asOf,
+        items: assetItems,
+      });
+      if (!result.total.isZero()) {
+        converted.push({ type: 'other_assets', amount: result.total });
+      }
+    }
+
     const total = converted.reduce((sum, item) => sum.plus(item.amount), toDecimal(0));
 
     return ok(
@@ -296,6 +339,106 @@ export default async function dashboardRoutes(app: FastifyInstance) {
             currency: tx.entries[0]?.currency ?? 'CNY',
           };
         }),
+      },
+      request.id,
+    );
+  });
+
+  // ===== 预算预警聚合：复用预算口径，只做裁剪 =====
+  app.get('/dashboard/budget-alerts', { preHandler: app.authenticate }, async (request) => {
+    const { userId } = requireAuth(request);
+    const settings = await getUserContext(app, userId);
+    const alerts = await computeBudgetAlerts(app.prisma, {
+      userId,
+      timezone: settings.timezone,
+      baseCurrency: settings.baseCurrency,
+    });
+
+    const exceeded = alerts.filter((item) => item.level === 'exceeded').length;
+    const warning = alerts.filter((item) => item.level === 'warning').length;
+
+    return ok(
+      {
+        // 仪表板只要前 5 条，完整列表在预算页
+        alerts: alerts.slice(0, 5),
+        counts: { total: alerts.length, exceeded, warning },
+      },
+      request.id,
+    );
+  });
+
+  // ===== 目标进度聚合：按进度与期限排序取前 5 =====
+  app.get('/dashboard/goal-progress', { preHandler: app.authenticate }, async (request) => {
+    const { userId } = requireAuth(request);
+    const settings = await app.prisma.userSettings.findUniqueOrThrow({
+      where: { userId },
+      select: { timezone: true, baseCurrency: true },
+    });
+    const asOf = formatInTimeZone(new Date(), settings.timezone, 'yyyy-MM-dd');
+
+    const goals = await app.prisma.financialGoal.findMany({
+      where: { userId, status: { in: ['active', 'achieved'] } },
+      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
+      take: 20,
+      // 进度计算需要完整的口径字段，缺一个就会在 toCoreInput 里报错
+      select: {
+        id: true,
+        name: true,
+        targetAmount: true,
+        currency: true,
+        targetDate: true,
+        startedAt: true,
+        initialAmount: true,
+        inflationAdjusted: true,
+        inflationRate: true,
+        expectedAnnualReturn: true,
+        monthlyContribution: true,
+        fundingSource: true,
+        accountId: true,
+        portfolioId: true,
+        achievedAt: true,
+        status: true,
+      },
+    });
+
+    const items: Array<{
+      id: string;
+      name: string;
+      currency: string;
+      targetAmount: string;
+      progress: string | null;
+      isAchieved: boolean;
+      targetDate: string | null;
+      monthsRemaining: number | null;
+    }> = [];
+
+    for (const goal of goals) {
+      const progress = await computeGoalProgress(app.prisma, { userId, goal: goal as never, asOf });
+      items.push({
+        id: goal.id,
+        name: goal.name,
+        currency: goal.currency,
+        targetAmount: moneyToString(goal.targetAmount),
+        progress: progress.progress,
+        isAchieved: progress.isAchieved,
+        targetDate: goal.targetDate ? goal.targetDate.toISOString().slice(0, 10) : null,
+        monthsRemaining: progress.monthsRemaining,
+      });
+    }
+
+    // 已达成排后；其余按「剩余月数升序」——临近期限的最需要提醒
+    const sorted = [...items].sort((a, b) => {
+      if (a.isAchieved !== b.isAchieved) return a.isAchieved ? 1 : -1;
+      return (a.monthsRemaining ?? Number.MAX_SAFE_INTEGER) - (b.monthsRemaining ?? Number.MAX_SAFE_INTEGER);
+    });
+
+    return ok(
+      {
+        goals: sorted.slice(0, 5),
+        counts: {
+          active: items.filter((item) => !item.isAchieved).length,
+          achieved: items.filter((item) => item.isAchieved).length,
+        },
       },
       request.id,
     );

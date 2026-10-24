@@ -357,7 +357,7 @@ describe('目标预测', () => {
     expect(body.deterministic).not.toBeNull();
     expect(body.deterministic.requiredMonthly).not.toBeNull();
     expect(Number(body.deterministic.requiredMonthly)).toBeGreaterThan(0);
-    expect(body.deterministic.basis.engine).toBe('compound-v1');
+    expect(body.deterministic.basis.engine).toBe('compound-v2');
     expect(body.deterministic.timeline.length).toBeGreaterThan(0);
     expect(body.probabilistic).toBeNull();
     expect(body.unavailableReasons).toContain('no_matching_run');

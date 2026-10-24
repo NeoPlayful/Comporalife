@@ -1,0 +1,52 @@
+{
+  "title": "Liabilities",
+  "subtitle": "Non-account liabilities such as mortgages, counted into net worth by balance snapshot",
+  "new_liability": "Add liability",
+  "show_archived": "Show archived",
+  "archived_badge": "Archived",
+  "archive": "Archive",
+  "archive_confirm": "Archive \"{{name}}\"? It will no longer count toward net worth; balance history is kept.",
+  "notice_no_account": "Register mortgages and loans here. Only accounts whose balance changes with bookkeeping should be created as accounts, otherwise net worth will be double deducted.",
+  "latest_snapshot": "Latest balance {{balance}} {{currency}} ({{date}})",
+  "never_snapshotted": "No balance recorded yet — not counted in net worth",
+  "interest_rate_ref": "Annual rate {{rate}}% (reference only, not used in calculations)",
+  "kinds": {
+    "mortgage": "Mortgage",
+    "consumer_loan": "Consumer loan",
+    "auto_loan": "Auto loan",
+    "credit_line": "Credit line",
+    "other": "Other"
+  },
+  "form": {
+    "name": "Liability name",
+    "kind": "Category",
+    "currency": "Currency",
+    "original_amount": "Original principal",
+    "start_date": "Start date",
+    "interest_rate": "Annual rate",
+    "reference_only": "Reference only, not used in any calculation",
+    "note": "Note",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "snapshot": {
+    "title": "Balances ({{count}})",
+    "date": "Balance date",
+    "balance": "Outstanding balance",
+    "add": "Add balance",
+    "empty": "No balance records yet",
+    "remove": "Delete balance record",
+    "overwrite_confirm": "A balance already exists for this date. Overwrite it?"
+  },
+  "summary": {
+    "total": "Total liabilities",
+    "unpriced": "No balance recorded, excluded from total: {{names}}",
+    "missing_rate": "Missing exchange rate, excluded from total: {{currencies}}",
+    "basis": "Based on balances as of {{date}}, converted to {{currency}}"
+  },
+  "empty": {
+    "title": "No liabilities yet",
+    "description": "Register mortgages or other non-account liabilities to include them in net worth."
+  }
+}

@@ -44,9 +44,11 @@
     "action": "Categorize"
   },
   "alerts": {
-    "title": "Budget alerts",
-    "total_scope": "Total budget",
-    "empty": "No alerts this period"
+    "title": "Current period alerts",
+    "total_exceeded": "Total budget exceeded: spent {{spent}} of {{available}} {{currency}}",
+    "total_warning": "Total budget nearing limit: spent {{spent}} of {{available}} {{currency}}",
+    "category_exceeded": "{{name}} exceeded: spent {{spent}} of {{available}} {{currency}}",
+    "category_warning": "{{name}} nearing limit: spent {{spent}} of {{available}} {{currency}}"
   },
   "carryover": {
     "title": "Carryover",

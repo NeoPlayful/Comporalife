@@ -13,6 +13,10 @@ export interface AdminUser {
   lastLoginIp: string | null;
   createdAt: string;
   sessionCount?: number;
+  /** 注销申请时间；非空表示有待审批的申请 */
+  deletionRequestedAt?: string | null;
+  /** 冷却期是否已满，由服务端计算 */
+  coolingOffElapsed?: boolean;
 }
 
 export interface DashboardOverview {
@@ -67,8 +71,15 @@ export const adminApi = {
     ),
   userAuditLogs: (id: string) =>
     api.get<{ logs: Array<{ id: string; action: string; createdAt: string }> }>(`/api/admin/users/${id}/audit-logs`),
-  reviewDeletion: (id: string) =>
-    api.post<{ id: string; status: string; disposition: string }>(`/api/admin/users/${id}/deletion-review`, {}),
+  reviewDeletion: (id: string, decision: 'approve' | 'reject', note?: string) =>
+    api.post<{ id: string; decision: string; status: string; disposition?: string }>(
+      `/api/admin/users/${id}/deletion-review`,
+      { decision, ...(note ? { note } : {}) },
+    ),
+  sendPasswordReset: (id: string) =>
+    api.post<{ triggered: boolean }>(`/api/admin/users/${id}/send-password-reset`, {}),
+  retryJob: (id: string) =>
+    api.post<{ id: string; status: string; attempts: number }>(`/api/admin/jobs/${id}/retry`, {}),
 
   admins: () =>
     api.get<{ admins: Array<{ id: string; email: string; nickname: string; role: AdminRole; status: string; createdAt: string }> }>(
@@ -94,4 +105,7 @@ export const adminApi = {
   registration: () => api.get<{ enabled: boolean }>('/api/admin/settings/registration'),
   setRegistration: (enabled: boolean) =>
     api.patch<{ enabled: boolean }>('/api/admin/settings/registration', { enabled }),
+  emailVerification: () => api.get<{ enabled: boolean }>('/api/admin/settings/email-verification'),
+  setEmailVerification: (enabled: boolean) =>
+    api.patch<{ enabled: boolean }>('/api/admin/settings/email-verification', { enabled }),
 };
