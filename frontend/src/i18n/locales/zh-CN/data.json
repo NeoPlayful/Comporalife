@@ -1,0 +1,163 @@
+{
+  "title": "数据管理",
+  "subtitle": "检查数据质量、导出明文数据、创建可还原的加密备份",
+  "tabs": {
+    "quality": "数据质量",
+    "export": "数据导出",
+    "backup": "备份与恢复",
+    "jobs": "任务"
+  },
+  "quality": {
+    "title": "数据质量",
+    "checked_at": "检查时间：{{time}}",
+    "lookback": "回看 {{months}} 个月",
+    "recheck": "重新检查",
+    "rechecking": "已提交检查",
+    "metrics": {
+      "uncategorized": "未分类流水",
+      "duplicates": "疑似重复",
+      "missing_months": "缺失月份",
+      "stale_valuations": "过期估值",
+      "rate_lag": "汇率滞后",
+      "import_failures": "导入失败批次"
+    },
+    "rules": {
+      "posted_income_expense_without_category": "已过账的收入与支出中没有分类的记录",
+      "same_account_amount_within_3_days": "同账户、同金额、日期相差不超过 3 天",
+      "complete_months_without_entries_12m": "最近完整月份中，某账户整月没有任何流水",
+      "price_age_over_7_days": "组合估值日期距今超过 7 天",
+      "rate_age_over_7_days": "汇率日期距今超过 7 天",
+      "failed_import_batches": "状态为失败的导入批次"
+    },
+    "unavailable": {
+      "no_accounts": "还没有账户，无法判断缺失月份"
+    },
+    "drilldown": "查看明细",
+    "items": "{{count}} 条",
+    "detail_title": "问题明细",
+    "no_issues": "这一类没有发现问题",
+    "unclassified": "未分类",
+    "duplicate_pair": "与另一笔流水重复",
+    "day_gap": "相差 {{days}} 天",
+    "missing_months_by_account": "{{name}}：{{months}}",
+    "stale_portfolio": "{{name}} · 估值 {{date}}（{{days}} 天前）",
+    "never_valued": "从未估值",
+    "rate_pair": "{{from}} → {{to}} · {{status}}",
+    "rate_missing": "没有汇率",
+    "rate_days": "{{days}} 天前",
+    "load_more": "加载更多"
+  },
+  "export": {
+    "title": "数据导出",
+    "hint": "导出是明文 CSV 包，方便查看与交给其他工具；需要能原样还原请使用备份",
+    "scope": "导出范围",
+    "scopes": {
+      "full": "全量",
+      "ledger": "账本与账户",
+      "investments": "投资组合与标的",
+      "simulations": "模拟方案",
+      "planning": "目标与报表",
+      "settings": "设置与偏好"
+    },
+    "from": "开始日期",
+    "to": "结束日期",
+    "range_hint": "日期区间只作用于账户、流水、投资交易与估值",
+    "include_archived": "包含已归档数据",
+    "create": "生成导出",
+    "creating": "生成中…",
+    "sync_done": "导出已生成，共 {{rows}} 行",
+    "async_queued": "数据量较大，已提交后台任务，共约 {{rows}} 行",
+    "list_title": "导出记录",
+    "empty": "还没有导出记录",
+    "download": "下载 ZIP",
+    "delete": "删除",
+    "row_count": "{{rows}} 行",
+    "size": "{{size}}",
+    "status": {
+      "queued": "排队中",
+      "running": "生成中",
+      "ready": "可下载",
+      "failed": "失败",
+      "expired": "已过期"
+    },
+    "expires": "{{time}} 到期",
+    "manifest": "包内文件",
+    "completeness_title": "完整性声明",
+    "complete": "数据完整",
+    "incomplete": "存在缺失项",
+    "missing_months": "缺失月份：{{months}}",
+    "excluded": "未包含：{{items}}"
+  },
+  "backup": {
+    "title": "备份与恢复",
+    "hint": "备份是加密的逻辑数据包，可在需要时原样还原；导出不能当备份用",
+    "create": "创建备份",
+    "creating": "创建中…",
+    "created": "备份任务已提交",
+    "list_title": "备份记录",
+    "empty": "还没有备份",
+    "download": "下载密文",
+    "delete": "删除",
+    "restore": "恢复",
+    "restore_count": "已恢复 {{count}} 次",
+    "never_restored": "从未恢复",
+    "status": {
+      "creating": "创建中",
+      "ready": "可用",
+      "failed": "失败",
+      "expired": "已过期"
+    },
+    "wizard": {
+      "title": "恢复向导",
+      "step1": "确认备份",
+      "step2": "预览影响面",
+      "step3": "选择范围并确认",
+      "previewing": "正在比对现有数据…",
+      "created_at": "备份创建于 {{time}}",
+      "domains": "受影响的数据域",
+      "domain": "数据域",
+      "insert": "新增",
+      "overwrite": "覆盖",
+      "conflict": "冲突",
+      "conflicts_title": "冲突明细（同名不同 ID）",
+      "truncated": "冲突较多，仅显示前若干条",
+      "warning": "恢复不会删除备份之后新增的数据，也不会把系统重置到备份那一刻",
+      "select_domains": "选择要恢复的数据域",
+      "policy": "遇到已存在的数据",
+      "policy_skip": "跳过（保留现有）",
+      "policy_overwrite": "覆盖（用备份内容替换）",
+      "confirm_hint": "请输入 RESTORE 以确认执行",
+      "confirm_placeholder": "输入 RESTORE",
+      "execute": "执行恢复",
+      "executing": "恢复中…",
+      "result": "恢复完成：写入 {{written}} 条，跳过 {{skipped}} 条",
+      "cancel": "取消",
+      "next": "下一步",
+      "back": "上一步"
+    }
+  },
+  "jobs": {
+    "title": "任务",
+    "filter_all": "全部",
+    "filter_running": "进行中",
+    "filter_failed": "失败",
+    "empty": "没有任务",
+    "kinds": {
+      "export": "数据导出",
+      "backup": "备份",
+      "restore": "恢复",
+      "recheck": "质量检查",
+      "monte-carlo": "风险模拟"
+    },
+    "status": {
+      "queued": "排队中",
+      "running": "运行中",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "cancel": "取消",
+    "retry": "重试",
+    "progress": "{{percent}}%"
+  }
+}

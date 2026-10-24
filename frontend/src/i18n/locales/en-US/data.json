@@ -1,0 +1,163 @@
+{
+  "title": "Data Management",
+  "subtitle": "Check data quality, export plain data, and create restorable encrypted backups",
+  "tabs": {
+    "quality": "Quality",
+    "export": "Export",
+    "backup": "Backup & Restore",
+    "jobs": "Jobs"
+  },
+  "quality": {
+    "title": "Data quality",
+    "checked_at": "Checked at {{time}}",
+    "lookback": "Last {{months}} months",
+    "recheck": "Re-check",
+    "rechecking": "Check submitted",
+    "metrics": {
+      "uncategorized": "Uncategorized",
+      "duplicates": "Possible duplicates",
+      "missing_months": "Missing months",
+      "stale_valuations": "Stale valuations",
+      "rate_lag": "Rate lag",
+      "import_failures": "Failed imports"
+    },
+    "rules": {
+      "posted_income_expense_without_category": "Posted income or expense without a category",
+      "same_account_amount_within_3_days": "Same account and amount within 3 days",
+      "complete_months_without_entries_12m": "A complete month with no entries for an account",
+      "price_age_over_7_days": "Portfolio valuation older than 7 days",
+      "rate_age_over_7_days": "Exchange rate older than 7 days",
+      "failed_import_batches": "Import batches in failed state"
+    },
+    "unavailable": {
+      "no_accounts": "No accounts yet, so missing months cannot be determined"
+    },
+    "drilldown": "View details",
+    "items": "{{count}} items",
+    "detail_title": "Issues",
+    "no_issues": "Nothing found in this category",
+    "unclassified": "Uncategorized",
+    "duplicate_pair": "Duplicates another transaction",
+    "day_gap": "{{days}} day(s) apart",
+    "missing_months_by_account": "{{name}}: {{months}}",
+    "stale_portfolio": "{{name}} · valued {{date}} ({{days}} days ago)",
+    "never_valued": "Never valued",
+    "rate_pair": "{{from}} → {{to}} · {{status}}",
+    "rate_missing": "No rate",
+    "rate_days": "{{days}} days ago",
+    "load_more": "Load more"
+  },
+  "export": {
+    "title": "Data export",
+    "hint": "A plain CSV bundle for reading and using elsewhere; use backups when you need an exact restore",
+    "scope": "Scope",
+    "scopes": {
+      "full": "Everything",
+      "ledger": "Ledger and accounts",
+      "investments": "Portfolios and instruments",
+      "simulations": "Simulation scenarios",
+      "planning": "Goals and reports",
+      "settings": "Settings"
+    },
+    "from": "From",
+    "to": "To",
+    "range_hint": "The date range applies only to accounts, transactions, trades and valuations",
+    "include_archived": "Include archived data",
+    "create": "Create export",
+    "creating": "Creating…",
+    "sync_done": "Export ready with {{rows}} rows",
+    "async_queued": "Large dataset queued as a background job, about {{rows}} rows",
+    "list_title": "Exports",
+    "empty": "No exports yet",
+    "download": "Download ZIP",
+    "delete": "Delete",
+    "row_count": "{{rows}} rows",
+    "size": "{{size}}",
+    "status": {
+      "queued": "Queued",
+      "running": "Running",
+      "ready": "Ready",
+      "failed": "Failed",
+      "expired": "Expired"
+    },
+    "expires": "Expires {{time}}",
+    "manifest": "Files in bundle",
+    "completeness_title": "Completeness",
+    "complete": "Data complete",
+    "incomplete": "Missing items",
+    "missing_months": "Missing months: {{months}}",
+    "excluded": "Not included: {{items}}"
+  },
+  "backup": {
+    "title": "Backup & Restore",
+    "hint": "A backup is an encrypted logical package that can be restored exactly; an export is not a backup",
+    "create": "Create backup",
+    "creating": "Creating…",
+    "created": "Backup task submitted",
+    "list_title": "Backups",
+    "empty": "No backups yet",
+    "download": "Download encrypted file",
+    "delete": "Delete",
+    "restore": "Restore",
+    "restore_count": "Restored {{count}} time(s)",
+    "never_restored": "Never restored",
+    "status": {
+      "creating": "Creating",
+      "ready": "Ready",
+      "failed": "Failed",
+      "expired": "Expired"
+    },
+    "wizard": {
+      "title": "Restore wizard",
+      "step1": "Confirm backup",
+      "step2": "Preview impact",
+      "step3": "Choose scope and confirm",
+      "previewing": "Comparing against current data…",
+      "created_at": "Backup created {{time}}",
+      "domains": "Affected domains",
+      "domain": "Domain",
+      "insert": "Insert",
+      "overwrite": "Overwrite",
+      "conflict": "Conflict",
+      "conflicts_title": "Conflicts (same name, different ID)",
+      "truncated": "Many conflicts; only the first few are shown",
+      "warning": "Restore never deletes data added after the backup, and does not reset the system to that moment",
+      "select_domains": "Select domains to restore",
+      "policy": "When data already exists",
+      "policy_skip": "Skip (keep existing)",
+      "policy_overwrite": "Overwrite (use backup content)",
+      "confirm_hint": "Type RESTORE to confirm",
+      "confirm_placeholder": "Type RESTORE",
+      "execute": "Run restore",
+      "executing": "Restoring…",
+      "result": "Restore finished: {{written}} written, {{skipped}} skipped",
+      "cancel": "Cancel",
+      "next": "Next",
+      "back": "Back"
+    }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "filter_all": "All",
+    "filter_running": "Running",
+    "filter_failed": "Failed",
+    "empty": "No jobs",
+    "kinds": {
+      "export": "Export",
+      "backup": "Backup",
+      "restore": "Restore",
+      "recheck": "Quality check",
+      "monte-carlo": "Risk simulation"
+    },
+    "status": {
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "progress": "{{percent}}%"
+  }
+}

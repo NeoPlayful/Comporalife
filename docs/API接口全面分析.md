@@ -429,7 +429,7 @@
 | GET | `/api/market-data/status` | 行情与汇率更新状态 |
 
 
-## 21、数据导出、备份与恢复 (Data Management)
+## 21、数据导出、备份与恢复 (Data Management) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -447,9 +447,14 @@
 | DELETE | `/api/backups/:id` | 删除备份 |
 | GET | `/api/data-quality/summary` | 重复、未分类、对账异常总览 |
 | POST | `/api/data-quality/recheck` | 异步重跑数据质量检查 |
+| GET | `/api/data-quality/uncategorized` | 未分类流水明细 |
+| GET | `/api/data-quality/duplicates` | 疑似重复流水 |
+| GET | `/api/data-quality/missing-months` | 缺失月份清单 |
+| GET | `/api/data-quality/stale-valuations` | 过期估值清单 |
+| GET | `/api/data-quality/rate-lag` | 汇率滞后清单 |
 
 
-## 22、后台任务 (Jobs)
+## 22、后台任务 (Jobs) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -458,8 +463,10 @@
 | POST | `/api/jobs/:id/cancel` | 取消可取消任务 |
 | POST | `/api/jobs/:id/retry` | 重试失败的本人任务 |
 
+> 任务列表用读模型合并 `job_tasks` 与 `monte_carlo_runs`；写操作按 `kind` 分派到各自实现。
 
-## 23、通知与审计 (Notifications & Audit)
+
+## 23、通知与审计 (Notifications & Audit) — 审计已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -468,6 +475,8 @@
 | POST | `/api/notifications/read-all` | 全部标记已读 |
 | GET | `/api/audit-logs` | 查询个人敏感操作日志 |
 | GET | `/api/audit-logs/:id` | 审计事件详情 |
+
+> 审计查询只返回白名单字段，IP 脱敏到网段，不返回金额与流水内容。
 
 
 ## 24、系统设置 (Settings)
@@ -486,7 +495,7 @@
 | PATCH | `/api/settings/privacy` | 修改隐私偏好 |
 
 
-## 25、平台管理后台 (Admin Console)
+## 25、平台管理后台 (Admin Console) — 已实现
 
 > 统一账户系统：`super_admin` / `admin` / `user`。所有 `/api/admin/*` 必须验证平台管理员角色；管理员默认无权查看用户财务流水、余额、持仓和模拟数据。除特别说明，`admin` 和 `super_admin` 均可访问；角色授予、撤销仅限 `super_admin`。
 

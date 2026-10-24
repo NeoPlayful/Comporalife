@@ -782,7 +782,7 @@ describe('能力声明', () => {
     const res = await app.inject({ method: 'GET', url: '/api/system/capabilities' });
     const data = res.json().data;
 
-    expect(data.phase).toBe('phase-6');
+    expect(data.phase).toBe('phase-7');
     expect(data.available).toContain('portfolios');
     expect(data.available).toContain('instruments');
     expect(data.planned).not.toContain('portfolios');

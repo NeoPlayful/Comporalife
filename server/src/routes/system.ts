@@ -3,6 +3,14 @@ import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import {
   ANALYTICS_MAX_RANGE_DAYS,
+  BACKUP_RETENTION_COUNT,
+  BACKUP_RETENTION_DAYS,
+  EXPORT_MAX_ROWS,
+  EXPORT_RETENTION_DAYS,
+  EXPORT_SYNC_MAX_ROWS,
+  QUALITY_LOOKBACK_MONTHS,
+  RESTORE_PREVIEW_LIMIT,
+  TASK_MAX_ATTEMPTS,
   ANALYTICS_MAX_SERIES_POINTS,
   INVESTMENT_MAX_CASHFLOWS,
   INVESTMENT_MAX_SERIES_POINTS,
@@ -35,7 +43,7 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-6';
+const PHASE = 'phase-7';
 
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断
@@ -96,8 +104,13 @@ export default async function systemRoutes(app: FastifyInstance) {
           'monte-carlo',
           'goals',
           'reports',
+          'exports',
+          'backups',
+          'data-quality',
+          'jobs',
+          'admin',
         ],
-        planned: ['admin'],
+        planned: [],
         baseCurrencyDefault: env.DEFAULT_CURRENCY,
         maxSimulationYears: 100,
         importLimits: {
@@ -135,6 +148,22 @@ export default async function systemRoutes(app: FastifyInstance) {
           maxRows: REPORT_MAX_ROWS,
           retention: REPORT_RETENTION,
           formats: ['csv', 'xlsx'],
+        },
+        exportLimits: {
+          syncMaxRows: EXPORT_SYNC_MAX_ROWS,
+          maxRows: EXPORT_MAX_ROWS,
+          retentionDays: EXPORT_RETENTION_DAYS,
+        },
+        backupLimits: {
+          retentionCount: BACKUP_RETENTION_COUNT,
+          retentionDays: BACKUP_RETENTION_DAYS,
+          previewLimit: RESTORE_PREVIEW_LIMIT,
+        },
+        taskLimits: {
+          maxAttempts: TASK_MAX_ATTEMPTS,
+        },
+        qualityLimits: {
+          lookbackMonths: QUALITY_LOOKBACK_MONTHS,
         },
       },
       request.id,

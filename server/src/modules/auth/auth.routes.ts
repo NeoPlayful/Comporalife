@@ -5,6 +5,7 @@ import { ok } from '../../lib/api-utils.js';
 import { AppError, errors } from '../../lib/errors.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { clearRefreshCookie, setRefreshCookie } from '../../lib/session.js';
+import { isRegistrationEnabled } from '../settings/system-settings.service.js';
 import { AuthService } from './auth.service.js';
 import {
   changePasswordSchema,
@@ -19,6 +20,11 @@ export default async function authRoutes(app: FastifyInstance) {
   const service = new AuthService(app.prisma, app.redis);
 
   app.post('/register', async (request, reply) => {
+    // 注册开关是部署级配置，关闭时直接拒绝，不进入参数校验之后的任何流程
+    if (!(await isRegistrationEnabled(app.prisma))) {
+      throw errors.registrationDisabled();
+    }
+
     const body = registerSchema.parse(request.body);
     const { user } = await service.register(body);
 

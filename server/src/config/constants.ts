@@ -308,3 +308,78 @@ export const REPORT_TYPES = [
   'simulation',
 ] as const;
 export const REPORT_FORMATS = ['csv', 'xlsx'] as const;
+
+// ===== 数据管理与运维 =====
+
+/** 同步导出的行数阈值，超过走异步任务 */
+export const EXPORT_SYNC_MAX_ROWS = envInt('EXPORT_SYNC_MAX_ROWS', 20_000);
+
+/** 单次导出的行数上限 */
+export const EXPORT_MAX_ROWS = envInt('EXPORT_MAX_ROWS', 200_000);
+
+/** 导出文件保留天数 */
+export const EXPORT_RETENTION_DAYS = envInt('EXPORT_RETENTION_DAYS', 7);
+
+/** 每用户保留的备份份数 */
+export const BACKUP_RETENTION_COUNT = envInt('BACKUP_RETENTION_COUNT', 10);
+
+/** 备份文件保留天数 */
+export const BACKUP_RETENTION_DAYS = envInt('BACKUP_RETENTION_DAYS', 90);
+
+/** 备份包结构版本，恢复时校验 */
+export const BACKUP_SCHEMA_VERSION = 'comporalife-backup-v1';
+
+/** 导出包结构版本 */
+export const EXPORT_SCHEMA_VERSION = 'comporalife-export-v1';
+
+/** 恢复预览中冲突条目上限 */
+export const RESTORE_PREVIEW_LIMIT = envInt('RESTORE_PREVIEW_LIMIT', 200);
+
+/** 恢复批量写入大小 */
+export const RESTORE_BATCH_SIZE = envInt('RESTORE_BATCH_SIZE', 500);
+
+/** 恢复确认标记：必须精确匹配才执行 */
+export const RESTORE_CONFIRM_TOKEN = 'RESTORE';
+
+/** 通用任务最大重试次数 */
+export const TASK_MAX_ATTEMPTS = envInt('TASK_MAX_ATTEMPTS', 3);
+
+/** 通用任务并发上限 */
+export const TASK_MAX_CONCURRENT = envInt('TASK_MAX_CONCURRENT', 2);
+
+/** 通用任务超时 */
+export const TASK_TIMEOUT_SECONDS = envInt('TASK_TIMEOUT_SECONDS', 600);
+
+/** 通用任务分片时间预算 */
+export const TASK_CHUNK_MS = envInt('TASK_CHUNK_MS', 15);
+
+/** 通用任务进度写入节流 */
+export const TASK_PROGRESS_INTERVAL_MS = envInt('TASK_PROGRESS_INTERVAL_MS', 400);
+
+/** 通用任务心跳超时 */
+export const TASK_HEARTBEAT_TIMEOUT_SECONDS = envInt('TASK_HEARTBEAT_TIMEOUT_SECONDS', 60);
+
+/** 疑似重复的日期窗口（天） */
+export const DUPLICATE_WINDOW_DAYS = envInt('DUPLICATE_WINDOW_DAYS', 3);
+
+/** 汇率滞后的天数阈值 */
+export const RATE_STALE_DAYS = envInt('RATE_STALE_DAYS', 7);
+
+/** 数据质量总览默认回看的月数 */
+export const QUALITY_LOOKBACK_MONTHS = envInt('QUALITY_LOOKBACK_MONTHS', 12);
+
+/** 单个质量问题明细的默认条数 */
+export const QUALITY_ITEM_LIMIT = envInt('QUALITY_ITEM_LIMIT', 100);
+
+/** 审计日志查询的默认条数 */
+export const AUDIT_LOG_PAGE_SIZE = envInt('AUDIT_LOG_PAGE_SIZE', 50);
+
+/** 注册开关在 system_settings 中的键 */
+export const SETTING_REGISTRATION_ENABLED = 'registration.enabled';
+
+export const EXPORT_STATUSES = ['queued', 'running', 'ready', 'failed', 'expired'] as const;
+export const EXPORT_SCOPES = ['full', 'ledger', 'investments', 'simulations', 'planning', 'settings'] as const;
+export const BACKUP_STATUSES = ['creating', 'ready', 'failed', 'expired'] as const;
+export const BACKUP_FORMATS = ['json_encrypted'] as const;
+export const TASK_KINDS = ['export', 'backup', 'restore', 'recheck'] as const;
+export const TASK_STATUSES = ['queued', 'running', 'succeeded', 'failed', 'cancelled'] as const;

@@ -38,7 +38,9 @@ async function main() {
         email,
         passwordHash,
         nickname: '演示用户',
-        role: 'user',
+        // 演示账号同时作为超级管理员，便于体验管理后台；
+        // 管理后台本身不提供任何用户财务数据视图，角色放权不放大数据权限
+        role: 'super_admin',
         status: 'active',
         settings: { create: { baseCurrency: 'CNY', timezone: 'Asia/Shanghai', theme: 'dark' } },
       },
