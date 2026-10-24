@@ -362,36 +362,58 @@
 **导出：** 本阶段不提供 `export` 接口，报表导出归 Phase 6。
 
 
-## 18、财富目标与财务自由 (Financial Goals)
+## 18、财富目标与财务自由 (Financial Goals) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/goals` | 个人目标列表 |
-| POST | `/api/goals` | 创建净资产、储蓄、退休等目标 |
-| GET | `/api/goals/:id` | 目标详情 |
-| PATCH | `/api/goals/:id` | 更新目标金额、期限、假设 |
-| DELETE | `/api/goals/:id` | 删除目标 |
-| GET | `/api/goals/:id/progress` | 实际进度与差距 |
-| POST | `/api/goals/:id/projection` | 预测达标时间和所需定投 |
-| GET | `/api/goals/:id/history` | 目标进度历史 |
-| GET | `/api/financial-independence/overview` | 财务自由指标与缺口 |
-| POST | `/api/financial-independence/calculate` | 退休支出、提取率、通胀敏感性计算 |
+| GET | `/api/goals` | 目标列表（含进度摘要，可按状态与类型筛选） |
+| POST | `/api/goals` | 创建目标（七类：储蓄/购置/教育/退休/应急金/财务自由/自定义） |
+| GET | `/api/goals/:id` | 目标详情与当前进度 |
+| PATCH | `/api/goals/:id` | 更新目标金额、期限、绑定与假设 |
+| DELETE | `/api/goals/:id` | 删除目标（仅删目标，不动账本） |
+| GET | `/api/goals/:id/progress` | 当前金额、完成比例、缺口 |
+| GET | `/api/goals/:id/history` | 按月重算的进度曲线与首次达成时间 |
+| POST | `/api/goals/:id/projection` | 达成时间、所需月供、匹配运行的达标概率 |
+| GET | `/api/goals/summary` | 活跃目标汇总与可投资结余对比 |
+| GET | `/api/financial-independence/overview` | 财务自由指标与敏感性网格 |
+| POST | `/api/financial-independence/calculate` | 按自定义支出/提取率试算（不保存） |
+
+> `/summary` 必须注册在 `/:id` 之前。进度只由账本与组合推导，接口**不接受**进度入参。
+
+**绑定口径：** `net_worth`（净资产增量 + 起算金额）、`account`（账户余额）、`portfolio`（账户现金 + 证券市值）。绑定对象归档时进度返回 `null` 并标注不可用。
+
+**预测分源：** `deterministic` 来自复利引擎（点估计、ETA、所需月供）；`probabilistic` 只取「目标金额 + 年限 + 币种」三者匹配的最近一次成功蒙特卡罗运行，不匹配时返回 `null` 与 `no_matching_run`，**绝不借用不相干运行的概率**。
+
+**财务自由：** 年化支出取最近 12 个完整月，不足 6 个完整月时派生指标全部为 `null`；支出为 0 时覆盖月数为 `null`，不返回 Infinity。
 
 
-## 19、财务报告 (Reports)
+## 19、财务报告 (Reports) — 已实现
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/reports` | 报告列表 |
-| POST | `/api/reports` | 创建个人财务报告 |
-| GET | `/api/reports/:id` | 报告元数据 |
-| GET | `/api/reports/:id/data` | 报告结构化数据 |
-| GET | `/api/reports/:id/download` | 下载报告文件 |
-| DELETE | `/api/reports/:id` | 删除报告 |
-| POST | `/api/reports/net-worth` | 生成资产负债报告 |
-| POST | `/api/reports/cashflow` | 生成现金流报告 |
-| POST | `/api/reports/investment` | 生成投资绩效报告 |
-| POST | `/api/reports/simulation` | 生成模拟分析报告 |
+| GET | `/api/reports` | 报表列表（可按类型筛选） |
+| POST | `/api/reports` | 按通用参数生成报表 |
+| GET | `/api/reports/:id` | 报表元数据与口径（`basis`） |
+| GET | `/api/reports/:id/data` | 冻结的报表数据 |
+| POST | `/api/reports/:id/regenerate` | 用原参数重新生成，更新快照 |
+| GET | `/api/reports/:id/download?format=csv\|xlsx` | 下载报表 |
+| DELETE | `/api/reports/:id` | 删除报表 |
+| POST | `/api/reports/net-worth` | 生成资产负债报表 |
+| POST | `/api/reports/cashflow` | 生成现金流量报表 |
+| POST | `/api/reports/analytics` | 生成收支分析报表 |
+| POST | `/api/reports/investment` | 生成投资绩效报表 |
+| POST | `/api/reports/goals` | 生成目标进度报表 |
+| POST | `/api/reports/simulation` | 生成模拟分析报表 |
+
+> 分类生成接口是固定路径，必须先于 `/:id` 注册。
+
+**快照语义：** `params` / `basis` / `data` 三者一起冻结。生成后修改账本，`/data` 不变；要看最新数据必须显式 `regenerate`。`basis.completeness` 逐项列出缺失月份、缺失汇率、过期估值与无价标的，任一项缺失即 `isComplete = false`。
+
+**导出：** CSV 为 UTF-8 带 BOM、RFC 4180 转义、`
+
+`；以 `= + - @` 开头的文本加单引号前缀（数值不受影响，负数不会被误伤）。XLSX 金额为数值类型可直接求和。文件名同时给 ASCII 与 RFC 5987 中文名。
+
+**模拟导出：** `GET /api/simulations/monte-carlo/:id/export`（方案 JSON）、`GET /api/simulations/monte-carlo/:id/runs/:runId/export`（运行 CSV，首区块含 `modelVersion` 与 `seed`）、`GET /api/simulations/compound/:id/export`（复利 CSV）。
 
 
 ## 20、汇率与行情 (Exchange Rates & Prices)
@@ -674,9 +696,9 @@ GET /api/analytics/income-expense?from=2026-01-01&to=2026-12-31&currency=USD
 | 资产配置与再平衡 (Allocation) | 9 |
 | 资产配置与再平衡 (Allocation) | 5 |
 | 复利与定投模拟 (Compound Simulations) | 10 |
-| 蒙特卡罗模拟 (Monte Carlo) | 13 |
-| 财富目标与财务自由 (Financial Goals) | 10 |
-| 财务报告 (Reports) | 10 |
+| 蒙特卡罗模拟 (Monte Carlo) | 16 |
+| 财富目标与财务自由 (Financial Goals) | 11 |
+| 财务报告 (Reports) | 13 |
 | 汇率与行情 (Exchange Rates & Prices) | 7 |
 | 数据导出、备份与恢复 (Data Management) | 14 |
 | 后台任务 (Jobs) | 4 |
@@ -684,7 +706,7 @@ GET /api/analytics/income-expense?from=2026-01-01&to=2026-12-31&currency=USD
 | 系统设置 (Settings) | 10 |
 | 最小平台管理 (Admin) | 8 |
 | 系统维护 (System) | 4 |
-| **合计** | **256** |
+| **合计** | **260** |
 
 ## 总结
 

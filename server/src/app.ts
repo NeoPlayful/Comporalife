@@ -28,6 +28,9 @@ import profileRoutes from './modules/profile/profile.routes.js';
 import settingsRoutes from './modules/settings/settings.routes.js';
 import simulationsRoutes from './modules/simulations/simulations.routes.js';
 import monteCarloRoutes from './modules/simulations/monte-carlo/monte-carlo.routes.js';
+import simulationExportRoutes from './modules/simulations/simulation-export.routes.js';
+import goalsRoutes from './modules/goals/goals.routes.js';
+import reportsRoutes from './modules/reports/reports.routes.js';
 import { JobExecutor } from './modules/jobs/job.executor.js';
 import { createMonteCarloHandler } from './modules/simulations/monte-carlo/monte-carlo.handler.js';
 import tagsRoutes from './modules/tags/tags.routes.js';
@@ -119,6 +122,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(tradesRoutes, { prefix: API_PREFIX });
     await app.register(simulationsRoutes, { prefix: API_PREFIX });
     await app.register(monteCarloRoutes, { prefix: API_PREFIX });
+    await app.register(simulationExportRoutes, { prefix: API_PREFIX });
+    await app.register(goalsRoutes, { prefix: API_PREFIX });
+    await app.register(reportsRoutes, { prefix: API_PREFIX });
     // 模板路由必须先于 /imports/:id 注册，否则会被参数路由吞掉
     await app.register(templatesRoutes, { prefix: API_PREFIX });
     await app.register(importsRoutes, { prefix: API_PREFIX });

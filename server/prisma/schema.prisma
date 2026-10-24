@@ -159,6 +159,8 @@ model User {
   portfolioTargets    PortfolioTarget[]
   monteCarloScenarios MonteCarloScenario[]
   monteCarloRuns      MonteCarloRun[]
+  financialGoals      FinancialGoal[]
+  reports             Report[]
 
   @@map("users")
 }
@@ -217,6 +219,7 @@ model Account {
   reconciliations AccountReconciliation[]
   importBatches   ImportBatch[]
   portfolios      Portfolio[]
+  financialGoals  FinancialGoal[]
 
   @@index([userId, status])
   @@map("accounts")
@@ -674,6 +677,7 @@ model Portfolio {
   cashflows  PortfolioCashflow[]
   valuations PortfolioValuation[]
   targets    PortfolioTarget[]
+  goals      FinancialGoal[]
 
   @@unique([userId, name])
   @@unique([userId, accountId])
@@ -856,4 +860,95 @@ model MonteCarloRun {
   @@index([scenarioId, createdAt(sort: Desc)])
   @@index([status, createdAt])
   @@map("monte_carlo_runs")
+}
+
+enum GoalType {
+  savings
+  purchase
+  education
+  retirement
+  emergency_fund
+  financial_independence
+  custom
+}
+
+enum GoalFundingSource {
+  net_worth
+  account
+  portfolio
+}
+
+enum GoalStatus {
+  active
+  achieved
+  archived
+}
+
+enum ReportType {
+  net_worth
+  cashflow
+  analytics
+  investment
+  goals
+  simulation
+}
+
+model FinancialGoal {
+  id                   String            @id @default(uuid()) @db.Uuid
+  userId               String            @map("user_id") @db.Uuid
+  name                 String
+  type                 GoalType          @default(savings)
+  targetAmount         Decimal           @map("target_amount") @db.Decimal(20, 6)
+  currency             String            @db.Char(3)
+  targetDate           DateTime?         @map("target_date") @db.Date
+  startedAt            DateTime          @map("started_at") @db.Date
+  // 起算日已计入的金额；进度 = 增量 + 该值，避免历史资产负债拉成负数
+  initialAmount        Decimal           @default(0) @map("initial_amount") @db.Decimal(20, 6)
+  inflationAdjusted    Boolean           @default(false) @map("inflation_adjusted")
+  inflationRate        Decimal?          @map("inflation_rate") @db.Decimal(10, 6)
+  expectedAnnualReturn Decimal?          @map("expected_annual_return") @db.Decimal(10, 6)
+  monthlyContribution  Decimal?          @map("monthly_contribution") @db.Decimal(20, 6)
+  fundingSource        GoalFundingSource @default(net_worth) @map("funding_source")
+  accountId            String?           @map("account_id") @db.Uuid
+  portfolioId          String?           @map("portfolio_id") @db.Uuid
+  priority             Int               @default(1)
+  status               GoalStatus        @default(active)
+  // 按月重算得到，非人工置位；余额回落后保留历史达成日
+  achievedAt           DateTime?         @map("achieved_at") @db.Date
+  note                 String?
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account   Account?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  portfolio Portfolio? @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, name])
+  @@index([userId, status, priority])
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("financial_goals")
+}
+
+model Report {
+  id            String     @id @default(uuid()) @db.Uuid
+  userId        String     @map("user_id") @db.Uuid
+  type          ReportType
+  title         String
+  rangeFrom     DateTime   @map("range_from") @db.Date
+  rangeTo       DateTime   @map("range_to") @db.Date
+  currency      String     @db.Char(3)
+  // 生成参数、口径与数据三者必须一起冻结：只存参数等于用今天的账本重算历史报表
+  params        Json
+  basis         Json
+  data          Json
+  rowCount      Int        @map("row_count")
+  modelVersions Json       @map("model_versions")
+  generatedAt   DateTime   @map("generated_at") @db.Timestamptz(6)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, type, createdAt(sort: Desc)])
+  @@map("reports")
 }

@@ -1,0 +1,127 @@
+{
+  "title": "Financial Goals",
+  "subtitle": "Progress is derived from your ledger and portfolios — it cannot be entered by hand",
+  "tabs": {
+    "goals": "Goals",
+    "fi": "Financial Independence"
+  },
+  "status": {
+    "all": "All",
+    "active": "Active",
+    "achieved": "Achieved",
+    "archived": "Archived"
+  },
+  "summary": {
+    "total_target": "Total target",
+    "total_current": "Current total",
+    "total_gap": "Total gap",
+    "required_monthly": "Required monthly",
+    "investable_surplus": "Investable surplus",
+    "shortfall": "Monthly shortfall",
+    "no_surplus": "Not enough surplus history to compare"
+  },
+  "card": {
+    "funding_unavailable": "Funding unavailable"
+  },
+  "empty": {
+    "title": "No goals yet",
+    "description": "Create your first goal and progress will follow the linked account or portfolio automatically"
+  },
+  "detail": {
+    "empty": "Select a goal on the left",
+    "current": "Current",
+    "target": "Target",
+    "gap": "Gap",
+    "inflation_note": "Inflation-adjusted; original target {{original}} {{currency}}",
+    "funding_unavailable": "Funding unavailable: {{reason}}",
+    "achieved_at": "Achieved on {{date}}",
+    "history": "Progress history",
+    "history_empty": "No progress data yet",
+    "granularity_note": "Recomputed monthly — the actual crossing may have happened earlier in that month",
+    "prediction": "Projection"
+  },
+  "chart": {
+    "actual": "Actual",
+    "target": "Target"
+  },
+  "funding_reason": {
+    "account_archived": "Linked account is archived",
+    "portfolio_archived": "Linked portfolio is archived",
+    "funding_missing": "No linked object",
+    "funding_not_found": "Linked object not found",
+    "currency_mismatch": "Linked currency differs from the goal",
+    "funding_unavailable": "Funding unavailable"
+  },
+  "prediction": {
+    "deterministic_title": "Fixed-return projection",
+    "probabilistic_title": "Random-simulation projection",
+    "deterministic_unavailable": "Enter an annual return to project",
+    "no_expected_return": "No annual return assumption set",
+    "eta": "Expected date",
+    "eta_value": "about {{months}} months ({{date}})",
+    "beyond_horizon": "Beyond projection horizon",
+    "required_monthly": "Required monthly",
+    "projected_value": "Projected value",
+    "infeasible": "The current plan cannot reach the target — raise the monthly amount or extend the horizon",
+    "basis": "{{rate}}% annual · engine {{engine}} · contributions at period end",
+    "no_matching_run": "No matching simulation run, so no probability is shown",
+    "matched_expected": "A run with target {{amount}} {{currency}} over {{years}} years is required",
+    "go_create_run": "Create a simulation run",
+    "probability": "Success probability",
+    "range": "P10 – P90",
+    "median": "Median",
+    "run_basis": "{{paths}} paths · seed {{seed}}"
+  },
+  "fi": {
+    "title": "Financial independence estimate",
+    "subtitle": "Metrics and sensitivity only — never a retirement verdict",
+    "annual_expense": "Annual expense",
+    "target_assets": "Target assets",
+    "progress": "Funded",
+    "coverage_months": "Coverage (months)",
+    "safety_margin": "Safety margin",
+    "withdrawal_rate": "Withdrawal rate",
+    "sensitivity_title": "Withdrawal rate × expense sensitivity",
+    "rate_column": "Rate",
+    "expense_scale": "Expense {{percent}}%",
+    "reasons": {
+      "insufficient_expense_months": "Not enough complete months to annualize expenses reliably",
+      "no_expense_recorded": "No expenses recorded in the recent range",
+      "no_expense_data": "No expense data available"
+    },
+    "disclaimers": {
+      "withdrawal_rate_is_scenario_only": "The withdrawal rate is a planning scenario, not a sustainability promise",
+      "past_expense_not_future_expense": "Past expenses are not future expenses — adjust for your own situation",
+      "not_retirement_advice": "This page is not retirement or investment advice"
+    }
+  },
+  "form": {
+    "name": "Goal name",
+    "type": "Type",
+    "target_amount": "Target amount",
+    "currency": "Currency",
+    "started_at": "Start date",
+    "target_date": "Target date",
+    "initial_amount": "Amount already counted",
+    "priority": "Priority",
+    "funding": "Funding source",
+    "funding_hint": "Linking an account or portfolio updates progress as real balances change",
+    "select_account": "Select an account",
+    "select_portfolio": "Select a portfolio",
+    "assumptions": "Assumptions",
+    "inflation_adjusted": "Adjust target for inflation",
+    "inflation_rate": "Annual inflation",
+    "expected_return": "Expected annual return",
+    "expected_return_hint": "e.g. 0.06 means 6%",
+    "monthly_contribution": "Planned monthly",
+    "note": "Note",
+    "submit": "Save goal"
+  },
+  "actions": {
+    "create": "New goal",
+    "edit": "Edit",
+    "archive": "Archive",
+    "delete": "Delete",
+    "delete_confirm": "This cannot be undone. Delete this goal?"
+  }
+}

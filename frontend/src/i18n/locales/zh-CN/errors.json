@@ -76,5 +76,18 @@
   "MC_PATH_INDEX_INVALID": "路径索引越界",
   "MC_COMPARE_INCOMPATIBLE": "所选运行无法直接对比",
   "MC_STRESS_PRESET_UNKNOWN": "未知的压力情景",
-  "MC_RANGE_INVALID": "区间不合法"
+  "MC_RANGE_INVALID": "区间不合法",
+  "GOAL_NOT_FOUND": "目标不存在",
+  "GOAL_NAME_EXISTS": "该目标名称已存在",
+  "GOAL_PARAMETERS_INVALID": "目标参数不合法",
+  "GOAL_FUNDING_INVALID": "绑定的资金来源不可用",
+  "GOAL_LIMIT_EXCEEDED": "活跃目标已达数量上限",
+  "GOAL_PROJECTION_UNAVAILABLE": "缺少预测所需的参数",
+  "FI_PARAMETERS_INVALID": "财务自由参数不合法",
+  "REPORT_NOT_FOUND": "报表不存在",
+  "REPORT_TYPE_UNSUPPORTED": "不支持的报表类型",
+  "REPORT_PARAMETERS_INVALID": "报表参数不合法",
+  "REPORT_RANGE_INVALID": "统计区间超出允许范围",
+  "REPORT_TOO_LARGE": "报表明细行数过多，请缩小时间区间",
+  "REPORT_FORMAT_UNSUPPORTED": "不支持的导出格式"
 }

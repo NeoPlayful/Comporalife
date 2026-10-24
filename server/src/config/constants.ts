@@ -247,3 +247,64 @@ export const RETURN_MODELS = ['lognormal'] as const;
 export const REBALANCE_FREQUENCIES = ['none', 'monthly', 'quarterly', 'annual'] as const;
 export const STRESS_PRESETS = ['crash', 'stagflation', 'lost_decade'] as const;
 export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
+
+// ===== 财富目标与财务报表 =====
+
+/** 单用户活跃目标上限 */
+export const GOAL_MAX_COUNT = envInt('GOAL_MAX_COUNT', 50);
+
+/** 反推月供的合理性上限，超过视为无解，而不是返回一个伪解 */
+export const GOAL_MAX_REQUIRED_MONTHLY = envInt('GOAL_MAX_REQUIRED_MONTHLY', 1_000_000);
+
+/** 预测与 ETA 的最大月数（50 年） */
+export const GOAL_PROJECTION_MAX_MONTHS = envInt('GOAL_PROJECTION_MAX_MONTHS', 600);
+
+/** 进度历史的最大重算月数 */
+export const GOAL_HISTORY_MAX_MONTHS = envInt('GOAL_HISTORY_MAX_MONTHS', 120);
+
+/** 目标名称长度上限 */
+export const GOAL_NAME_MAX_LENGTH = 80;
+
+/** 默认安全提取率与允许区间 */
+export const FI_DEFAULT_WITHDRAWAL_RATE = 0.04;
+export const FI_MIN_WITHDRAWAL_RATE = 0.02;
+export const FI_MAX_WITHDRAWAL_RATE = 0.1;
+
+/** 年化支出的最小月数：不足时返回 null，不按现有月份外推 */
+export const FI_MIN_EXPENSE_MONTHS = envInt('FI_MIN_EXPENSE_MONTHS', 6);
+
+/** 报表生成与导出的行数上限 */
+export const REPORT_MAX_ROWS = envInt('REPORT_MAX_ROWS', 50_000);
+
+/** 每用户保留的最新报表数 */
+export const REPORT_RETENTION = envInt('REPORT_RETENTION', 100);
+
+/** 同步导出的时间预算（用于告警，不作为中断条件） */
+export const EXPORT_TIMEOUT_MS = envInt('EXPORT_TIMEOUT_MS', 3_000);
+
+/** 报表标题长度上限 */
+export const REPORT_TITLE_MAX_LENGTH = 120;
+
+/** CSV 导出单文件大小预警（字节），超出时日志告警但不阻断 */
+export const EXPORT_MAX_BYTES = envInt('EXPORT_MAX_BYTES', 20 * 1024 * 1024);
+
+export const GOAL_TYPES = [
+  'savings',
+  'purchase',
+  'education',
+  'retirement',
+  'emergency_fund',
+  'financial_independence',
+  'custom',
+] as const;
+export const GOAL_FUNDING_SOURCES = ['net_worth', 'account', 'portfolio'] as const;
+export const GOAL_STATUSES = ['active', 'achieved', 'archived'] as const;
+export const REPORT_TYPES = [
+  'net_worth',
+  'cashflow',
+  'analytics',
+  'investment',
+  'goals',
+  'simulation',
+] as const;
+export const REPORT_FORMATS = ['csv', 'xlsx'] as const;

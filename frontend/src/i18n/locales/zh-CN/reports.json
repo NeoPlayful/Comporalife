@@ -1,0 +1,55 @@
+{
+  "title": "财务报表",
+  "subtitle": "生成即冻结：之后的账本变化不会改变已生成的报表",
+  "types": {
+    "net_worth": "资产负债",
+    "cashflow": "现金流量",
+    "analytics": "收支分析",
+    "investment": "投资绩效",
+    "goals": "目标进度",
+    "simulation": "模拟分析"
+  },
+  "builder": {
+    "type": "报表类型",
+    "from": "开始日期",
+    "to": "结束日期",
+    "generate": "生成报表",
+    "generating": "生成中…",
+    "snapshot_hint": "报表数据在生成时冻结，需最新数据请点击「重新生成」"
+  },
+  "list": {
+    "rows": "{{rows}} 行"
+  },
+  "empty": {
+    "title": "还没有报表",
+    "description": "选择类型与时间区间，生成第一份报表"
+  },
+  "preview": {
+    "title": "数据预览",
+    "empty": "选择左侧报表查看内容",
+    "empty_hint": "或先生成一份新报表",
+    "no_rows": "该区间没有数据",
+    "truncated": "仅预览前 {{shown}} 行，共 {{total}} 行，完整数据请下载文件"
+  },
+  "basis": {
+    "title": "口径说明",
+    "summary": "{{from}} ~ {{to}} · {{currency}} · {{accounts}} 个账户",
+    "missing_months": "缺失月份：{{months}}",
+    "missing_rates": "缺失汇率：{{pairs}}",
+    "stale_valuations": "{{count}} 个组合估值已过期",
+    "unpriced": "缺少价格的标的：{{symbols}}",
+    "models": "模型版本：复利 {{compound}} · 蒙特卡罗 {{monteCarlo}}",
+    "generated": "生成于 {{at}}"
+  },
+  "actions": {
+    "regenerate": "重新生成",
+    "delete": "删除",
+    "delete_confirm": "删除后不可恢复，确认删除该报表？"
+  },
+  "notice": {
+    "generated": "已生成报表，共 {{rows}} 行",
+    "regenerated": "已重新生成，共 {{rows}} 行",
+    "downloaded": "已下载 {{format}}（{{rows}} 行，约 {{size}} KB）",
+    "download_failed": "下载失败，请重试"
+  }
+}

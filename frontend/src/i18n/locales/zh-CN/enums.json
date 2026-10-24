@@ -114,5 +114,36 @@
     "zero_start_value": "起始价值为 0",
     "no_cashflow_sign_change": "现金流方向单一，无法求解",
     "not_converged": "求解未收敛"
+  },
+  "goal_type": {
+    "savings": "储蓄",
+    "purchase": "大额购置",
+    "education": "教育金",
+    "retirement": "退休储备",
+    "emergency_fund": "应急备用金",
+    "financial_independence": "财务自由",
+    "custom": "自定义"
+  },
+  "goal_status": {
+    "active": "进行中",
+    "achieved": "已达成",
+    "archived": "已归档"
+  },
+  "goal_funding_source": {
+    "net_worth": "净资产",
+    "account": "账户余额",
+    "portfolio": "投资组合"
+  },
+  "report_type": {
+    "net_worth": "资产负债",
+    "cashflow": "现金流量",
+    "analytics": "收支分析",
+    "investment": "投资绩效",
+    "goals": "目标进度",
+    "simulation": "模拟分析"
+  },
+  "report_format": {
+    "csv": "CSV",
+    "xlsx": "Excel"
   }
 }

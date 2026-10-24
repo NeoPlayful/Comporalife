@@ -1,0 +1,127 @@
+{
+  "title": "财富目标",
+  "subtitle": "目标进度只由账本与投资组合推导，不接受手工填写",
+  "tabs": {
+    "goals": "目标列表",
+    "fi": "财务自由"
+  },
+  "status": {
+    "all": "全部",
+    "active": "进行中",
+    "achieved": "已达成",
+    "archived": "已归档"
+  },
+  "summary": {
+    "total_target": "目标总额",
+    "total_current": "当前合计",
+    "total_gap": "缺口合计",
+    "required_monthly": "所需月供合计",
+    "investable_surplus": "可投资结余",
+    "shortfall": "月供缺口",
+    "no_surplus": "结余样本不足，暂无法对比"
+  },
+  "card": {
+    "funding_unavailable": "绑定资金不可用"
+  },
+  "empty": {
+    "title": "还没有财富目标",
+    "description": "创建第一个目标，系统会按绑定的账户或组合自动追踪进度"
+  },
+  "detail": {
+    "empty": "从左侧选择一个目标查看详情",
+    "current": "当前金额",
+    "target": "目标金额",
+    "gap": "缺口",
+    "inflation_note": "已按通胀调整，原始目标 {{original}} {{currency}}",
+    "funding_unavailable": "资金不可用：{{reason}}",
+    "achieved_at": "达成于 {{date}}",
+    "history": "进度历史",
+    "history_empty": "暂无进度数据",
+    "granularity_note": "按月重算，实际达成可能发生在该月内更早的日期",
+    "prediction": "达成预测"
+  },
+  "chart": {
+    "actual": "实际金额",
+    "target": "目标线"
+  },
+  "funding_reason": {
+    "account_archived": "绑定账户已归档",
+    "portfolio_archived": "绑定组合已归档",
+    "funding_missing": "未选择绑定对象",
+    "funding_not_found": "绑定对象不存在",
+    "currency_mismatch": "绑定对象币种与目标不一致",
+    "funding_unavailable": "资金不可用"
+  },
+  "prediction": {
+    "deterministic_title": "按固定收益率推算",
+    "probabilistic_title": "按随机模拟推算",
+    "deterministic_unavailable": "填写年化收益后即可推算",
+    "no_expected_return": "尚未填写年化收益假设",
+    "eta": "预计达成",
+    "eta_value": "约 {{months}} 个月（{{date}}）",
+    "beyond_horizon": "超出预测范围",
+    "required_monthly": "所需月供",
+    "projected_value": "到期金额",
+    "infeasible": "按当前计划无法达成，请提高月供或延长期限",
+    "basis": "年化 {{rate}}% · 引擎 {{engine}} · 期末投入",
+    "no_matching_run": "暂无匹配的模拟运行，因此不展示概率",
+    "matched_expected": "需要一次目标金额 {{amount}} {{currency}}、期限 {{years}} 年的模拟运行",
+    "go_create_run": "去创建模拟运行",
+    "probability": "达标概率",
+    "range": "P10 – P90",
+    "median": "中位数",
+    "run_basis": "{{paths}} 条路径 · 种子 {{seed}}"
+  },
+  "fi": {
+    "title": "财务自由估算",
+    "subtitle": "只给指标与敏感性，不判断是否可以退休",
+    "annual_expense": "年化支出",
+    "target_assets": "目标资产",
+    "progress": "完成度",
+    "coverage_months": "覆盖月数",
+    "safety_margin": "安全边际",
+    "withdrawal_rate": "安全提取率",
+    "sensitivity_title": "提取率 × 支出敏感性",
+    "rate_column": "提取率",
+    "expense_scale": "支出 {{percent}}%",
+    "reasons": {
+      "insufficient_expense_months": "完整月份不足，无法可靠年化支出",
+      "no_expense_recorded": "最近区间没有支出记录",
+      "no_expense_data": "没有可用的支出数据"
+    },
+    "disclaimers": {
+      "withdrawal_rate_is_scenario_only": "提取率仅用于情景规划，不承诺长期可持续",
+      "past_expense_not_future_expense": "历史支出不等于未来支出，请结合自身情况调整",
+      "not_retirement_advice": "本页不构成任何退休或投资建议"
+    }
+  },
+  "form": {
+    "name": "目标名称",
+    "type": "目标类型",
+    "target_amount": "目标金额",
+    "currency": "币种",
+    "started_at": "起算日",
+    "target_date": "目标日期",
+    "initial_amount": "起算日已计入金额",
+    "priority": "优先级",
+    "funding": "资金绑定",
+    "funding_hint": "绑定账户或组合后，进度会随真实余额变化自动更新",
+    "select_account": "选择账户",
+    "select_portfolio": "选择投资组合",
+    "assumptions": "预测假设",
+    "inflation_adjusted": "目标金额随通胀调整",
+    "inflation_rate": "年通胀率",
+    "expected_return": "预期年化收益",
+    "expected_return_hint": "例如 0.06 表示 6%",
+    "monthly_contribution": "计划月供",
+    "note": "备注",
+    "submit": "保存目标"
+  },
+  "actions": {
+    "create": "新建目标",
+    "edit": "编辑",
+    "archive": "归档",
+    "delete": "删除",
+    "delete_confirm": "删除后不可恢复，确认删除该目标？"
+  }
+}
