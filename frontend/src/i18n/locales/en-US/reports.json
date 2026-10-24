@@ -1,0 +1,55 @@
+{
+  "title": "Financial Reports",
+  "subtitle": "Generated reports are frozen — later ledger changes do not rewrite them",
+  "types": {
+    "net_worth": "Net worth",
+    "cashflow": "Cashflow",
+    "analytics": "Spending analysis",
+    "investment": "Investment performance",
+    "goals": "Goal progress",
+    "simulation": "Simulation analysis"
+  },
+  "builder": {
+    "type": "Report type",
+    "from": "From",
+    "to": "To",
+    "generate": "Generate report",
+    "generating": "Generating…",
+    "snapshot_hint": "Data is frozen at generation time — use Regenerate for the latest numbers"
+  },
+  "list": {
+    "rows": "{{rows}} rows"
+  },
+  "empty": {
+    "title": "No reports yet",
+    "description": "Pick a type and date range to generate your first report"
+  },
+  "preview": {
+    "title": "Data preview",
+    "empty": "Select a report to view its contents",
+    "empty_hint": "Or generate a new one first",
+    "no_rows": "No data in this range",
+    "truncated": "Showing first {{shown}} of {{total}} rows — download the file for everything"
+  },
+  "basis": {
+    "title": "Basis",
+    "summary": "{{from}} ~ {{to}} · {{currency}} · {{accounts}} accounts",
+    "missing_months": "Missing months: {{months}}",
+    "missing_rates": "Missing rates: {{pairs}}",
+    "stale_valuations": "{{count}} portfolio valuations are stale",
+    "unpriced": "Unpriced symbols: {{symbols}}",
+    "models": "Model versions: compound {{compound}} · Monte Carlo {{monteCarlo}}",
+    "generated": "Generated at {{at}}"
+  },
+  "actions": {
+    "regenerate": "Regenerate",
+    "delete": "Delete",
+    "delete_confirm": "This cannot be undone. Delete this report?"
+  },
+  "notice": {
+    "generated": "Report generated — {{rows}} rows",
+    "regenerated": "Regenerated — {{rows}} rows",
+    "downloaded": "Downloaded {{format}} ({{rows}} rows, ~{{size}} KB)",
+    "download_failed": "Download failed, please retry"
+  }
+}

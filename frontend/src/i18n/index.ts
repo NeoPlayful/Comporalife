@@ -25,6 +25,8 @@ const NAMESPACES = [
   'imports',
   'compound',
   'monte-carlo',
+  'goals',
+  'reports',
   'settings',
   'enums',
   'errors',

@@ -15,6 +15,11 @@ import {
   MONTE_CARLO_PREVIEW_TIMEOUT_MS,
   MONTE_CARLO_QUEUE_LIMIT,
   MONTE_CARLO_TIMEOUT_SECONDS,
+  GOAL_MAX_COUNT,
+  GOAL_PROJECTION_MAX_MONTHS,
+  FI_MIN_EXPENSE_MONTHS,
+  REPORT_MAX_ROWS,
+  REPORT_RETENTION,
 } from '../config/constants.js';
 import { env } from '../config/env.js';
 import { ok } from '../lib/api-utils.js';
@@ -30,7 +35,7 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-5';
+const PHASE = 'phase-6';
 
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断
@@ -89,8 +94,10 @@ export default async function systemRoutes(app: FastifyInstance) {
           'portfolios',
           'instruments',
           'monte-carlo',
+          'goals',
+          'reports',
         ],
-        planned: ['goals', 'reports', 'admin'],
+        planned: ['admin'],
         baseCurrencyDefault: env.DEFAULT_CURRENCY,
         maxSimulationYears: 100,
         importLimits: {
@@ -116,6 +123,18 @@ export default async function systemRoutes(app: FastifyInstance) {
           maxConcurrentRuns: MONTE_CARLO_MAX_CONCURRENT_RUNS,
           queueLimit: MONTE_CARLO_QUEUE_LIMIT,
           timeoutSeconds: MONTE_CARLO_TIMEOUT_SECONDS,
+        },
+        goalLimits: {
+          maxCount: GOAL_MAX_COUNT,
+          projectionMaxMonths: GOAL_PROJECTION_MAX_MONTHS,
+        },
+        fiLimits: {
+          minExpenseMonths: FI_MIN_EXPENSE_MONTHS,
+        },
+        reportLimits: {
+          maxRows: REPORT_MAX_ROWS,
+          retention: REPORT_RETENTION,
+          formats: ['csv', 'xlsx'],
         },
       },
       request.id,

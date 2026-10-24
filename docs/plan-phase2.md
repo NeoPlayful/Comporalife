@@ -1346,7 +1346,7 @@ IMPORT_ROW_RETENTION_DAYS=365
 | Phase 3 分析与预算 | 分类趋势、商户排行、周期识别、预算执行 | 依赖 Phase 2 的分类覆盖率与商户字段 |
 | Phase 4 投资 | 组合、证券、成本基础、TWR/XIRR | 依赖 Phase 2 的导入框架扩展投资交易模板 |
 | Phase 5 风险模拟 | 蒙特卡罗、分片异步执行 | 复用 Phase 2 的批次状态机思路；**注**：Phase 5 计划已改为进程内执行器，不使用 BullMQ 与 Worker Threads，见 `docs/plan-phase5.md` 第 5.1 节 |
-| Phase 6 目标与报告 | 财富目标、报表导出 | 依赖 Phase 1/2 的账本与分类数据 |
+| Phase 6 目标与报告 | 财富目标、报表导出 | 依赖 Phase 1/2 的账本与分类数据。**注**：Phase 6 已实现六类报表与 CSV/XLSX 导出，不含 PDF，见 `docs/plan-phase6.md` |
 | Phase 7 数据管理与运维 | 备份恢复、导出、管理后台、审计扩展 | 依赖 Phase 2 的加密存储与审计事件 |
 
 ### 需补齐的设计文档

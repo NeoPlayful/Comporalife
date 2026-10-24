@@ -81,6 +81,20 @@ export const ErrorCode = {
   MC_COMPARE_INCOMPATIBLE: 'MC_COMPARE_INCOMPATIBLE',
   MC_STRESS_PRESET_UNKNOWN: 'MC_STRESS_PRESET_UNKNOWN',
   MC_RANGE_INVALID: 'MC_RANGE_INVALID',
+  // ===== 财富目标与财务报表 =====
+  GOAL_NOT_FOUND: 'GOAL_NOT_FOUND',
+  GOAL_NAME_EXISTS: 'GOAL_NAME_EXISTS',
+  GOAL_PARAMETERS_INVALID: 'GOAL_PARAMETERS_INVALID',
+  GOAL_FUNDING_INVALID: 'GOAL_FUNDING_INVALID',
+  GOAL_LIMIT_EXCEEDED: 'GOAL_LIMIT_EXCEEDED',
+  GOAL_PROJECTION_UNAVAILABLE: 'GOAL_PROJECTION_UNAVAILABLE',
+  FI_PARAMETERS_INVALID: 'FI_PARAMETERS_INVALID',
+  REPORT_NOT_FOUND: 'REPORT_NOT_FOUND',
+  REPORT_TYPE_UNSUPPORTED: 'REPORT_TYPE_UNSUPPORTED',
+  REPORT_PARAMETERS_INVALID: 'REPORT_PARAMETERS_INVALID',
+  REPORT_RANGE_INVALID: 'REPORT_RANGE_INVALID',
+  REPORT_TOO_LARGE: 'REPORT_TOO_LARGE',
+  REPORT_FORMAT_UNSUPPORTED: 'REPORT_FORMAT_UNSUPPORTED',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -164,6 +178,19 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   MC_COMPARE_INCOMPATIBLE: 422,
   MC_STRESS_PRESET_UNKNOWN: 422,
   MC_RANGE_INVALID: 400,
+  GOAL_NOT_FOUND: 404,
+  GOAL_NAME_EXISTS: 409,
+  GOAL_PARAMETERS_INVALID: 422,
+  GOAL_FUNDING_INVALID: 422,
+  GOAL_LIMIT_EXCEEDED: 422,
+  GOAL_PROJECTION_UNAVAILABLE: 409,
+  FI_PARAMETERS_INVALID: 422,
+  REPORT_NOT_FOUND: 404,
+  REPORT_TYPE_UNSUPPORTED: 422,
+  REPORT_PARAMETERS_INVALID: 422,
+  REPORT_RANGE_INVALID: 400,
+  REPORT_TOO_LARGE: 422,
+  REPORT_FORMAT_UNSUPPORTED: 415,
 };
 
 export class AppError extends Error {
@@ -356,4 +383,32 @@ export const errors = {
   mcStressPresetUnknown: (key: string) =>
     new AppError(ErrorCode.MC_STRESS_PRESET_UNKNOWN, '未知的压力情景', { key }),
   mcRangeInvalid: (message: string) => new AppError(ErrorCode.MC_RANGE_INVALID, message),
+  // ===== 财富目标与财务报表 =====
+  goalNotFound: () => new AppError(ErrorCode.GOAL_NOT_FOUND, '目标不存在'),
+  goalNameExists: () => new AppError(ErrorCode.GOAL_NAME_EXISTS, '该目标名称已存在'),
+  goalParametersInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.GOAL_PARAMETERS_INVALID, message, details),
+  goalFundingInvalid: (message = '绑定的资金来源不可用', details?: unknown) =>
+    new AppError(ErrorCode.GOAL_FUNDING_INVALID, message, details),
+  goalLimitExceeded: (limit: number) =>
+    new AppError(ErrorCode.GOAL_LIMIT_EXCEEDED, `活跃目标最多 ${limit} 个`, undefined, { limit }),
+  goalProjectionUnavailable: (reason: string) =>
+    new AppError(ErrorCode.GOAL_PROJECTION_UNAVAILABLE, '缺少预测所需的参数', { reason }),
+  fiParametersInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.FI_PARAMETERS_INVALID, message, details),
+  reportNotFound: () => new AppError(ErrorCode.REPORT_NOT_FOUND, '报表不存在'),
+  reportTypeUnsupported: (type: string) =>
+    new AppError(ErrorCode.REPORT_TYPE_UNSUPPORTED, '不支持的报表类型', { type }),
+  reportParametersInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.REPORT_PARAMETERS_INVALID, message, details),
+  reportRangeInvalid: (message: string) => new AppError(ErrorCode.REPORT_RANGE_INVALID, message),
+  reportTooLarge: (rows: number, maxRows: number) =>
+    new AppError(
+      ErrorCode.REPORT_TOO_LARGE,
+      `报表明细 ${rows} 行，超过 ${maxRows} 行上限，请缩小时间区间`,
+      undefined,
+      { rows, maxRows },
+    ),
+  reportFormatUnsupported: (format: string) =>
+    new AppError(ErrorCode.REPORT_FORMAT_UNSUPPORTED, '不支持的导出格式', { format }),
 };

@@ -114,5 +114,36 @@
     "zero_start_value": "Zero start value",
     "no_cashflow_sign_change": "No cashflow sign change",
     "not_converged": "Not converged"
+  },
+  "goal_type": {
+    "savings": "Savings",
+    "purchase": "Major purchase",
+    "education": "Education",
+    "retirement": "Retirement",
+    "emergency_fund": "Emergency fund",
+    "financial_independence": "Financial independence",
+    "custom": "Custom"
+  },
+  "goal_status": {
+    "active": "Active",
+    "achieved": "Achieved",
+    "archived": "Archived"
+  },
+  "goal_funding_source": {
+    "net_worth": "Net worth",
+    "account": "Account balance",
+    "portfolio": "Portfolio"
+  },
+  "report_type": {
+    "net_worth": "Net worth",
+    "cashflow": "Cashflow",
+    "analytics": "Spending analysis",
+    "investment": "Investment performance",
+    "goals": "Goal progress",
+    "simulation": "Simulation analysis"
+  },
+  "report_format": {
+    "csv": "CSV",
+    "xlsx": "Excel"
   }
 }

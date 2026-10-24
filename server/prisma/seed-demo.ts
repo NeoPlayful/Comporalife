@@ -155,7 +155,8 @@ async function main() {
     });
   }
 
-  for (let month = 5; month >= 0; month -= 1) {
+  // 生成 13 个月流水：财务自由需要最近 12 个完整月才能年化支出
+  for (let month = 12; month >= 0; month -= 1) {
     const salaryDate = daysAgo(month * 30 + 5);
     await addIncome(accounts.salary.id, '工资', '18500.00', salaryDate, `${salaryDate.getMonth() + 1} 月工资`);
 
@@ -517,6 +518,104 @@ async function main() {
         durationMs: 420,
         result: serializeResult(outcome.result) as never,
         samplePaths: outcome.result.samplePaths as never,
+      },
+    });
+  }
+
+  // ===== 财富目标 =====
+  // 三个目标分别覆盖：账户绑定（进行中）、组合绑定、已达成，
+  // 让目标页在演示账号下有可对比的进度、缺口与状态。
+  const goalStart = daysAgo(365);
+  const goalStartText = goalStart.toISOString().slice(0, 10);
+  const goalTargetDate = new Date(goalStart.getTime() + 365 * 9 * 86_400_000).toISOString().slice(0, 10);
+
+  await prisma.financialGoal.create({
+    data: {
+      userId: user.id,
+      name: '孩子教育金',
+      type: 'education',
+      targetAmount: '800000',
+      currency: 'CNY',
+      targetDate: new Date(`${goalTargetDate}T00:00:00.000Z`),
+      startedAt: new Date(`${goalStartText}T00:00:00.000Z`),
+      initialAmount: '20000',
+      inflationAdjusted: true,
+      inflationRate: '0.025',
+      expectedAnnualReturn: '0.060000',
+      monthlyContribution: '3000',
+      fundingSource: 'account',
+      accountId: accounts.salary.id,
+      priority: 1,
+      note: '演示数据：按 2.5% 通胀调整的教育金目标',
+    },
+  });
+
+  await prisma.financialGoal.create({
+    data: {
+      userId: user.id,
+      name: '长期投资积累',
+      type: 'savings',
+      targetAmount: '500000',
+      currency: 'CNY',
+      startedAt: new Date(`${goalStartText}T00:00:00.000Z`),
+      initialAmount: '0',
+      expectedAnnualReturn: '0.080000',
+      monthlyContribution: '5000',
+      fundingSource: 'portfolio',
+      portfolioId: portfolio.id,
+      priority: 2,
+      note: '演示数据：绑定到长期投资组合',
+    },
+  });
+
+  await prisma.financialGoal.create({
+    data: {
+      userId: user.id,
+      name: '应急备用金',
+      type: 'emergency_fund',
+      targetAmount: '30000',
+      currency: 'CNY',
+      startedAt: new Date(`${goalStartText}T00:00:00.000Z`),
+      initialAmount: '0',
+      fundingSource: 'account',
+      // 绑到余额为正的工资卡，让演示账号自然呈现「已达成」状态
+      accountId: accounts.salary.id,
+      priority: 3,
+      note: '演示数据：小额目标，用于展示已达成状态',
+    },
+  });
+
+  // ===== 财务报表 =====
+  // 直接调用生成服务落一份冻结快照，保证演示报表与真实生成口径一致，不写死数字。
+  const { generateReport } = await import('../src/modules/reports/report.service.js');
+
+  const reportRange = {
+    from: new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10),
+    to: new Date().toISOString().slice(0, 10),
+  };
+
+  for (const type of ['cashflow', 'net_worth'] as const) {
+    const payload = await generateReport(prisma, {
+      userId: user.id,
+      type,
+      from: reportRange.from,
+      to: reportRange.to,
+    });
+
+    await prisma.report.create({
+      data: {
+        userId: user.id,
+        type: payload.type,
+        title: payload.title,
+        rangeFrom: new Date(`${payload.rangeFrom}T00:00:00.000Z`),
+        rangeTo: new Date(`${payload.rangeTo}T00:00:00.000Z`),
+        currency: payload.basis.currency,
+        params: payload.params as never,
+        basis: payload.basis as never,
+        data: payload.data as never,
+        rowCount: payload.rowCount,
+        modelVersions: payload.modelVersions as never,
+        generatedAt: new Date(payload.basis.generatedAt),
       },
     });
   }

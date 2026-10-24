@@ -4,6 +4,8 @@ import {
   BarChart3,
   Activity,
   Calculator,
+  FileText,
+  Goal as GoalIcon,
   LineChart,
   LayoutDashboard,
   Settings,
@@ -26,6 +28,8 @@ const NAV_ITEMS = [
   { to: '/categories', key: 'categories', icon: Tags },
   { to: '/compound', key: 'compound', icon: Calculator },
   { to: '/monte-carlo', key: 'monte-carlo', icon: Activity },
+  { to: '/goals', key: 'goals', icon: GoalIcon },
+  { to: '/reports', key: 'reports', icon: FileText },
   { to: '/settings', key: 'settings', icon: Settings },
 ] as const;
 

@@ -76,5 +76,18 @@
   "MC_PATH_INDEX_INVALID": "Path index out of range",
   "MC_COMPARE_INCOMPATIBLE": "The selected runs cannot be compared",
   "MC_STRESS_PRESET_UNKNOWN": "Unknown stress scenario",
-  "MC_RANGE_INVALID": "Invalid range"
+  "MC_RANGE_INVALID": "Invalid range",
+  "GOAL_NOT_FOUND": "Goal not found",
+  "GOAL_NAME_EXISTS": "A goal with this name already exists",
+  "GOAL_PARAMETERS_INVALID": "Invalid goal parameters",
+  "GOAL_FUNDING_INVALID": "The linked funding source is unavailable",
+  "GOAL_LIMIT_EXCEEDED": "Active goal limit reached",
+  "GOAL_PROJECTION_UNAVAILABLE": "Missing parameters required for projection",
+  "FI_PARAMETERS_INVALID": "Invalid financial independence parameters",
+  "REPORT_NOT_FOUND": "Report not found",
+  "REPORT_TYPE_UNSUPPORTED": "Unsupported report type",
+  "REPORT_PARAMETERS_INVALID": "Invalid report parameters",
+  "REPORT_RANGE_INVALID": "Date range exceeds the allowed limit",
+  "REPORT_TOO_LARGE": "Report has too many rows — narrow the date range",
+  "REPORT_FORMAT_UNSUPPORTED": "Unsupported export format"
 }
