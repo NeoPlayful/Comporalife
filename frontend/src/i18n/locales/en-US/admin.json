@@ -2,7 +2,8 @@
   "title": "Admin",
   "subtitle": "Accounts and operations only — never user financial data",
   "nav": {
-    "back_to_app": "Back to app"
+    "back_to_app": "Back to app",
+    "badge": "Operations console"
   },
   "dashboard": {
     "title": "Overview",

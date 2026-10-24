@@ -23,7 +23,11 @@ const MonteCarloPage = lazy(() => import('./pages/MonteCarloPage'));
 const GoalsPage = lazy(() => import('./pages/GoalsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const DataPage = lazy(() => import('./pages/DataPage'));
-const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
+const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
+const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
+const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
+const AdminSystemPage = lazy(() => import('./pages/admin/AdminSystemPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
@@ -74,18 +78,23 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
 
-        {/* 管理后台使用独立布局：不进入普通侧边栏，也不复用应用外壳 */}
+        {/* 管理后台复用应用外壳，但导航只保留运维板块，不与理财入口混排 */}
         <Route element={<AdminGuard />}>
           <Route
             path="admin"
             element={
               <ErrorBoundary>
                 <Suspense fallback={<LoadingState />}>
-                  <AdminPage />
+                  <AdminLayout />
                 </Suspense>
               </ErrorBoundary>
             }
-          />
+          >
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="admins" element={<AdminAdminsPage />} />
+            <Route path="system" element={<AdminSystemPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>
