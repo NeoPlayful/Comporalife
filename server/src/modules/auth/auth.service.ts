@@ -123,13 +123,16 @@ export class AuthService {
     const email = input.email.toLowerCase().trim();
     const user = await this.prisma.user.findUnique({ where: { email } });
 
-    // 邮箱不存在与密码错误返回同一错误，避免账号枚举
+    // 邮箱不存在与密码错误返回同一错误，避免账号枚举；
+    // 失败事件只记 IP 与网段，不存邮箱或密码，避免日志本身成为攻击面
     if (!user) {
+      await this.recordLoginFailure(null, input.ip ?? null);
       throw errors.unauthorized('邮箱或密码错误');
     }
 
     const valid = await argon2.verify(user.passwordHash, input.password);
     if (!valid) {
+      await this.recordLoginFailure(user.id, input.ip ?? null);
       throw errors.unauthorized('邮箱或密码错误');
     }
 
@@ -345,6 +348,13 @@ export class AuthService {
 
     // 令牌一次性使用
     await this.redis.del(key);
+  }
+
+  private async recordLoginFailure(userId: string | null, ip: string | null): Promise<void> {
+    // 审计失败不影响登录主流程：写不进去也不能把 401 变成 500
+    await this.prisma.auditLog
+      .create({ data: { userId, action: 'auth.login_failed', ip } })
+      .catch(() => undefined);
   }
 
   async listSessions(userId: string, currentSessionId: string) {

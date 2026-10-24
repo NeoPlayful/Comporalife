@@ -15,6 +15,10 @@ export const JobFailureCode = {
   TIMEOUT: 'MC_TIMEOUT',
   INTERRUPTED: 'MC_INTERRUPTED',
   INTERNAL: 'MC_INTERNAL',
+  // 通用任务的失败码沿用同一组值域，前端按码点翻译
+  TASK_TIMEOUT: 'TASK_TIMEOUT',
+  TASK_INTERNAL: 'TASK_INTERNAL',
+  TASK_INTERRUPTED: 'TASK_INTERRUPTED',
 } as const;
 
 export type JobFailureCodeValue = (typeof JobFailureCode)[keyof typeof JobFailureCode];

@@ -4,6 +4,7 @@ import ErrorBoundary from './components/ui/ErrorBoundary';
 import LoadingState from './components/ui/LoadingState';
 import AppLayout from './components/layout/AppLayout';
 import AuthGuard from './components/layout/AuthGuard';
+import AdminGuard from './components/admin/AdminGuard';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -21,6 +22,8 @@ const CompoundPage = lazy(() => import('./pages/CompoundPage'));
 const MonteCarloPage = lazy(() => import('./pages/MonteCarloPage'));
 const GoalsPage = lazy(() => import('./pages/GoalsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const DataPage = lazy(() => import('./pages/DataPage'));
+const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
@@ -65,9 +68,24 @@ export default function App() {
           <Route path="monte-carlo" element={<MonteCarloPage />} />
           <Route path="goals" element={<GoalsPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="data" element={<DataPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        {/* 管理后台使用独立布局：不进入普通侧边栏，也不复用应用外壳 */}
+        <Route element={<AdminGuard />}>
+          <Route
+            path="admin"
+            element={
+              <ErrorBoundary>
+                <Suspense fallback={<LoadingState />}>
+                  <AdminPage />
+                </Suspense>
+              </ErrorBoundary>
+            }
+          />
         </Route>
       </Route>
     </Routes>

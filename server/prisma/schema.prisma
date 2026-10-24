@@ -161,6 +161,9 @@ model User {
   monteCarloRuns      MonteCarloRun[]
   financialGoals      FinancialGoal[]
   reports             Report[]
+  dataExports         DataExport[]
+  backups             Backup[]
+  jobTasks            JobTask[]
 
   @@map("users")
 }
@@ -951,4 +954,138 @@ model Report {
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, type, createdAt(sort: Desc)])
   @@map("reports")
+}
+
+// ===== 数据管理、备份与运维 =====
+
+enum ExportStatus {
+  queued
+  running
+  ready
+  failed
+  expired
+}
+
+enum ExportScope {
+  full
+  ledger
+  investments
+  simulations
+  planning
+  settings
+}
+
+enum BackupStatus {
+  creating
+  ready
+  failed
+  expired
+}
+
+enum BackupFormat {
+  json_encrypted
+}
+
+enum TaskKind {
+  export
+  backup
+  restore
+  recheck
+}
+
+enum TaskStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+model DataExport {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  scope       ExportScope
+  format      String       @default("csv_zip")
+  status      ExportStatus @default(queued)
+  // 范围参数：起止日期、是否包含归档、实体域清单
+  params      Json
+  // 完成后写入：文件清单、行数、完整性声明
+  manifest    Json?
+  fileKey     String?      @map("file_key")
+  sizeBytes   BigInt?      @map("size_bytes")
+  sha256      String?      @db.Char(64)
+  rowCount    Int?         @map("row_count")
+  failureCode String?      @map("failure_code")
+  expiresAt   DateTime?    @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime?    @map("completed_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([expiresAt])
+  @@map("data_exports")
+}
+
+model Backup {
+  id            String       @id @default(uuid()) @db.Uuid
+  userId        String       @map("user_id") @db.Uuid
+  format        BackupFormat @default(json_encrypted)
+  schemaVersion String       @map("schema_version")
+  // 覆盖的实体域与记录数快照
+  scope         Json
+  fileKey       String       @map("file_key")
+  sizeBytes     BigInt       @map("size_bytes")
+  // 明文逻辑包的摘要：恢复时先解密再校验，避免把乱码当成好包
+  sha256        String       @db.Char(64)
+  status        BackupStatus @default(creating)
+  restoreCount  Int          @default(0) @map("restore_count")
+  lastRestoredAt DateTime?   @map("last_restored_at") @db.Timestamptz(6)
+  expiresAt     DateTime?    @map("expires_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("backups")
+}
+
+model JobTask {
+  id                String     @id @default(uuid()) @db.Uuid
+  userId            String     @map("user_id") @db.Uuid
+  kind              TaskKind
+  status            TaskStatus @default(queued)
+  // 0.0000–1.0000，应用层保证单调不减
+  progress          Decimal    @default(0) @db.Decimal(5, 4)
+  stage             String?
+  targetType        String?    @map("target_type")
+  targetId          String?    @map("target_id") @db.Uuid
+  summary           Json?
+  failureCode       String?    @map("failure_code")
+  failureMessage    String?    @map("failure_message")
+  attempts          Int        @default(0)
+  heartbeatAt       DateTime?  @map("heartbeat_at") @db.Timestamptz(6)
+  startedAt         DateTime?  @map("started_at") @db.Timestamptz(6)
+  finishedAt        DateTime?  @map("finished_at") @db.Timestamptz(6)
+  cancelRequestedAt DateTime?  @map("cancel_requested_at") @db.Timestamptz(6)
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([kind, status])
+  @@map("job_tasks")
+}
+
+model SystemSetting {
+  key       String   @id @db.VarChar(64)
+  value     Json
+  updatedBy String?  @map("updated_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("system_settings")
 }

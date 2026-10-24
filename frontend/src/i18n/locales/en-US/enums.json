@@ -145,5 +145,56 @@
   "report_format": {
     "csv": "CSV",
     "xlsx": "Excel"
+  },
+  "export_status": {
+    "queued": "Queued",
+    "running": "Running",
+    "ready": "Ready",
+    "failed": "Failed",
+    "expired": "Expired"
+  },
+  "export_scope": {
+    "full": "Everything",
+    "ledger": "Ledger and accounts",
+    "investments": "Portfolios and instruments",
+    "simulations": "Simulation scenarios",
+    "planning": "Goals and reports",
+    "settings": "Settings"
+  },
+  "backup_status": {
+    "creating": "Creating",
+    "ready": "Ready",
+    "failed": "Failed",
+    "expired": "Expired"
+  },
+  "task_kind": {
+    "export": "Export",
+    "backup": "Backup",
+    "restore": "Restore",
+    "recheck": "Quality check"
+  },
+  "task_status": {
+    "queued": "Queued",
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "backup_domain": {
+    "accounts": "Accounts",
+    "categories": "Categories",
+    "tags": "Tags",
+    "transactions": "Transactions",
+    "entries": "Entries",
+    "budgets": "Budgets",
+    "instruments": "Instruments",
+    "portfolios": "Portfolios",
+    "trades": "Trades",
+    "portfolio_cashflows": "Portfolio cashflows",
+    "valuations": "Valuations",
+    "simulation_scenarios": "Simulation scenarios",
+    "goals": "Goals",
+    "reports": "Reports",
+    "settings": "Settings"
   }
 }

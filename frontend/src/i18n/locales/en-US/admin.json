@@ -1,0 +1,79 @@
+{
+  "title": "Admin",
+  "subtitle": "Accounts and operations only — never user financial data",
+  "nav": {
+    "back_to_app": "Back to app"
+  },
+  "dashboard": {
+    "title": "Overview",
+    "users_total": "Users",
+    "users_active": "Active",
+    "users_disabled": "Disabled",
+    "new_24h": "New in 24h",
+    "new_7d": "New in 7 days",
+    "sessions": "Active sessions",
+    "logins_7d": "Logins (7d)",
+    "failed_logins_7d": "Failed logins (7d)",
+    "active_jobs": "Active jobs",
+    "system": "System",
+    "version": "Version",
+    "node": "Node",
+    "uptime": "Uptime",
+    "memory": "Memory",
+    "database": "Database"
+  },
+  "users": {
+    "title": "Users",
+    "search": "Search email or ID",
+    "role": "Role",
+    "status": "Status",
+    "all_roles": "All roles",
+    "all_statuses": "All statuses",
+    "empty": "No users",
+    "joined": "Joined {{time}}",
+    "last_login": "Last login {{time}}",
+    "never_logged_in": "Never logged in",
+    "sessions": "{{count}} session(s)",
+    "reveal": "Reveal identity",
+    "actions": "Actions",
+    "disable": "Disable",
+    "enable": "Enable",
+    "revoke_sessions": "Revoke sessions",
+    "deletion_review": "Approve deletion",
+    "login_logs": "Login history",
+    "audit_logs": "Admin actions",
+    "notice_no_financial": "Admin views never include balances, transactions, portfolios or goals",
+    "disable_confirm": "Disable this account? All sessions will be revoked immediately.",
+    "revoke_confirm": "Revoke all sessions? Existing tokens stop working immediately."
+  },
+  "admins": {
+    "title": "Administrators",
+    "empty": "No administrators",
+    "grant": "Grant admin",
+    "revoke": "Revoke admin",
+    "grant_hint": "Enter the user ID to grant admin role",
+    "grant_placeholder": "User ID",
+    "self_protection": "You cannot modify your own role",
+    "last_super_admin": "The last super administrator cannot be demoted or disabled"
+  },
+  "system": {
+    "title": "System",
+    "jobs": "Background jobs",
+    "registration": "Public registration",
+    "registration_on": "Open",
+    "registration_off": "Closed",
+    "registration_hint": "When closed, the register endpoint returns 403",
+    "audit_title": "Admin audit log",
+    "job_status": "Job status"
+  },
+  "roles": {
+    "super_admin": "Super admin",
+    "admin": "Admin",
+    "user": "User"
+  },
+  "statuses": {
+    "active": "Active",
+    "disabled": "Disabled",
+    "pending_verification": "Pending"
+  }
+}

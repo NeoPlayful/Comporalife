@@ -27,6 +27,8 @@ const NAMESPACES = [
   'monte-carlo',
   'goals',
   'reports',
+  'data',
+  'admin',
   'settings',
   'enums',
   'errors',

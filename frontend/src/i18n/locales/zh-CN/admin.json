@@ -1,0 +1,79 @@
+{
+  "title": "管理后台",
+  "subtitle": "只管理账号与运维，永远不接触用户财务数据",
+  "nav": {
+    "back_to_app": "返回应用"
+  },
+  "dashboard": {
+    "title": "总览",
+    "users_total": "用户总数",
+    "users_active": "正常",
+    "users_disabled": "已禁用",
+    "new_24h": "24 小时新增",
+    "new_7d": "7 天新增",
+    "sessions": "活跃会话",
+    "logins_7d": "登录次数（7 天）",
+    "failed_logins_7d": "登录失败（7 天）",
+    "active_jobs": "进行中任务",
+    "system": "系统",
+    "version": "版本",
+    "node": "运行时",
+    "uptime": "运行时长",
+    "memory": "内存占用",
+    "database": "数据库"
+  },
+  "users": {
+    "title": "用户",
+    "search": "搜索邮箱或 ID",
+    "role": "角色",
+    "status": "状态",
+    "all_roles": "全部角色",
+    "all_statuses": "全部状态",
+    "empty": "没有用户",
+    "joined": "注册于 {{time}}",
+    "last_login": "最近登录 {{time}}",
+    "never_logged_in": "从未登录",
+    "sessions": "{{count}} 个会话",
+    "reveal": "显示完整账号",
+    "actions": "操作",
+    "disable": "禁用",
+    "enable": "启用",
+    "revoke_sessions": "撤销会话",
+    "deletion_review": "批准删除申请",
+    "login_logs": "登录记录",
+    "audit_logs": "管理操作",
+    "notice_no_financial": "管理视图不包含余额、流水、持仓与目标",
+    "disable_confirm": "禁用该账号？全部会话会立即失效。",
+    "revoke_confirm": "撤销全部会话？已签发的令牌会立即失效。"
+  },
+  "admins": {
+    "title": "管理员",
+    "empty": "没有管理员",
+    "grant": "授予管理员",
+    "revoke": "撤销管理员",
+    "grant_hint": "输入要授予管理员角色的用户 ID",
+    "grant_placeholder": "用户 ID",
+    "self_protection": "不能修改自己的角色",
+    "last_super_admin": "最后一个超级管理员不能被降级或禁用"
+  },
+  "system": {
+    "title": "系统",
+    "jobs": "后台任务",
+    "registration": "公开注册",
+    "registration_on": "开放",
+    "registration_off": "关闭",
+    "registration_hint": "关闭后注册接口返回 403",
+    "audit_title": "管理操作审计",
+    "job_status": "任务状态"
+  },
+  "roles": {
+    "super_admin": "超级管理员",
+    "admin": "管理员",
+    "user": "普通用户"
+  },
+  "statuses": {
+    "active": "正常",
+    "disabled": "已禁用",
+    "pending_verification": "待验证"
+  }
+}

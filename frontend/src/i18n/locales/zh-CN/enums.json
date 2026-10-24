@@ -145,5 +145,56 @@
   "report_format": {
     "csv": "CSV",
     "xlsx": "Excel"
+  },
+  "export_status": {
+    "queued": "排队中",
+    "running": "生成中",
+    "ready": "可下载",
+    "failed": "失败",
+    "expired": "已过期"
+  },
+  "export_scope": {
+    "full": "全量",
+    "ledger": "账本与账户",
+    "investments": "投资组合与标的",
+    "simulations": "模拟方案",
+    "planning": "目标与报表",
+    "settings": "设置与偏好"
+  },
+  "backup_status": {
+    "creating": "创建中",
+    "ready": "可用",
+    "failed": "失败",
+    "expired": "已过期"
+  },
+  "task_kind": {
+    "export": "数据导出",
+    "backup": "备份",
+    "restore": "恢复",
+    "recheck": "质量检查"
+  },
+  "task_status": {
+    "queued": "排队中",
+    "running": "运行中",
+    "succeeded": "已完成",
+    "failed": "失败",
+    "cancelled": "已取消"
+  },
+  "backup_domain": {
+    "accounts": "账户",
+    "categories": "分类",
+    "tags": "标签",
+    "transactions": "交易",
+    "entries": "分录",
+    "budgets": "预算",
+    "instruments": "标的",
+    "portfolios": "组合",
+    "trades": "投资交易",
+    "portfolio_cashflows": "组合现金流",
+    "valuations": "估值",
+    "simulation_scenarios": "模拟方案",
+    "goals": "目标",
+    "reports": "报表",
+    "settings": "设置"
   }
 }

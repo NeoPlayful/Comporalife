@@ -1,9 +1,12 @@
+import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import {
   ArrowLeftRight,
   BarChart3,
   Activity,
   Calculator,
+  Database,
+  ShieldCheck,
   FileText,
   Goal as GoalIcon,
   LineChart,
@@ -30,12 +33,15 @@ const NAV_ITEMS = [
   { to: '/monte-carlo', key: 'monte-carlo', icon: Activity },
   { to: '/goals', key: 'goals', icon: GoalIcon },
   { to: '/reports', key: 'reports', icon: FileText },
+  { to: '/data', key: 'data', icon: Database },
   { to: '/settings', key: 'settings', icon: Settings },
 ] as const;
 
 export default function Sidebar() {
   const collapsed = useUiStore((state) => state.sidebarCollapsed);
   const { t } = useTranslation();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   return (
     <aside
@@ -51,6 +57,23 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            title={collapsed ? t('nav:admin') : undefined}
+            className={({ isActive }) =>
+              `flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                isActive
+                  ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
+                  : 'text-[var(--color-content-muted)] hover:bg-black/5 hover:text-[var(--color-content)] dark:hover:bg-white/5'
+              }`
+            }
+          >
+            <ShieldCheck className="size-4 shrink-0" aria-hidden />
+            {!collapsed && <span className="truncate">{t('nav:admin')}</span>}
+          </NavLink>
+        )}
+
         {NAV_ITEMS.map(({ to, key, icon: Icon }) => {
           const label = t(`nav:${key}`);
 

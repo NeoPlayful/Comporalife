@@ -95,6 +95,27 @@ export const ErrorCode = {
   REPORT_RANGE_INVALID: 'REPORT_RANGE_INVALID',
   REPORT_TOO_LARGE: 'REPORT_TOO_LARGE',
   REPORT_FORMAT_UNSUPPORTED: 'REPORT_FORMAT_UNSUPPORTED',
+  // ===== 数据管理与运维 =====
+  EXPORT_NOT_FOUND: 'EXPORT_NOT_FOUND',
+  EXPORT_NOT_READY: 'EXPORT_NOT_READY',
+  EXPORT_TOO_LARGE: 'EXPORT_TOO_LARGE',
+  EXPORT_RANGE_INVALID: 'EXPORT_RANGE_INVALID',
+  EXPORT_SCOPE_UNSUPPORTED: 'EXPORT_SCOPE_UNSUPPORTED',
+  BACKUP_NOT_FOUND: 'BACKUP_NOT_FOUND',
+  BACKUP_NOT_READY: 'BACKUP_NOT_READY',
+  BACKUP_CORRUPTED: 'BACKUP_CORRUPTED',
+  BACKUP_VERSION_UNSUPPORTED: 'BACKUP_VERSION_UNSUPPORTED',
+  BACKUP_DECRYPT_FAILED: 'BACKUP_DECRYPT_FAILED',
+  RESTORE_PARAMETERS_INVALID: 'RESTORE_PARAMETERS_INVALID',
+  RESTORE_CONFLICT_UNRESOLVED: 'RESTORE_CONFLICT_UNRESOLVED',
+  RESTORE_FAILED: 'RESTORE_FAILED',
+  TASK_NOT_FOUND: 'TASK_NOT_FOUND',
+  TASK_NOT_CANCELLABLE: 'TASK_NOT_CANCELLABLE',
+  TASK_NOT_RETRYABLE: 'TASK_NOT_RETRYABLE',
+  ADMIN_FORBIDDEN: 'ADMIN_FORBIDDEN',
+  ADMIN_SELF_MODIFICATION: 'ADMIN_SELF_MODIFICATION',
+  ADMIN_LAST_SUPER_ADMIN: 'ADMIN_LAST_SUPER_ADMIN',
+  REGISTRATION_DISABLED: 'REGISTRATION_DISABLED',
 } as const;
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
@@ -191,6 +212,26 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   REPORT_RANGE_INVALID: 400,
   REPORT_TOO_LARGE: 422,
   REPORT_FORMAT_UNSUPPORTED: 415,
+  EXPORT_NOT_FOUND: 404,
+  EXPORT_NOT_READY: 409,
+  EXPORT_TOO_LARGE: 422,
+  EXPORT_RANGE_INVALID: 400,
+  EXPORT_SCOPE_UNSUPPORTED: 422,
+  BACKUP_NOT_FOUND: 404,
+  BACKUP_NOT_READY: 409,
+  BACKUP_CORRUPTED: 422,
+  BACKUP_VERSION_UNSUPPORTED: 422,
+  BACKUP_DECRYPT_FAILED: 422,
+  RESTORE_PARAMETERS_INVALID: 422,
+  RESTORE_CONFLICT_UNRESOLVED: 409,
+  RESTORE_FAILED: 500,
+  TASK_NOT_FOUND: 404,
+  TASK_NOT_CANCELLABLE: 409,
+  TASK_NOT_RETRYABLE: 409,
+  ADMIN_FORBIDDEN: 403,
+  ADMIN_SELF_MODIFICATION: 422,
+  ADMIN_LAST_SUPER_ADMIN: 422,
+  REGISTRATION_DISABLED: 403,
 };
 
 export class AppError extends Error {
@@ -411,4 +452,44 @@ export const errors = {
     ),
   reportFormatUnsupported: (format: string) =>
     new AppError(ErrorCode.REPORT_FORMAT_UNSUPPORTED, '不支持的导出格式', { format }),
+  // ===== 数据管理与运维 =====
+  exportNotFound: () => new AppError(ErrorCode.EXPORT_NOT_FOUND, '导出记录不存在'),
+  exportNotReady: (status: string) =>
+    new AppError(ErrorCode.EXPORT_NOT_READY, '导出尚未完成或已过期', { status }),
+  exportTooLarge: (rows: number, maxRows: number) =>
+    new AppError(
+      ErrorCode.EXPORT_TOO_LARGE,
+      `导出数据 ${rows} 行，超过 ${maxRows} 行上限，请缩小范围`,
+      undefined,
+      { rows, maxRows },
+    ),
+  exportRangeInvalid: (message: string) => new AppError(ErrorCode.EXPORT_RANGE_INVALID, message),
+  exportScopeUnsupported: (scope: string) =>
+    new AppError(ErrorCode.EXPORT_SCOPE_UNSUPPORTED, '不支持的导出范围', { scope }),
+  backupNotFound: () => new AppError(ErrorCode.BACKUP_NOT_FOUND, '备份不存在'),
+  backupNotReady: (status: string) =>
+    new AppError(ErrorCode.BACKUP_NOT_READY, '备份尚未完成或已失败', { status }),
+  backupCorrupted: () =>
+    new AppError(ErrorCode.BACKUP_CORRUPTED, '备份文件校验失败，内容可能已损坏'),
+  backupVersionUnsupported: (version: string, expected: string) =>
+    new AppError(ErrorCode.BACKUP_VERSION_UNSUPPORTED, '备份结构版本不兼容', { version, expected }),
+  backupDecryptFailed: () =>
+    new AppError(ErrorCode.BACKUP_DECRYPT_FAILED, '备份文件无法解密，密钥或文件已损坏'),
+  restoreParametersInvalid: (message: string, details?: unknown) =>
+    new AppError(ErrorCode.RESTORE_PARAMETERS_INVALID, message, details),
+  restoreConflictUnresolved: () =>
+    new AppError(ErrorCode.RESTORE_CONFLICT_UNRESOLVED, '存在冲突，但未指定冲突处理策略'),
+  restoreFailed: (message = '恢复失败，已回滚全部写入') =>
+    new AppError(ErrorCode.RESTORE_FAILED, message),
+  taskNotFound: () => new AppError(ErrorCode.TASK_NOT_FOUND, '任务不存在'),
+  taskNotCancellable: (status: string) =>
+    new AppError(ErrorCode.TASK_NOT_CANCELLABLE, '该任务已结束，无法取消', { status }),
+  taskNotRetryable: (status: string, attempts: number) =>
+    new AppError(ErrorCode.TASK_NOT_RETRYABLE, '该任务不可重试', { status, attempts }),
+  adminForbidden: () => new AppError(ErrorCode.ADMIN_FORBIDDEN, '需要管理员权限'),
+  adminSelfModification: (message: string) => new AppError(ErrorCode.ADMIN_SELF_MODIFICATION, message),
+  adminLastSuperAdmin: () =>
+    new AppError(ErrorCode.ADMIN_LAST_SUPER_ADMIN, '不能降级或禁用最后一个超级管理员'),
+  registrationDisabled: () =>
+    new AppError(ErrorCode.REGISTRATION_DISABLED, '当前已关闭公开注册'),
 };

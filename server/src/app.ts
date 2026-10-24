@@ -31,7 +31,15 @@ import monteCarloRoutes from './modules/simulations/monte-carlo/monte-carlo.rout
 import simulationExportRoutes from './modules/simulations/simulation-export.routes.js';
 import goalsRoutes from './modules/goals/goals.routes.js';
 import reportsRoutes from './modules/reports/reports.routes.js';
+import qualityRoutes from './modules/quality/quality.routes.js';
+import jobsRoutes from './modules/jobs/jobs.routes.js';
 import { JobExecutor } from './modules/jobs/job.executor.js';
+import { TaskExecutor } from './modules/jobs/task.executor.js';
+import { createExportHandler } from './modules/exports/export.handler.js';
+import exportsRoutes from './modules/exports/exports.routes.js';
+import { createBackupHandler } from './modules/backups/backup.handler.js';
+import backupsRoutes from './modules/backups/backups.routes.js';
+import adminRoutes from './modules/admin/admin.routes.js';
 import { createMonteCarloHandler } from './modules/simulations/monte-carlo/monte-carlo.handler.js';
 import tagsRoutes from './modules/tags/tags.routes.js';
 import systemRoutes from './routes/system.js';
@@ -40,6 +48,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** 异步作业执行器；仅在启用 prisma 时存在 */
     jobs: JobExecutor;
+    /** 通用任务执行器（导出、备份、恢复、重检）；仅在启用 prisma 时存在 */
+    tasks: TaskExecutor;
   }
 }
 
@@ -94,9 +104,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     const executor = new JobExecutor(app.prisma, app.log);
     executor.register('monte-carlo', createMonteCarloHandler(app.prisma));
     app.decorate('jobs', executor);
+
+    // 通用任务与 MC 执行器并列：两条写路径独立，任务面板用读模型合并
+    const taskExecutor = new TaskExecutor(app.prisma, app.log);
+    taskExecutor.register(createExportHandler(app.prisma));
+    taskExecutor.register(createBackupHandler(app.prisma));
+    app.decorate('tasks', taskExecutor);
+
     app.addHook('onClose', async () => {
       executor.stop();
-      await executor.drain(5_000);
+      taskExecutor.stop();
+      await Promise.all([executor.drain(5_000), taskExecutor.drain(5_000)]);
     });
   }
 
@@ -125,6 +143,11 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(simulationExportRoutes, { prefix: API_PREFIX });
     await app.register(goalsRoutes, { prefix: API_PREFIX });
     await app.register(reportsRoutes, { prefix: API_PREFIX });
+    await app.register(qualityRoutes, { prefix: API_PREFIX });
+    await app.register(jobsRoutes, { prefix: API_PREFIX });
+    await app.register(exportsRoutes, { prefix: API_PREFIX });
+    await app.register(backupsRoutes, { prefix: API_PREFIX });
+    await app.register(adminRoutes, { prefix: API_PREFIX });
     // 模板路由必须先于 /imports/:id 注册，否则会被参数路由吞掉
     await app.register(templatesRoutes, { prefix: API_PREFIX });
     await app.register(importsRoutes, { prefix: API_PREFIX });

@@ -29,7 +29,7 @@ async function main() {
 
     // 监听成功后再启动执行器：先恢复被中断的运行，再开始消费队列。
     // 顺序不能颠倒，否则恢复出来的作业会与正在领取的槽争抢。
-    await app.jobs.start();
+    await Promise.all([app.jobs.start(), app.tasks.start()]);
   } catch (err) {
     app.log.error({ err }, '服务启动失败');
     process.exit(1);

@@ -43,7 +43,7 @@ describe('系统接口', () => {
     try {
       const res = await app.inject({ method: 'GET', url: '/api/system/capabilities' });
       const body = res.json();
-      expect(body.data.phase).toBe('phase-6');
+      expect(body.data.phase).toBe('phase-7');
       expect(body.data.available).toContain('transactions');
       expect(body.data.available).toContain('analytics');
       expect(body.data.available).toContain('budgets');
@@ -60,6 +60,16 @@ describe('系统接口', () => {
       expect(body.data.reportLimits.formats).toContain('csv');
       expect(body.data.planned).not.toContain('budgets');
       expect(body.data.simulationLimits.maxPaths).toBeGreaterThan(0);
+
+      for (const capability of ['exports', 'backups', 'data-quality', 'jobs', 'admin']) {
+        expect(body.data.available).toContain(capability);
+        expect(body.data.planned).not.toContain(capability);
+      }
+
+      expect(body.data.exportLimits.maxRows).toBeGreaterThan(0);
+      expect(body.data.backupLimits.retentionCount).toBeGreaterThan(0);
+      expect(body.data.taskLimits.maxAttempts).toBeGreaterThan(0);
+      expect(body.data.qualityLimits.lookbackMonths).toBeGreaterThan(0);
     } finally {
       await app.close();
     }
