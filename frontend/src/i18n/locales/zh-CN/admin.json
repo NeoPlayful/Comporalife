@@ -2,7 +2,8 @@
   "title": "管理后台",
   "subtitle": "只管理账号与运维，永远不接触用户财务数据",
   "nav": {
-    "back_to_app": "返回应用"
+    "back_to_app": "返回应用",
+    "badge": "运维控制台"
   },
   "dashboard": {
     "title": "总览",
