@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import { isAdminRole } from '@/lib/auth';
 import { useAuthStore } from '@/stores/auth-store';
 
 /**
@@ -10,7 +11,7 @@ import { useAuthStore } from '@/stores/auth-store';
 export default function AdminGuard() {
   const user = useAuthStore((state) => state.user);
 
-  if (!user || (user.role !== 'admin' && user.role !== 'super_admin')) {
+  if (!user || !isAdminRole(user.role)) {
     return <Navigate to="/dashboard" replace />;
   }
 

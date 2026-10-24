@@ -14,7 +14,7 @@
     "sessions": "活跃会话",
     "logins_7d": "登录次数（7 天）",
     "failed_logins_7d": "登录失败（7 天）",
-    "active_jobs": "进行中任务",
+    "active_jobs": "进行中平台任务",
     "system": "系统",
     "version": "版本",
     "node": "运行时",
@@ -58,7 +58,7 @@
   },
   "system": {
     "title": "系统",
-    "jobs": "后台任务",
+    "jobs": "平台任务",
     "registration": "公开注册",
     "registration_on": "开放",
     "registration_off": "关闭",

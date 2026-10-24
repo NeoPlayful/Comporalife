@@ -14,7 +14,7 @@
     "sessions": "Active sessions",
     "logins_7d": "Logins (7d)",
     "failed_logins_7d": "Failed logins (7d)",
-    "active_jobs": "Active jobs",
+    "active_jobs": "Active platform jobs",
     "system": "System",
     "version": "Version",
     "node": "Node",
@@ -58,7 +58,7 @@
   },
   "system": {
     "title": "System",
-    "jobs": "Background jobs",
+    "jobs": "Platform jobs",
     "registration": "Public registration",
     "registration_on": "Open",
     "registration_off": "Closed",
