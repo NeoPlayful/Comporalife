@@ -19,7 +19,7 @@ import {
   type ValuePoint,
 } from './performance.engine.js';
 import { summarizePortfolio, getPortfolioContext } from './portfolio.service.js';
-import { portfolioPositions, valueHoldings } from './valuation.service.js';
+import { portfolioPositions } from './valuation.service.js';
 
 function dayKeyOf(date: Date, timezone: string): string {
   return formatInTimeZone(date, timezone, 'yyyy-MM-dd');
@@ -115,10 +115,83 @@ async function buildValueSeries(
     dates: string[];
   },
 ): Promise<ValuePoint[]> {
+  const account = await prisma.account.findFirst({
+    where: { id: params.accountId, userId: params.userId },
+    select: { openingBalance: true, openingBalanceDate: true },
+  });
+
+  const opening = toDecimal(account?.openingBalance.toString() ?? '0');
+  const openingDate = account?.openingBalanceDate ?? null;
+
+  // 区间内全部价格一次性取回，避免在逐日循环里按标的一再查询
+  const accountDates = params.dates.map((date) => new Date(`${date}T23:59:59.999Z`));
+  const earliest = accountDates[0];
+  const latest = accountDates[accountDates.length - 1];
+
+  const priceRows =
+    earliest && latest
+      ? await prisma.instrumentPrice.findMany({
+          where: {
+            userId: params.userId,
+            priceDate: { lte: latest },
+          },
+          orderBy: [{ instrumentId: 'asc' }, { priceDate: 'desc' }],
+          select: { instrumentId: true, price: true, priceDate: true },
+        })
+      : [];
+
+  // (instrumentId, date) → 该日及以前最近一条价格
+  const pricesByInstrument = new Map<string, Array<{ priceDate: string; price: Decimal }>>();
+  for (const row of priceRows) {
+    const key = row.instrumentId;
+    const list = pricesByInstrument.get(key);
+    const item = { priceDate: row.priceDate.toISOString().slice(0, 10), price: toDecimal(row.price.toString()) };
+    if (list) list.push(item);
+    else pricesByInstrument.set(key, [item]);
+  }
+
+  function priceOn(instrumentId: string, date: string): Decimal | null {
+    const list = pricesByInstrument.get(instrumentId);
+    if (!list) return null;
+    // 列表按日期倒序，首个 <= date 即所需
+    for (const item of list) {
+      if (item.priceDate <= date) return item.price;
+    }
+    return null;
+  }
+
+  // 手工估值快照：仅在缺价时接管，整体市值不可拆分到标的
+  const snapshots =
+    latest
+      ? await prisma.portfolioValuation.findMany({
+          where: {
+            userId: params.userId,
+            portfolioId: params.portfolioId,
+            source: 'manual',
+            valuationDate: { lte: latest },
+          },
+          orderBy: { valuationDate: 'desc' },
+          select: { valuationDate: true, marketValue: true },
+        })
+      : [];
+
+  const snapshotPoints = snapshots.map((row) => ({
+    valuationDate: row.valuationDate.toISOString().slice(0, 10),
+    marketValue: toDecimal(row.marketValue.toString()),
+  }));
+
+  function snapshotAt(date: string): { valuationDate: string; marketValue: Decimal } | null {
+    // 列表按日期倒序，首个 <= date 即所需
+    for (const item of snapshotPoints) {
+      if (item.valuationDate <= date) return item;
+    }
+    return null;
+  }
+
   const points: ValuePoint[] = [];
 
   for (const date of params.dates) {
-    // 采样点按用户时区当日零点，与账本口径一致
+    // 采样点按用户时区当日收盘，与账本口径一致
     const asOf = new Date(`${date}T23:59:59.999Z`);
 
     const positions = await portfolioPositions(prisma, {
@@ -132,18 +205,39 @@ async function buildValueSeries(
       continue;
     }
 
-    const valuation = await valueHoldings(prisma, {
-      userId: params.userId,
-      currency: params.currency,
-      holdings: positions.holdings.map((holding) => ({
-        instrumentId: holding.instrumentId,
-        quantity: holding.quantity,
-      })),
-      asOf,
-    });
+    let marketValue = new Decimal(0);
+    let complete = true;
+    let missingPrice = false;
 
-    // 组合价值需要现金，但历史现金无法直接取，
-    // 因此用「初始入金 + 累计外部现金流 + 已实现损益 + 股息」反推现金
+    for (const holding of positions.holdings) {
+      if (!holding.quantity.gt(0)) continue;
+      const price = priceOn(holding.instrumentId, date);
+      // 该日及以前没有价格 → 该点不完整，绝不用更晚的价格或成本价回填
+      if (price === null) {
+        missingPrice = true;
+        continue;
+      }
+      marketValue = marketValue.plus(roundMoney(holding.quantity.mul(price)));
+    }
+
+    // 缺价时用「当日或之前最近一条手工快照」整体替代证券市值，
+    // 快照是用户对整体市值的陈述，不可拆分到单个标的
+    let valuationSource: 'computed' | 'manual_snapshot' = 'computed';
+    let snapshotDate: string | null = null;
+
+    if (missingPrice) {
+      const snapshot = snapshotAt(date);
+      if (snapshot) {
+        marketValue = snapshot.marketValue;
+        valuationSource = 'manual_snapshot';
+        snapshotDate = snapshot.valuationDate;
+      } else {
+        // 无价格也无快照：该点不完整，市值只能按已知部分计算
+        complete = false;
+      }
+    }
+
+    // 现金口径必须与账户余额一致：期初余额（若已到期初日）+ 截至该日的分录
     const balance = await prisma.transactionEntry.aggregate({
       where: {
         userId: params.userId,
@@ -153,12 +247,16 @@ async function buildValueSeries(
       _sum: { amount: true },
     });
 
-    const cash = toDecimal(balance._sum.amount?.toString() ?? '0');
+    const movement = toDecimal(balance._sum.amount?.toString() ?? '0');
+    const openingIncluded = openingDate !== null && openingDate.getTime() <= asOf.getTime();
+    const cash = openingIncluded ? opening.plus(movement) : movement;
 
     points.push({
       date,
-      value: roundMoney(cash.plus(valuation.marketValue)),
-      complete: valuation.isComplete,
+      value: roundMoney(cash.plus(marketValue)),
+      complete,
+      valuationSource,
+      snapshotDate,
     });
   }
 
@@ -280,7 +378,14 @@ export async function computeReturns(
 }
 
 export interface PerformanceResult {
-  points: Array<{ date: string; value: Decimal; index: Decimal | null; complete: boolean }>;
+  points: Array<{
+    date: string;
+    value: Decimal;
+    index: Decimal | null;
+    complete: boolean;
+    valuationSource: 'computed' | 'manual_snapshot';
+    snapshotDate: string | null;
+  }>;
   granularity: 'day' | 'week' | 'month';
   downgraded: boolean;
   period: { from: string; to: string };
@@ -343,6 +448,8 @@ export async function computePerformance(
       // 以区间内首个有效点为基准 1；基准点之前或缺失时为 null
       index: base && point.complete ? point.value.div(base.value).toDecimalPlaces(6) : null,
       complete: point.complete,
+      valuationSource: point.valuationSource ?? 'computed',
+      snapshotDate: point.snapshotDate ?? null,
     })),
     granularity,
     downgraded: granularity !== 'day',

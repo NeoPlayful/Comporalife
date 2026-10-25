@@ -67,6 +67,10 @@ export default function PerformanceChart({
   };
 
   const missing = performance.missingValuations.slice(0, 5).join(', ');
+  // 有多少点是靠手工快照撑起来的，必须显式说明，否则用户会以为是重算结果
+  const snapshotPoints = performance.points.filter(
+    (point) => point.valuationSource === 'manual_snapshot',
+  ).length;
 
   return (
     <div className="space-y-3">
@@ -86,6 +90,12 @@ export default function PerformanceChart({
       {!performance.isComplete && missing && (
         <p className="rounded-lg bg-[var(--color-warning,#d3a35a)]/10 px-3 py-2 text-xs">
           {t('performance.missing_dates', { dates: missing })}
+        </p>
+      )}
+
+      {snapshotPoints > 0 && (
+        <p className="rounded-lg bg-[var(--color-accent)]/10 px-3 py-2 text-xs">
+          {t('performance.snapshot_points', { count: snapshotPoints })}
         </p>
       )}
 

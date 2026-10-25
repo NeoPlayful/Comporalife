@@ -29,7 +29,6 @@
     "cashflow_failed": "Failed to load cash flow",
     "cashflow_basis": "{{note}} · Timezone {{timezone}}",
     "cashflow_missing_rate": "Missing rates for {{currencies}}; those transactions are excluded from cashflow. ",
-
     "allocation": "Asset allocation",
     "loading_allocation": "Loading allocation…",
     "allocation_empty": "No allocatable assets",
@@ -47,7 +46,10 @@
     "missing_rate": "Missing rates for {{currencies}}.",
     "add_rates": "Add rates",
     "reconciliation_diff": "{{count}} accounts have reconciliation differences",
-    "archived_with_balance": "Archived with a non-zero balance: {{accounts}}"
+    "archived_with_balance": "Archived with a non-zero balance: {{accounts}}",
+    "unpriced_investments": "{{names}} unpriced; market value excluded from net worth. ",
+    "stale_valuations": "{{names}} have stale prices. ",
+    "add_prices": "Add prices"
   },
   "charts": {
     "net_worth_empty_title": "No net worth data",

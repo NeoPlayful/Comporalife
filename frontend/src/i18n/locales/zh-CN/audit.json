@@ -49,7 +49,13 @@
     "monte_carlo.run.queued": "发起模拟运行",
     "monte_carlo.run.cancelled": "取消模拟运行",
     "user.deletion_requested": "申请注销账号",
-    "user.deletion_cancelled": "撤销注销申请"
+    "user.deletion_cancelled": "撤销注销申请",
+    "price.created": "录入价格",
+    "price.updated": "修改价格",
+    "price.deleted": "删除价格",
+    "valuation.created": "新增估值快照",
+    "valuation.updated": "修改估值快照",
+    "valuation.deleted": "删除估值快照"
   },
   "empty": {
     "title": "暂无审计记录",

@@ -13,6 +13,7 @@ import { computeBalances } from '../accounts/balance.service.js';
 import { computeBudgetAlerts } from '../budgets/budget.service.js';
 import { convertMany } from '../currencies/currency.service.js';
 import { computeGoalProgress } from '../goals/goal.service.js';
+import { findStaleValuations } from '../quality/quality.service.js';
 import { computeCashflow } from './cashflow.service.js';
 import { computeNetWorth } from './networth.service.js';
 
@@ -528,6 +529,14 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       (record) => !new Prisma.Decimal(record.difference).isZero(),
     );
 
+    // 行情侧与汇率侧同等对待：过期估值和无价标的必须出现在总览里，
+    // 否则用户会以为净资产是完整的
+    const staleValuations = await findStaleValuations(app.prisma, {
+      userId,
+      timezone: settings.timezone,
+      baseCurrency: settings.baseCurrency,
+    });
+
     return ok(
       {
         uncategorizedTransactions: uncategorizedCount,
@@ -538,6 +547,13 @@ export default async function dashboardRoutes(app: FastifyInstance) {
           reconciledAt: record.reconciledAt,
         })),
         archivedWithNonZeroBalance: archivedNonZero.map((account) => account.name),
+        // 有价格日期但已过期 → 过期；无价格日期或存在无价标的 → 未定价
+        staleValuations: staleValuations.items.filter(
+          (item) => item.priceDate !== null && item.missingSymbols.length === 0,
+        ),
+        unpricedInvestments: staleValuations.items.filter(
+          (item) => item.priceDate === null || item.missingSymbols.length > 0,
+        ),
         baseCurrency: settings.baseCurrency,
       },
       request.id,

@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { ExportScope } from '@prisma/client';
 import { formatInTimeZone } from 'date-fns-tz';
-import { moneyToString, roundMoney, toDecimal } from '../../lib/money.js';
+import { moneyToString, priceToString, roundMoney, toDecimal } from '../../lib/money.js';
 import { loadAllPortfolioValuations } from '../portfolios/valuation.service.js';
 import { findMissingMonths, findRateLag, findStaleValuations } from '../quality/quality.service.js';
 
@@ -315,8 +315,8 @@ export async function loadDataset(
           row.portfolioId,
           row.instrumentId,
           row.kind,
-          row.quantity ? moneyToString(row.quantity) : null,
-          row.price ? moneyToString(row.price) : null,
+          row.quantity ? row.quantity.toFixed(8) : null,
+          row.price ? priceToString(row.price) : null,
           moneyToString(row.amount),
           moneyToString(row.fee),
           moneyToString(row.tax),
@@ -365,7 +365,7 @@ export async function loadDataset(
           row.id,
           row.instrumentId,
           dateOnly(row.priceDate, context.timezone),
-          moneyToString(row.price),
+          priceToString(row.price),
           row.source,
           row.note,
         ]),

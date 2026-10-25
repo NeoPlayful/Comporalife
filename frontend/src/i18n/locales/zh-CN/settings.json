@@ -27,7 +27,17 @@
     "edit": "编辑",
     "save": "保存",
     "cancel": "取消",
-    "delete": "删除"
+    "delete": "删除",
+    "page": {
+      "title": "汇率指标",
+      "subtitle": "多币种折算到基准币种所需的汇率。缺失汇率时相关金额不会计入统计。",
+      "new": "新增汇率",
+      "pair": "币种对",
+      "save": "保存",
+      "empty_title": "暂无汇率记录",
+      "empty_description": "添加一条汇率后，外币账户与资产即可折算到基准币种。",
+      "delete_confirm": "删除该汇率会影响历史折算，确认删除？"
+    }
   },
   "security": {
     "title": "账户安全",

@@ -185,7 +185,8 @@ describe('标的与价格', () => {
 
     const second = await setPrice(instrumentId, '2026-10-21', '4.20');
     expect(second.created).toBe(false);
-    expect(second.price).toBe('4.200000');
+    // 价格按 DECIMAL(20,8) 序列化，保留 8 位小数
+    expect(second.price).toBe('4.20000000');
   });
 
   it('未来日期价格被 422 拒绝', async () => {

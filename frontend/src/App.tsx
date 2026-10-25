@@ -16,6 +16,7 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
 const PortfoliosPage = lazy(() => import('./pages/PortfoliosPage'));
 const PortfolioDetailPage = lazy(() => import('./pages/PortfolioDetailPage'));
+const ExchangeRatesPage = lazy(() => import('./pages/ExchangeRatesPage'));
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const CompoundPage = lazy(() => import('./pages/CompoundPage'));
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="budgets" element={<BudgetsPage />} />
           <Route path="portfolios" element={<PortfoliosPage />} />
           <Route path="portfolios/:id" element={<PortfolioDetailPage />} />
+          <Route path="exchange-rates" element={<ExchangeRatesPage />} />
           <Route path="imports" element={<ImportsPage />} />
           <Route path="imports/new" element={<ImportNewPage />} />
           <Route path="imports/rules" element={<RulesPage />} />

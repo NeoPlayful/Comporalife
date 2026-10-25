@@ -5,7 +5,7 @@
 import type { FastifyInstance } from 'fastify';
 import { ok } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
-import { moneyToString, roundMoney, toDecimal } from '../../lib/money.js';
+import { moneyToString, priceToString, roundMoney, toDecimal } from '../../lib/money.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { getUserAnalyticsContext } from '../analytics/analytics.service.js';
 import {
@@ -91,7 +91,7 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
     for (const row of latestPrices) {
       if (priceById.has(row.instrumentId)) continue;
       priceById.set(row.instrumentId, {
-        price: moneyToString(toDecimal(row.price.toString())),
+        price: priceToString(toDecimal(row.price.toString())),
         priceDate: row.priceDate.toISOString().slice(0, 10),
       });
     }
@@ -169,7 +169,7 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
         ...instrument,
         latestPrice: latest
           ? {
-              price: moneyToString(toDecimal(latest.price.toString())),
+              price: priceToString(toDecimal(latest.price.toString())),
               priceDate: latest.priceDate.toISOString().slice(0, 10),
               source: latest.source,
             }
@@ -274,7 +274,7 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
       {
         items: prices.map((row) => ({
           id: row.id,
-          price: moneyToString(toDecimal(row.price.toString())),
+          price: priceToString(toDecimal(row.price.toString())),
           priceDate: row.priceDate.toISOString().slice(0, 10),
           source: row.source,
           note: row.note,
@@ -305,32 +305,53 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
 
     const earlier = await app.prisma.instrumentPrice.findFirst({
       where: { instrumentId: id, priceDate },
-      select: { id: true },
+      select: { id: true, price: true },
     });
 
-    const result = await app.prisma.instrumentPrice.upsert({
-      where: { instrumentId_priceDate: { instrumentId: id, priceDate } },
-      create: {
-        userId,
-        instrumentId: id,
-        priceDate,
-        price: toDecimal(body.price),
-        source: 'manual',
-        note: body.note ?? null,
-      },
-      update: {
-        price: toDecimal(body.price),
-        source: 'manual',
-        note: body.note ?? null,
-      },
-      select: { id: true, price: true, priceDate: true, source: true, note: true },
+    const result = await app.prisma.$transaction(async (tx) => {
+      const saved = await tx.instrumentPrice.upsert({
+        where: { instrumentId_priceDate: { instrumentId: id, priceDate } },
+        create: {
+          userId,
+          instrumentId: id,
+          priceDate,
+          price: toDecimal(body.price),
+          source: 'manual',
+          note: body.note ?? null,
+        },
+        update: {
+          price: toDecimal(body.price),
+          source: 'manual',
+          note: body.note ?? null,
+        },
+        select: { id: true, price: true, priceDate: true, source: true, note: true },
+      });
+
+      // 价格直接决定证券市值，属于财务口径输入，必须留痕（不记录价格数值）
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: earlier ? 'price.updated' : 'price.created',
+          targetType: 'instrument_price',
+          targetId: saved.id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: {
+            instrumentId: id,
+            priceDate: saved.priceDate.toISOString().slice(0, 10),
+            ...(earlier ? { changedFields: ['price'] } : {}),
+          },
+        },
+      });
+
+      return saved;
     });
 
     return reply.status(201).send(
       ok(
         {
           id: result.id,
-          price: moneyToString(toDecimal(result.price.toString())),
+          price: priceToString(toDecimal(result.price.toString())),
           priceDate: result.priceDate.toISOString().slice(0, 10),
           source: result.source,
           note: result.note,
@@ -347,15 +368,27 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
 
     const price = await app.prisma.instrumentPrice.findFirst({
       where: { id: priceId, instrumentId: id, userId },
-      select: { id: true },
+      select: { id: true, priceDate: true },
     });
     if (!price) throw errors.priceNotFound();
 
-    await app.prisma.instrumentPrice.delete({ where: { id: priceId } });
+    await app.prisma.$transaction(async (tx) => {
+      await tx.instrumentPrice.delete({ where: { id: priceId } });
 
-    // 依赖该价格的历史估值缓存必须失效，否则收益会用不存在的价格
-    await app.prisma.portfolioValuation.deleteMany({
-      where: { userId, source: 'computed' },
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'price.deleted',
+          targetType: 'instrument_price',
+          targetId: priceId,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: {
+            instrumentId: id,
+            priceDate: price.priceDate.toISOString().slice(0, 10),
+          },
+        },
+      });
     });
 
     return ok({ deleted: true }, request.id);
@@ -916,6 +949,8 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
           value: moneyToString(point.value),
           index: point.index === null ? null : point.index.toFixed(6),
           complete: point.complete,
+          valuationSource: point.valuationSource,
+          snapshotDate: point.snapshotDate,
         })),
         granularity: result.granularity,
         downgraded: result.downgraded,
@@ -1190,22 +1225,43 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
 
     if (existing && !body.overwrite) throw errors.valuationDateExists(existing.id);
 
-    const valuation = await app.prisma.portfolioValuation.upsert({
-      where: { portfolioId_valuationDate: { portfolioId: id, valuationDate } },
-      create: {
-        userId,
-        portfolioId: id,
-        valuationDate,
-        marketValue: toDecimal(body.marketValue),
-        source: 'manual',
-        note: body.note ?? null,
-      },
-      update: {
-        marketValue: toDecimal(body.marketValue),
-        source: 'manual',
-        note: body.note ?? null,
-      },
-      select: { id: true, valuationDate: true, marketValue: true, source: true, note: true },
+    const valuation = await app.prisma.$transaction(async (tx) => {
+      const saved = await tx.portfolioValuation.upsert({
+        where: { portfolioId_valuationDate: { portfolioId: id, valuationDate } },
+        create: {
+          userId,
+          portfolioId: id,
+          valuationDate,
+          marketValue: toDecimal(body.marketValue),
+          source: 'manual',
+          note: body.note ?? null,
+        },
+        update: {
+          marketValue: toDecimal(body.marketValue),
+          source: 'manual',
+          note: body.note ?? null,
+        },
+        select: { id: true, valuationDate: true, marketValue: true, source: true, note: true },
+      });
+
+      // 手工快照会替代重算市值，直接改变收益曲线，必须留痕
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: existing ? 'valuation.updated' : 'valuation.created',
+          targetType: 'portfolio_valuation',
+          targetId: saved.id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: {
+            portfolioId: id,
+            valuationDate: saved.valuationDate.toISOString().slice(0, 10),
+            ...(existing ? { changedFields: ['marketValue'] } : {}),
+          },
+        },
+      });
+
+      return saved;
     });
 
     return reply.status(201).send(
@@ -1228,11 +1284,29 @@ export default async function portfoliosRoutes(app: FastifyInstance) {
 
     const valuation = await app.prisma.portfolioValuation.findFirst({
       where: { id: valuationId, portfolioId: id, userId },
-      select: { id: true },
+      select: { id: true, valuationDate: true },
     });
     if (!valuation) throw errors.portfolioValuationNotFound();
 
-    await app.prisma.portfolioValuation.delete({ where: { id: valuationId } });
+    await app.prisma.$transaction(async (tx) => {
+      await tx.portfolioValuation.delete({ where: { id: valuationId } });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'valuation.deleted',
+          targetType: 'portfolio_valuation',
+          targetId: valuationId,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: {
+            portfolioId: id,
+            valuationDate: valuation.valuationDate.toISOString().slice(0, 10),
+          },
+        },
+      });
+    });
+
     return ok({ deleted: true }, request.id);
   });
 }

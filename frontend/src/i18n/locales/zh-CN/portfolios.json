@@ -86,7 +86,8 @@
     "downgraded": "采样点较多，已自动降级粒度：{{granularity}}",
     "granularity_day": "日",
     "granularity_week": "周",
-    "granularity_month": "月"
+    "granularity_month": "月",
+    "snapshot_points": "其中 {{count}} 个时点使用手工估值快照，非价格重算结果。"
   },
   "allocation": {
     "title": "配置",
@@ -167,26 +168,6 @@
     "confirm_delete": "删除现金流会同时冲正对应的账本记录，确定继续吗？",
     "hint": "买入、卖出、股息与手续费不是外部现金流，不需要在这里登记。"
   },
-  "instruments": {
-    "title": "投资标的",
-    "add": "新增标的",
-    "empty": "还没有标的",
-    "empty_hint": "先建标的，再录入价格与交易。",
-    "symbol": "代码",
-    "name": "名称",
-    "asset_class": "资产类别",
-    "currency": "币种",
-    "latest_price": "最新价格",
-    "no_price": "未录价格",
-    "add_price": "录入价格",
-    "price_date": "价格日期",
-    "price": "价格",
-    "price_created": "价格已录入",
-    "price_updated": "价格已更新",
-    "delete_confirm": "删除标的会同时删除其价格记录，确定继续吗？",
-    "price_delete_confirm": "删除价格会影响依赖它的历史收益，确定继续吗？",
-    "in_use": "该标的已有交易，无法删除。"
-  },
   "actions": {
     "edit": "编辑",
     "archive": "归档",
@@ -207,5 +188,17 @@
     "no_portfolio": "组合不存在或已被删除",
     "no_permission": "无权访问该组合",
     "load_failed": "加载失败"
+  },
+  "valuations": {
+    "title": "估值快照",
+    "hint": "没有价格的历史时点，可用手工快照提供整体证券市值。有价格时仍以重算为准。",
+    "date": "估值日期",
+    "market_value": "证券市值",
+    "note": "备注",
+    "add": "录入快照",
+    "empty": "暂无估值快照",
+    "delete": "删除快照",
+    "delete_confirm": "删除该快照后，对应时点若仍无价格将重新标记为不完整，确认删除？",
+    "overwrite_confirm": "该日期已有快照，是否覆盖？"
   }
 }

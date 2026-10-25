@@ -190,12 +190,28 @@ export interface ReturnsResponse {
 }
 
 export interface PerformanceResponse {
-  points: Array<{ date: string; value: string; index: string | null; complete: boolean }>;
+  points: Array<{
+    date: string;
+    value: string;
+    index: string | null;
+    complete: boolean;
+    /** 该点市值来自重算，还是被手工估值快照接管 */
+    valuationSource: 'computed' | 'manual_snapshot';
+    snapshotDate: string | null;
+  }>;
   granularity: 'day' | 'week' | 'month';
   downgraded: boolean;
   period: { from: string; to: string };
   isComplete: boolean;
   missingValuations: string[];
+}
+
+export interface PortfolioValuationRecord {
+  id: string;
+  valuationDate: string;
+  marketValue: string;
+  source: 'computed' | 'manual';
+  note: string | null;
 }
 
 export interface AllocationItem {
@@ -331,6 +347,17 @@ export const portfoliosApi = {
 
   performance: (id: string, params: { from?: string; to?: string } = {}) =>
     api.get<PerformanceResponse>(`/api/portfolios/${id}/performance${query(params)}`),
+
+  valuations: (id: string) =>
+    api.get<{ items: PortfolioValuationRecord[] }>(`/api/portfolios/${id}/valuations`),
+
+  addValuation: (
+    id: string,
+    body: { valuationDate: string; marketValue: string; note?: string | null; overwrite?: boolean },
+  ) => api.post<PortfolioValuationRecord>(`/api/portfolios/${id}/valuations`, body),
+
+  removeValuation: (id: string, valuationId: string) =>
+    api.delete<{ deleted: boolean }>(`/api/portfolios/${id}/valuations/${valuationId}`),
 
   allocation: (id: string) => api.get<AllocationResponse>(`/api/portfolios/${id}/allocation`),
 

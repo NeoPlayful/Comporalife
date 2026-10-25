@@ -26,5 +26,6 @@
   "liabilities": "负债管理",
   "notifications": "通知",
   "audit": "审计日志",
-  "admin": "管理后台"
+  "admin": "管理后台",
+  "exchange-rates": "汇率指标"
 }

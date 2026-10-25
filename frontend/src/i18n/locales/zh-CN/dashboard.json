@@ -29,7 +29,6 @@
     "cashflow_failed": "现金流加载失败",
     "cashflow_basis": "{{note}} · 时区 {{timezone}}",
     "cashflow_missing_rate": "缺少 {{currencies}} 汇率，相关流水未计入收支，",
-
     "allocation": "资产配置",
     "loading_allocation": "加载配置…",
     "allocation_empty": "暂无可分配的资产",
@@ -47,7 +46,10 @@
     "missing_rate": "缺少 {{currencies}} 汇率，",
     "add_rates": "补录汇率",
     "reconciliation_diff": "{{count}} 个账户对账存在差异",
-    "archived_with_balance": "已归档但仍有余额：{{accounts}}"
+    "archived_with_balance": "已归档但仍有余额：{{accounts}}",
+    "unpriced_investments": "{{names}} 未定价，证券市值未计入净资产，",
+    "stale_valuations": "{{names}} 的价格已过期，",
+    "add_prices": "去录入价格"
   },
   "charts": {
     "net_worth_empty_title": "暂无净资产数据",

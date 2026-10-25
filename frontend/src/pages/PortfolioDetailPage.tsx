@@ -472,19 +472,23 @@ export default function PortfolioDetailPage() {
       )}
 
       {tab === 'performance' && (
-        <section className="card space-y-4">
-          {performanceQuery.isLoading || returnsQuery.isLoading ? (
-            <LoadingState />
-          ) : performanceQuery.data ? (
-            <PerformanceChart
-              performance={performanceQuery.data}
-              returns={returnsQuery.data}
-              currency={currency}
-            />
-          ) : (
-            <EmptyState title={t('performance.empty')} />
-          )}
-        </section>
+        <div className="space-y-4">
+          <section className="card space-y-4">
+            {performanceQuery.isLoading || returnsQuery.isLoading ? (
+              <LoadingState />
+            ) : performanceQuery.data ? (
+              <PerformanceChart
+                performance={performanceQuery.data}
+                returns={returnsQuery.data}
+                currency={currency}
+              />
+            ) : (
+              <EmptyState title={t('performance.empty')} />
+            )}
+          </section>
+
+          <ValuationSnapshotPanel portfolioId={id} />
+        </div>
       )}
 
       {tab === 'allocation' && (
@@ -898,5 +902,146 @@ export default function PortfolioDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 手工估值快照。
+ *
+ * 只在「该时点没有价格」时接管证券市值，是用户对整体市值的陈述，
+ * 因此不可拆分到单个标的。列表与录入放在收益页下方，
+ * 因为它的作用就是修复缺价时段的收益曲线。
+ */
+function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
+  const { t } = useTranslation('portfolios');
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState({
+    valuationDate: new Date().toISOString().slice(0, 10),
+    marketValue: '',
+    note: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  const listQuery = useQuery({
+    queryKey: ['portfolio', portfolioId, 'valuations'],
+    queryFn: () => portfoliosApi.valuations(portfolioId),
+  });
+
+  function invalidate() {
+    void queryClient.invalidateQueries({ queryKey: ['portfolio', portfolioId] });
+    void queryClient.invalidateQueries({ queryKey: ['portfolio', portfolioId, 'valuations'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  }
+
+  const addMutation = useMutation({
+    mutationFn: (overwrite: boolean) =>
+      portfoliosApi.addValuation(portfolioId, {
+        valuationDate: draft.valuationDate,
+        marketValue: draft.marketValue.trim(),
+        ...(draft.note.trim() ? { note: draft.note.trim() } : {}),
+        overwrite,
+      }),
+    onSuccess: () => {
+      setDraft({ valuationDate: new Date().toISOString().slice(0, 10), marketValue: '', note: '' });
+      setError(null);
+      invalidate();
+    },
+    onError: (err) => {
+      // 同日已存在快照时后端要求显式覆盖，这里让用户确认后重试
+      if (window.confirm(t('valuations.overwrite_confirm'))) {
+        addMutation.mutate(true);
+        return;
+      }
+      setError(translateError(err, t));
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (valuationId: string) => portfoliosApi.removeValuation(portfolioId, valuationId),
+    onSuccess: () => {
+      setError(null);
+      invalidate();
+    },
+    onError: (err) => setError(translateError(err, t)),
+  });
+
+  const items = listQuery.data?.items ?? [];
+
+  return (
+    <section className="card space-y-3">
+      <div>
+        <h2 className="text-sm font-medium">{t('valuations.title')}</h2>
+        <p className="mt-1 text-xs text-[var(--color-content-muted)]">{t('valuations.hint')}</p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-4">
+        <input
+          type="date"
+          className="input"
+          value={draft.valuationDate}
+          onChange={(event) => setDraft({ ...draft, valuationDate: event.target.value })}
+          aria-label={t('valuations.date')}
+        />
+        <input
+          className="input font-mono"
+          inputMode="decimal"
+          placeholder={t('valuations.market_value')}
+          value={draft.marketValue}
+          onChange={(event) => setDraft({ ...draft, marketValue: event.target.value })}
+          aria-label={t('valuations.market_value')}
+        />
+        <input
+          className="input"
+          placeholder={t('valuations.note')}
+          value={draft.note}
+          onChange={(event) => setDraft({ ...draft, note: event.target.value })}
+          aria-label={t('valuations.note')}
+        />
+        <button
+          type="button"
+          disabled={!draft.valuationDate || !draft.marketValue.trim() || addMutation.isPending}
+          onClick={() => addMutation.mutate(false)}
+          className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {t('valuations.add')}
+        </button>
+      </div>
+
+      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
+
+      {listQuery.isLoading && <LoadingState />}
+
+      {listQuery.data && items.length === 0 && (
+        <p className="py-2 text-sm text-[var(--color-content-muted)]">{t('valuations.empty')}</p>
+      )}
+
+      {items.length > 0 && (
+        <ul className="divide-y divide-[var(--color-border-subtle)]">
+          {items.map((item) => (
+            <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <span className="text-[var(--color-content-muted)]">{formatDate(item.valuationDate)}</span>
+              <span className="font-mono tabular-nums">
+                {formatNumber(item.marketValue, { maximumFractionDigits: 6 })}
+              </span>
+              <span className="flex-1 truncate text-xs text-[var(--color-content-muted)]">
+                {item.note ?? ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(t('valuations.delete_confirm'))) {
+                    removeMutation.mutate(item.id);
+                  }
+                }}
+                className="rounded-lg p-1 text-[var(--color-negative)] hover:bg-[var(--color-negative)]/10 disabled:opacity-50"
+                aria-label={t('valuations.delete')}
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
