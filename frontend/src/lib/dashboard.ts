@@ -126,11 +126,24 @@ export interface RecentTransaction {
   currency: string;
 }
 
+export interface QualityFlagItem {
+  targetType: 'portfolio' | 'asset';
+  targetId: string;
+  name: string;
+  priceDate: string | null;
+  daysStale: number | null;
+  missingSymbols: string[];
+}
+
 export interface DataQuality {
   uncategorizedTransactions: number;
   missingRateCurrencies: string[];
   reconciliationDifferences: Array<{ accountId: string; difference: string; reconciledAt: string }>;
   archivedWithNonZeroBalance: string[];
+  /** 有价格日期但已超过过期阈值 */
+  staleValuations: QualityFlagItem[];
+  /** 从未录价，或组合内存在无价标的 */
+  unpricedInvestments: QualityFlagItem[];
   baseCurrency: string;
 }
 

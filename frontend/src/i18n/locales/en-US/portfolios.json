@@ -86,7 +86,8 @@
     "downgraded": "Many points; granularity downgraded to {{granularity}}.",
     "granularity_day": "day",
     "granularity_week": "week",
-    "granularity_month": "month"
+    "granularity_month": "month",
+    "snapshot_points": "{{count}} points use a manual valuation snapshot rather than recalculated prices."
   },
   "allocation": {
     "title": "Allocation",
@@ -167,26 +168,6 @@
     "confirm_delete": "Deleting a cashflow also reverses the ledger entry. Continue?",
     "hint": "Buys, sells, dividends and fees are not external cashflows and do not belong here."
   },
-  "instruments": {
-    "title": "Instruments",
-    "add": "Add instrument",
-    "empty": "No instruments yet",
-    "empty_hint": "Create an instrument first, then record prices and trades.",
-    "symbol": "Symbol",
-    "name": "Name",
-    "asset_class": "Asset class",
-    "currency": "Currency",
-    "latest_price": "Latest price",
-    "no_price": "No price",
-    "add_price": "Record price",
-    "price_date": "Price date",
-    "price": "Price",
-    "price_created": "Price recorded",
-    "price_updated": "Price updated",
-    "delete_confirm": "Deleting the instrument also removes its prices. Continue?",
-    "price_delete_confirm": "Deleting a price affects historical returns that depend on it. Continue?",
-    "in_use": "This instrument has trades and cannot be deleted."
-  },
   "actions": {
     "edit": "Edit",
     "archive": "Archive",
@@ -207,5 +188,17 @@
     "no_portfolio": "Portfolio not found or deleted",
     "no_permission": "You cannot access this portfolio",
     "load_failed": "Failed to load"
+  },
+  "valuations": {
+    "title": "Valuation snapshots",
+    "hint": "For periods without prices, a manual snapshot supplies the total market value. Recalculation still wins whenever prices exist.",
+    "date": "Valuation date",
+    "market_value": "Market value",
+    "note": "Note",
+    "add": "Add snapshot",
+    "empty": "No snapshots yet",
+    "delete": "Delete snapshot",
+    "delete_confirm": "Deleting this snapshot marks the point incomplete again if no price exists. Delete?",
+    "overwrite_confirm": "A snapshot already exists for this date. Overwrite it?"
   }
 }

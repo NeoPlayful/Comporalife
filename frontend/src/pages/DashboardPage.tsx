@@ -71,7 +71,9 @@ export default function DashboardPage() {
     (quality?.uncategorizedTransactions ?? 0) > 0 ||
     (quality?.missingRateCurrencies.length ?? 0) > 0 ||
     (quality?.reconciliationDifferences.length ?? 0) > 0 ||
-    (quality?.archivedWithNonZeroBalance.length ?? 0) > 0;
+    (quality?.archivedWithNonZeroBalance.length ?? 0) > 0 ||
+    (quality?.staleValuations.length ?? 0) > 0 ||
+    (quality?.unpricedInvestments.length ?? 0) > 0;
 
   const listSeparator = t('common:list_separator');
 
@@ -345,6 +347,34 @@ export default function DashboardPage() {
             </p>
           ) : (
             <ul className="space-y-2 text-sm">
+              {quality.unpricedInvestments.length > 0 && (
+                <li className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />
+                  <span>
+                    {t('dashboard:sections.unpriced_investments', {
+                      names: quality.unpricedInvestments
+                        .map((item) => item.name)
+                        .join(listSeparator),
+                    })}
+                    <Link to="/portfolios" className="text-[var(--color-accent)]">
+                      {t('dashboard:sections.add_prices')}
+                    </Link>
+                  </span>
+                </li>
+              )}
+              {quality.staleValuations.length > 0 && (
+                <li className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />
+                  <span>
+                    {t('dashboard:sections.stale_valuations', {
+                      names: quality.staleValuations.map((item) => item.name).join(listSeparator),
+                    })}
+                    <Link to="/portfolios" className="text-[var(--color-accent)]">
+                      {t('dashboard:sections.add_prices')}
+                    </Link>
+                  </span>
+                </li>
+              )}
               {quality.uncategorizedTransactions > 0 && (
                 <li className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[var(--color-negative)]" />

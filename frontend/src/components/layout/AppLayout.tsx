@@ -31,6 +31,7 @@ const NAV_KEYS = [
   { to: '/analytics', key: 'analytics', icon: BarChart3 },
   { to: '/budgets', key: 'budgets', icon: Target },
   { to: '/portfolios', key: 'portfolios', icon: LineChart },
+  { to: '/exchange-rates', key: 'exchange-rates', icon: ArrowLeftRight },
   { to: '/categories', key: 'categories', icon: Tags },
   { to: '/compound', key: 'compound', icon: Calculator },
   { to: '/monte-carlo', key: 'monte-carlo', icon: Activity },

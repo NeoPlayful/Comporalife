@@ -36,9 +36,13 @@ export const listInstrumentsSchema = z.object({
 
 export const instrumentIdSchema = z.object({ id: z.string().uuid() });
 
+// 价格是 DECIMAL(20,8)：整数位最多 12 位；0 会让市值归零且不进缺价清单，必须拒绝
 export const createPriceSchema = z.object({
   priceDate: dateText,
-  price: z.string().regex(/^\d+(\.\d{1,8})?$/, '价格必须为正数且最多 8 位小数'),
+  price: z
+    .string()
+    .regex(/^\d{1,12}(\.\d{1,8})?$/, '价格格式不正确：整数位最多 12 位、小数位最多 8 位')
+    .refine((value) => Number(value) > 0, '价格必须大于 0'),
   note: z.string().max(200).optional().nullable(),
 });
 
@@ -79,8 +83,18 @@ export const createTradeSchema = z
     instrumentId: z.string().uuid().optional().nullable(),
     kind: z.enum(TRADE_KINDS),
     tradeDate: z.string().datetime({ offset: true }),
-    quantity: z.string().regex(/^\d+(\.\d{1,8})?$/, '数量最多 8 位小数').optional().nullable(),
-    price: z.string().regex(/^\d+(\.\d{1,8})?$/, '价格最多 8 位小数').optional().nullable(),
+    quantity: z
+      .string()
+      .regex(/^\d{1,16}(\.\d{1,8})?$/, '数量最多 16 位整数、8 位小数')
+      .optional()
+      .nullable(),
+    // 价格 0 会让成本与收益同时失真，非买卖类的价格必须为空，故此处只需拒绝 0
+    price: z
+      .string()
+      .regex(/^\d{1,12}(\.\d{1,8})?$/, '价格整数位最多 12 位、小数位最多 8 位')
+      .refine((value) => Number(value) > 0, '价格必须大于 0')
+      .optional()
+      .nullable(),
     amount: z.string().regex(/^\d+(\.\d{1,6})?$/, '金额必须为正数且最多 6 位小数').optional(),
     fee: z.string().regex(/^\d+(\.\d{1,6})?$/).optional(),
     tax: z.string().regex(/^\d+(\.\d{1,6})?$/).optional(),

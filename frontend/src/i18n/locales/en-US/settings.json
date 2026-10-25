@@ -27,7 +27,17 @@
     "edit": "Edit",
     "save": "Save",
     "cancel": "Cancel",
-    "delete": "Delete"
+    "delete": "Delete",
+    "page": {
+      "title": "Exchange Rates",
+      "subtitle": "Rates used to convert foreign currencies into your base currency. Amounts without a rate are excluded from totals.",
+      "new": "Add rate",
+      "pair": "Currency pair",
+      "save": "Save",
+      "empty_title": "No exchange rates yet",
+      "empty_description": "Add a rate to convert foreign-currency accounts and assets into your base currency.",
+      "delete_confirm": "Deleting this rate affects historical conversions. Delete?"
+    }
   },
   "security": {
     "title": "Account security",

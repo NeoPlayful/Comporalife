@@ -12,6 +12,10 @@ export interface ValuePoint {
   date: string;
   value: Decimal;
   complete: boolean;
+  /** 该点市值的来源：重算，或手工估值快照 */
+  valuationSource?: 'computed' | 'manual_snapshot';
+  /** 使用手工快照时，快照自身的估值日期 */
+  snapshotDate?: string | null;
 }
 
 export interface ExternalCashflow {
