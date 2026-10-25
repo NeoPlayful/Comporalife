@@ -11,13 +11,15 @@ export interface RateLookupResult {
 /**
  * 汇率折算：
  * - 同币种直接返回 1
- * - 查最近一条 rateDate <= asOf 的用户汇率
+ * - 查最近一条 rateDate <= asOf 的全局汇率
  * - 缺少直接汇率时尝试反向取倒数
  * - 禁止链式套算（A→B→C），避免中间精度累积成难以解释的偏差
+ *
+ * 汇率已全局化：查询不按用户过滤，同一币种对同一天对所有用户是同一个值。
  */
 export async function resolveRate(
   prisma: PrismaClient,
-  params: { userId: string; from: string; to: string; asOf: Date },
+  params: { from: string; to: string; asOf: Date },
 ): Promise<RateLookupResult | null> {
   if (params.from === params.to) {
     return { rate: new Decimal(1), rateDate: params.asOf, inverted: false };
@@ -25,7 +27,6 @@ export async function resolveRate(
 
   const direct = await prisma.exchangeRate.findFirst({
     where: {
-      userId: params.userId,
       baseCurrency: params.from,
       quoteCurrency: params.to,
       rateDate: { lte: params.asOf },
@@ -40,7 +41,6 @@ export async function resolveRate(
 
   const reverse = await prisma.exchangeRate.findFirst({
     where: {
-      userId: params.userId,
       baseCurrency: params.to,
       quoteCurrency: params.from,
       rateDate: { lte: params.asOf },
@@ -70,7 +70,6 @@ export interface ConversionResult {
 export async function convertMany(
   prisma: PrismaClient,
   params: {
-    userId: string;
     baseCurrency: string;
     asOf: Date;
     items: Array<{ amount: Decimal; currency: string }>;
@@ -92,7 +91,6 @@ export async function convertMany(
 
     if (rate === undefined) {
       rate = await resolveRate(prisma, {
-        userId: params.userId,
         from: item.currency,
         to: params.baseCurrency,
         asOf: params.asOf,

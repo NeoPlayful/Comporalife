@@ -3,6 +3,7 @@ import { env } from './config/env.js';
 import { isMailConfigured } from './lib/mailer.js';
 import { scheduleImportCleanup } from './modules/imports/cleanup.js';
 import { scheduleDataRetention } from './modules/jobs/retention.js';
+import { scheduleRateSync } from './modules/market-data/rate-sync.scheduler.js';
 
 async function main() {
   const app = await buildApp();
@@ -13,6 +14,9 @@ async function main() {
   const stopRetention = scheduleDataRetention(app.prisma, (err) => {
     app.log.warn({ err }, '备份与导出保留清理任务失败');
   });
+  const stopRateSync = scheduleRateSync(app, (err) => {
+    app.log.warn({ err }, '汇率同步任务失败');
+  });
 
   // 生产环境没有 SMTP 时，密码重置与邮箱验证都不可用；提前告警而不是等用户触发才报错
   if (env.NODE_ENV === 'production' && !isMailConfigured()) {
@@ -21,6 +25,7 @@ async function main() {
   app.addHook('onClose', async () => {
     stopCleanup();
     stopRetention();
+    stopRateSync();
   });
 
   const shutdown = async (signal: string) => {

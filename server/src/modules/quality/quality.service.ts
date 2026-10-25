@@ -280,6 +280,14 @@ export async function findStaleValuations(
     priceDate: string | null;
     daysStale: number | null;
     missingSymbols: string[];
+    /** 标的级明细：哪些标的多久没更新价格，供明细页下钻 */
+    instruments: Array<{
+      instrumentId: string;
+      symbol: string;
+      name: string;
+      priceDate: string | null;
+      daysStale: number | null;
+    }>;
   }>;
   total: number;
 }> {
@@ -303,6 +311,16 @@ export async function findStaleValuations(
         priceDate: summary.priceDate,
         daysStale,
         missingSymbols: summary.missingSymbols,
+        // 组合级只看得到「整体过期」，用户需要知道具体是哪个标的拖后腿
+        instruments: summary.holdings.map((holding) => ({
+          instrumentId: holding.instrumentId,
+          symbol: holding.symbol,
+          name: holding.name,
+          priceDate: holding.priceDate,
+          daysStale: holding.priceDate
+            ? Math.floor((asOf.getTime() - new Date(holding.priceDate).getTime()) / DAY_MS)
+            : null,
+        })),
       };
     });
 
@@ -330,6 +348,7 @@ export async function findStaleValuations(
           priceDate: null,
           daysStale: null,
           missingSymbols: [] as string[],
+          instruments: [],
         };
       }
 
@@ -343,6 +362,7 @@ export async function findStaleValuations(
         priceDate: latest.valuationDate.toISOString().slice(0, 10),
         daysStale,
         missingSymbols: [] as string[],
+        instruments: [],
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -361,10 +381,18 @@ export async function findRateLag(
   prisma: PrismaClient,
   context: QualityContext,
 ): Promise<{
-  items: Array<{ from: string; to: string; latestDate: string | null; daysLag: number | null }>;
+  items: Array<{
+    from: string;
+    to: string;
+    latestDate: string | null;
+    daysLag: number | null;
+    source: 'manual' | 'provider' | null;
+    /** missing = 从未录入；sync_failed = 同步失败；stale = 有值但过期 */
+    state: 'missing' | 'sync_failed' | 'stale';
+  }>;
   total: number;
 }> {
-  const [accounts, portfolios, assets, liabilities] = await Promise.all([
+  const [accounts, portfolios, assets, liabilities, lastRun] = await Promise.all([
     prisma.account.findMany({
       where: { userId: context.userId, status: 'active' },
       select: { currency: true },
@@ -381,7 +409,18 @@ export async function findRateLag(
       where: { userId: context.userId, status: 'active' },
       select: { currency: true },
     }),
+    // 同步失败与「从未录入」要给用户不同的处置建议，必须区分开
+    prisma.rateSyncRun.findFirst({
+      orderBy: { startedAt: 'desc' },
+      select: { failures: true },
+    }),
   ]);
+
+  const failedPairs = new Set(
+    Array.isArray(lastRun?.failures)
+      ? (lastRun!.failures as Array<{ pair?: string }>).map((item) => item.pair ?? '')
+      : [],
+  );
 
   const currencies = new Set<string>();
   for (const account of accounts) currencies.add(account.currency);
@@ -390,19 +429,25 @@ export async function findRateLag(
   for (const liability of liabilities) currencies.add(liability.currency);
   currencies.delete(context.baseCurrency);
 
-  const items: Array<{ from: string; to: string; latestDate: string | null; daysLag: number | null }> = [];
+  const items: Array<{
+    from: string;
+    to: string;
+    latestDate: string | null;
+    daysLag: number | null;
+    source: 'manual' | 'provider' | null;
+    state: 'missing' | 'sync_failed' | 'stale';
+  }> = [];
 
   for (const currency of currencies) {
     const latest = await prisma.exchangeRate.findFirst({
       where: {
-        userId: context.userId,
         OR: [
           { baseCurrency: currency, quoteCurrency: context.baseCurrency },
           { baseCurrency: context.baseCurrency, quoteCurrency: currency },
         ],
       },
       orderBy: { rateDate: 'desc' },
-      select: { rateDate: true },
+      select: { rateDate: true, source: true },
     });
 
     const latestDate = latest ? latest.rateDate.toISOString().slice(0, 10) : null;
@@ -411,7 +456,16 @@ export async function findRateLag(
       : null;
 
     if (daysLag === null || daysLag > RATE_STALE_DAYS) {
-      items.push({ from: currency, to: context.baseCurrency, latestDate, daysLag });
+      const pairText = `${currency}->${context.baseCurrency}`;
+      const state = failedPairs.has(pairText) ? 'sync_failed' : latest ? 'stale' : 'missing';
+      items.push({
+        from: currency,
+        to: context.baseCurrency,
+        latestDate,
+        daysLag,
+        source: latest?.source ?? null,
+        state,
+      });
     }
   }
 

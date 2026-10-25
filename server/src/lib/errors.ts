@@ -78,6 +78,12 @@ export const ErrorCode = {
   CASHFLOW_NOT_FOUND: 'CASHFLOW_NOT_FOUND',
   CASHFLOW_AMOUNT_INVALID: 'CASHFLOW_AMOUNT_INVALID',
   VALUATION_DATE_EXISTS: 'VALUATION_DATE_EXISTS',
+  // ===== 汇率（全局参考数据）=====
+  RATE_WRITE_FORBIDDEN: 'RATE_WRITE_FORBIDDEN',
+  RATE_PAIR_REQUEST_EXISTS: 'RATE_PAIR_REQUEST_EXISTS',
+  RATE_PROVIDER_NOT_CONFIGURED: 'RATE_PROVIDER_NOT_CONFIGURED',
+  RATE_SYNC_IN_PROGRESS: 'RATE_SYNC_IN_PROGRESS',
+  RATE_SYNC_DISABLED: 'RATE_SYNC_DISABLED',
   PORTFOLIO_VALUATION_NOT_FOUND: 'PORTFOLIO_VALUATION_NOT_FOUND',
   ALLOCATION_TARGETS_INVALID: 'ALLOCATION_TARGETS_INVALID',
   ALLOCATION_TARGETS_MISMATCH: 'ALLOCATION_TARGETS_MISMATCH',
@@ -215,6 +221,11 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   CASHFLOW_NOT_FOUND: 404,
   CASHFLOW_AMOUNT_INVALID: 422,
   VALUATION_DATE_EXISTS: 409,
+  RATE_WRITE_FORBIDDEN: 403,
+  RATE_PAIR_REQUEST_EXISTS: 409,
+  RATE_PROVIDER_NOT_CONFIGURED: 400,
+  RATE_SYNC_IN_PROGRESS: 409,
+  RATE_SYNC_DISABLED: 409,
   PORTFOLIO_VALUATION_NOT_FOUND: 404,
   ALLOCATION_TARGETS_INVALID: 422,
   ALLOCATION_TARGETS_MISMATCH: 422,
@@ -312,6 +323,15 @@ export const errors = {
     new AppError(ErrorCode.CROSS_CURRENCY_TRANSFER_UNSUPPORTED, '当前版本不支持跨币种转账'),
   rateMissing: (pairs: string[]) =>
     new AppError(ErrorCode.CURRENCY_RATE_MISSING, '缺少折算所需汇率', { missingPairs: pairs }),
+  rateWriteForbidden: () =>
+    new AppError(ErrorCode.RATE_WRITE_FORBIDDEN, '汇率由系统统一维护，请在「汇率指标」页提交申请'),
+  ratePairRequestExists: () =>
+    new AppError(ErrorCode.RATE_PAIR_REQUEST_EXISTS, '该币种对已有待审核的申请'),
+  rateProviderNotConfigured: () =>
+    new AppError(ErrorCode.RATE_PROVIDER_NOT_CONFIGURED, '未配置外部汇率源'),
+  rateSyncInProgress: () =>
+    new AppError(ErrorCode.RATE_SYNC_IN_PROGRESS, '已有汇率同步在进行中'),
+  rateSyncDisabled: () => new AppError(ErrorCode.RATE_SYNC_DISABLED, '汇率自动同步未开启'),
   simulationInvalid: (message: string) => new AppError(ErrorCode.SIMULATION_PARAMETERS_INVALID, message),
   mailNotConfigured: () => new AppError(ErrorCode.MAIL_NOT_CONFIGURED, '邮件服务未配置'),
   mailDeliveryFailed: () => new AppError(ErrorCode.MAIL_DELIVERY_FAILED, '邮件投递失败'),

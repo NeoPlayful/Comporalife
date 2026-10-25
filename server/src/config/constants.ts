@@ -327,7 +327,7 @@ export const BACKUP_RETENTION_COUNT = envInt('BACKUP_RETENTION_COUNT', 10);
 export const BACKUP_RETENTION_DAYS = envInt('BACKUP_RETENTION_DAYS', 90);
 
 /** 备份包结构版本：新建包一律写当前版本 */
-export const BACKUP_SCHEMA_VERSION = 'comporalife-backup-v2';
+export const BACKUP_SCHEMA_VERSION = 'comporalife-backup-v3';
 
 /**
  * 可读取的备份结构版本。
@@ -337,6 +337,8 @@ export const BACKUP_SCHEMA_VERSION = 'comporalife-backup-v2';
 export const BACKUP_SUPPORTED_VERSIONS = [
   'comporalife-backup-v1',
   'comporalife-backup-v2',
+  // v3 起汇率移出用户备份域；读 v2 包时该域被忽略并给出警告
+  'comporalife-backup-v3',
 ] as const;
 
 /** 导出包结构版本 */
@@ -374,6 +376,9 @@ export const DUPLICATE_WINDOW_DAYS = envInt('DUPLICATE_WINDOW_DAYS', 3);
 
 /** 汇率滞后的天数阈值 */
 export const RATE_STALE_DAYS = envInt('RATE_STALE_DAYS', 7);
+
+/** 汇率同步运行记录的保留天数 */
+export const RATE_SYNC_RUN_RETENTION_DAYS = envInt('RATE_SYNC_RUN_RETENTION_DAYS', 90);
 
 /** 数据质量总览默认回看的月数 */
 export const QUALITY_LOOKBACK_MONTHS = envInt('QUALITY_LOOKBACK_MONTHS', 12);

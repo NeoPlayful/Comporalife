@@ -1,5 +1,9 @@
 import type { PrismaClient } from '@prisma/client';
-import { AUDIT_LOG_RETENTION_DAYS, NOTIFICATION_RETENTION_DAYS } from '../../config/constants.js';
+import {
+  AUDIT_LOG_RETENTION_DAYS,
+  NOTIFICATION_RETENTION_DAYS,
+  RATE_SYNC_RUN_RETENTION_DAYS,
+} from '../../config/constants.js';
 import { pruneBackups } from '../backups/backup.service.js';
 import { pruneExports } from '../exports/export.service.js';
 
@@ -15,6 +19,7 @@ export interface DataRetentionResult {
   exportsExpired: number;
   notificationsDeleted: number;
   auditLogsDeleted: number;
+  rateSyncRunsDeleted: number;
 }
 
 /**
@@ -30,6 +35,7 @@ export async function runDataRetentionCleanup(prisma: PrismaClient): Promise<Dat
     exportsExpired: 0,
     notificationsDeleted: 0,
     auditLogsDeleted: 0,
+    rateSyncRunsDeleted: 0,
   };
 
   let cursor: string | undefined;
@@ -74,6 +80,11 @@ export async function runDataRetentionCleanup(prisma: PrismaClient): Promise<Dat
   const auditCutoff = new Date(Date.now() - AUDIT_LOG_RETENTION_DAYS * DAY_MS);
   const auditDeleted = await prisma.auditLog.deleteMany({ where: { createdAt: { lt: auditCutoff } } });
   result.auditLogsDeleted = auditDeleted.count;
+
+  // 汇率同步运行记录属于运维元数据，保留期内足够排查，超期清理
+  const syncCutoff = new Date(Date.now() - RATE_SYNC_RUN_RETENTION_DAYS * DAY_MS);
+  const syncDeleted = await prisma.rateSyncRun.deleteMany({ where: { startedAt: { lt: syncCutoff } } });
+  result.rateSyncRunsDeleted = syncDeleted.count;
 
   return result;
 }

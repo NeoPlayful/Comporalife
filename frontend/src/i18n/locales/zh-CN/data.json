@@ -46,7 +46,10 @@
     "rate_pair": "{{from}} → {{to}} · {{status}}",
     "rate_missing": "没有汇率",
     "rate_days": "{{days}} 天前",
-    "load_more": "加载更多"
+    "load_more": "加载更多",
+    "go_record_price": "去录价",
+    "stale_days": "{{days}} 天前",
+    "no_price_yet": "未录价格"
   },
   "export": {
     "title": "数据导出",

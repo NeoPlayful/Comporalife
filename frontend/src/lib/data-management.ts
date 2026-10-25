@@ -56,6 +56,14 @@ export interface StaleValuationItem {
   priceDate: string | null;
   daysStale: number | null;
   missingSymbols: string[];
+  /** 标的级明细，用于「哪个标的该更新价格」的下钻 */
+  instruments: Array<{
+    instrumentId: string;
+    symbol: string;
+    name: string;
+    priceDate: string | null;
+    daysStale: number | null;
+  }>;
 }
 
 export interface RateLagItem {

@@ -249,7 +249,6 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     const converted: Array<{ type: string; amount: Decimal }> = [];
     for (const [type, items] of itemsByType) {
       const result = await convertMany(app.prisma, {
-        userId,
         baseCurrency: settings.baseCurrency,
         asOf,
         items,
@@ -278,7 +277,6 @@ export default async function dashboardRoutes(app: FastifyInstance) {
 
     if (assetItems.length > 0) {
       const result = await convertMany(app.prisma, {
-        userId,
         baseCurrency: settings.baseCurrency,
         asOf,
         items: assetItems,
@@ -500,7 +498,6 @@ export default async function dashboardRoutes(app: FastifyInstance) {
 
     for (const currency of involvedCurrencies) {
       const conversion = await convertMany(app.prisma, {
-        userId,
         baseCurrency: settings.baseCurrency,
         asOf,
         items: [{ amount: toDecimal(0), currency }],
@@ -509,6 +506,20 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         missingRateCurrencies.add(currency);
       }
     }
+
+    // 同步失败与「从未录入」的处置不同：前者要去后台看供应商，后者要补录
+    const lastSync = await app.prisma.rateSyncRun.findFirst({
+      orderBy: { startedAt: 'desc' },
+      select: { failures: true },
+    });
+    const failedPairs = new Set(
+      Array.isArray(lastSync?.failures)
+        ? (lastSync!.failures as Array<{ pair?: string }>).map((item) => item.pair ?? '')
+        : [],
+    );
+    const syncFailedCurrencies = [...missingRateCurrencies].filter((currency) =>
+      failedPairs.has(`${currency}->${settings.baseCurrency}`),
+    );
 
     const archivedWithBalance = await app.prisma.account.findMany({
       where: { userId, status: 'archived' },
@@ -541,6 +552,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       {
         uncategorizedTransactions: uncategorizedCount,
         missingRateCurrencies: [...missingRateCurrencies],
+        syncFailedRateCurrencies: syncFailedCurrencies,
         reconciliationDifferences: reconcileDifferences.map((record) => ({
           accountId: record.accountId,
           difference: moneyToString(record.difference.toString()),

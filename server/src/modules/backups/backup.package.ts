@@ -31,7 +31,6 @@ export type BackupDomain =
   | 'simulation_scenarios'
   | 'goals'
   | 'reports'
-  | 'exchange_rates'
   | 'settings';
 
 export const BACKUP_DOMAINS = [
@@ -55,7 +54,6 @@ export const BACKUP_DOMAINS = [
   'simulation_scenarios',
   'goals',
   'reports',
-  'exchange_rates',
   'settings',
 ] as const satisfies readonly BackupDomain[];
 
@@ -81,7 +79,6 @@ export const RESTORE_ORDER: BackupDomain[] = [
   'simulation_scenarios',
   'goals',
   'reports',
-  'exchange_rates',
   'settings',
 ];
 
@@ -163,12 +160,8 @@ export async function buildBackupPackage(
 
   const compoundScenarios = await prisma.simulationScenario.findMany({ where: { userId }, orderBy: { id: 'asc' } });
 
-  // 汇率为手工维护，重建成本高；缺失会让历史折算无法复现，因此默认包含
-  const includeRates = params.includeRates ?? true;
-  const exchangeRates = includeRates
-    ? await prisma.exchangeRate.findMany({ where: { userId }, orderBy: { id: 'asc' } })
-    : [];
-
+  // 汇率已是全局系统参考数据（Phase 10）。个人备份不得回滚所有人共用的汇率，
+  // 因此该域不再进包；恢复旧包时按「已迁移为系统数据」忽略。
   const domains: Partial<Record<BackupDomain, unknown[]>> = {
     accounts: plain(accounts),
     categories: plain(categories),
@@ -192,7 +185,6 @@ export async function buildBackupPackage(
     valuations: plain(valuations),
     simulation_scenarios: plain([...compoundScenarios, ...simulationScenarios]),
     goals: plain(goals),
-    exchange_rates: plain(exchangeRates),
     reports: plain(
       reports.map((report) => ({
         id: report.id,
@@ -226,6 +218,7 @@ export async function buildBackupPackage(
     excluded: ['original_statement_files', 'password_hash', 'refresh_tokens', 'sessions', 'audit_logs', 'monte_carlo_results'],
     notes: [
       '备份为逻辑数据包，不包含原始账单文件与登录凭据',
+      '汇率属于系统参考数据，由后台统一维护，不随个人备份回滚',
       '蒙特卡罗运行只保留方案参数，结果可按种子与模型版本重算',
       '恢复不会删除备份中不存在的现有数据',
     ],

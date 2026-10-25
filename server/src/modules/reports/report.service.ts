@@ -129,7 +129,6 @@ async function buildNetWorth(ctx: BuildContext) {
     let rate = rateCache.get(account.currency);
     if (rate === undefined) {
       const resolved = await resolveRate(ctx.prisma, {
-        userId: ctx.userId,
         from: account.currency,
         to: ctx.baseCurrency,
         asOf,

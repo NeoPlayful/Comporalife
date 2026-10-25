@@ -43,7 +43,7 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-8';
+const PHASE = 'phase-10';
 
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断

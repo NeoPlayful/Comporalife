@@ -484,8 +484,8 @@ export async function loadDataset(
     }
 
     case 'exchange_rates': {
+      // 汇率是全局系统参考数据：导出的是「当时的快照」，不是用户私有数据
       const rows = await prisma.exchangeRate.findMany({
-        where: { userId: context.userId },
         orderBy: [{ baseCurrency: 'asc' }, { quoteCurrency: 'asc' }, { rateDate: 'asc' }],
         select: { id: true, baseCurrency: true, quoteCurrency: true, rate: true, rateDate: true, source: true },
       });

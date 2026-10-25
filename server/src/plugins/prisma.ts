@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
+import { isTest } from '../config/env.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -9,7 +10,8 @@ declare module 'fastify' {
 }
 
 async function prismaPlugin(app: FastifyInstance) {
-  const prisma = new PrismaClient();
+  // 测试里要通过 $on('query') 断言「循环内不查库」，事件只在开启日志后才有
+  const prisma = new PrismaClient({ log: isTest ? [{ emit: 'event', level: 'query' }] : [] });
 
   await prisma.$connect();
 

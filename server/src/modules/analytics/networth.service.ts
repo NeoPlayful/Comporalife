@@ -112,13 +112,11 @@ async function computeOtherAssetsAndLiabilities(
 
   const [assetConversion, liabilityConversion] = await Promise.all([
     convertMany(prisma, {
-      userId: params.userId,
       baseCurrency: params.baseCurrency,
       asOf: params.asOf,
       items: assetsToConvert,
     }),
     convertMany(prisma, {
-      userId: params.userId,
       baseCurrency: params.baseCurrency,
       asOf: params.asOf,
       items: liabilitiesToConvert,
@@ -208,19 +206,16 @@ export async function computeNetWorth(
 
   const [assetConversion, liabilityConversion, securitiesConversion] = await Promise.all([
     convertMany(prisma, {
-      userId: params.userId,
       baseCurrency: params.baseCurrency,
       asOf: params.asOf,
       items: assetItems,
     }),
     convertMany(prisma, {
-      userId: params.userId,
       baseCurrency: params.baseCurrency,
       asOf: params.asOf,
       items: liabilityItems,
     }),
     convertMany(prisma, {
-      userId: params.userId,
       baseCurrency: params.baseCurrency,
       asOf: params.asOf,
       items: securitiesItems,

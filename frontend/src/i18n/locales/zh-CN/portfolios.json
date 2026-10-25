@@ -67,6 +67,16 @@
     "stale": "价格过期",
     "no_price_hint": "没有价格时不计入市值与未实现损益，请先录入价格。"
   },
+  "instruments": {
+    "title": "投资标的",
+    "add": "新增标的",
+    "symbol": "代码",
+    "name": "名称",
+    "price": "价格",
+    "add_price": "录入价格",
+    "update_price": "更新价格",
+    "focus_price": "补录该标的价格"
+  },
   "performance": {
     "title": "收益曲线",
     "empty": "暂无收益数据",

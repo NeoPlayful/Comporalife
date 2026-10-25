@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import LoadingState from '@/components/ui/LoadingState';
 import { dataQualityApi } from '@/lib/data-management';
 import { formatDate, formatNumber } from '@/lib/format';
+import { Link } from 'react-router-dom';
 
 function money(amount: string, currency: string): string {
   return `${formatNumber(amount, { maximumFractionDigits: 2 })} ${currency}`;
@@ -134,16 +135,50 @@ export default function QualityDetailTable({ metricKey }: Props) {
     return (
       <ul className="divide-y divide-[var(--color-border-subtle)] rounded-xl border border-[var(--color-border-subtle)]">
         {data.items.map((item) => (
-          <li key={`${item.targetType}:${item.targetId}`} className="p-3 text-sm">
-            {item.priceDate
-              ? t(item.targetType === 'asset' ? 'quality.stale_asset' : 'quality.stale_portfolio', {
-                  name: item.name,
-                  date: formatDate(item.priceDate),
-                  days: item.daysStale ?? 0,
-                })
-              : `${item.name} · ${t('quality.never_valued')}`}
+          <li key={`${item.targetType}:${item.targetId}`} className="space-y-1.5 p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <span>
+                {item.priceDate
+                  ? t(item.targetType === 'asset' ? 'quality.stale_asset' : 'quality.stale_portfolio', {
+                      name: item.name,
+                      date: formatDate(item.priceDate),
+                      days: item.daysStale ?? 0,
+                    })
+                  : `${item.name} · ${t('quality.never_valued')}`}
+              </span>
+              {item.targetType === 'portfolio' && (
+                <Link
+                  to={`/portfolios/${item.targetId}`}
+                  className="shrink-0 text-xs text-[var(--color-accent)]"
+                >
+                  {t('quality.go_record_price')}
+                </Link>
+              )}
+            </div>
+            {/* 组合级只知道「整体过期」，具体哪个标的没更新才是用户要处理的 */}
+            {item.instruments.length > 0 && (
+              <ul className="space-y-0.5 border-l-2 border-[var(--color-border-subtle)] pl-2 text-xs">
+                {item.instruments.map((holding) => (
+                  <li key={holding.instrumentId} className="flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {holding.symbol}
+                      {holding.name ? ` · ${holding.name}` : ''}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-[var(--color-content-muted)]">
+                      {holding.priceDate
+                        ? `${formatDate(holding.priceDate)} · ${t('quality.stale_days', {
+                            days: holding.daysStale ?? 0,
+                          })}`
+                        : t('quality.no_price_yet')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
             {item.missingSymbols.length > 0 && (
-              <p className="text-xs text-[var(--color-content-muted)]">{item.missingSymbols.join(', ')}</p>
+              <p className="text-xs text-[var(--color-content-muted)]">
+                {item.missingSymbols.join(', ')}
+              </p>
             )}
           </li>
         ))}

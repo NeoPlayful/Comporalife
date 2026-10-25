@@ -299,7 +299,7 @@ audit_logs                敏感操作审计
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | id | UUID | 主键 |
-| userId | UUID | 归属用户（个人汇率，非全局） |
+| userId | UUID | 归属用户（个人汇率，非全局）。**Phase 10 修正**：汇率改为全局系统参考数据，已移除 userId |
 | baseCurrency | String | 基准币种 |
 | quoteCurrency | String | 计价币种 |
 | rate | Decimal(20,10) | 1 base = rate quote |
@@ -339,7 +339,7 @@ audit_logs                敏感操作审计
 | 7 | 分类归属 | 系统预设在建号时复制给用户 | 避免 `userId = NULL` 的权限分支与唯一索引空值问题 |
 | 8 | 交易删除 | 冲正替代硬删 | 保留余额可追溯性，符合功能文档要求 |
 | 9 | 转账币种 | Phase 1 仅同币种 | 跨币种需汇兑差额与双侧汇率，正确性成本高 |
-| 10 | 汇率来源 | 仅手工维护 | 无外部依赖，Dashboard 缺失汇率时明确报错 |
+| 10 | 汇率来源 | 仅手工维护 | 无外部依赖，Dashboard 缺失汇率时明确报错。**Phase 10 修正**：新增后台维护与外部汇率源自动同步，折算内核不变 |
 | 11 | 时区处理 | 存储 UTC，统计按用户时区切月 | 避免月末跨时区错分 |
 | 12 | 分页 | `page` + `pageSize`，上限 100 | Phase 1 数据量小，不需要游标分页 |
 | 13 | 乐观锁 | `accounts.version`、`transactions.version` | 冲突返回 409，避免并发覆盖 |

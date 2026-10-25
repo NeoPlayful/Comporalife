@@ -1,8 +1,21 @@
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatDate, formatNumber, formatPrice } from '@/lib/format';
 import type { Holding } from '@/lib/portfolios';
 import { AlertTriangle } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
+
+function PriceAction({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded border border-[var(--color-border-subtle)] px-1.5 py-0.5 text-[11px] hover:bg-black/5 dark:hover:bg-white/5"
+    >
+      {children}
+    </button>
+  );
+}
 
 function pct(value: string | null): string {
   if (value === null) return '—';
@@ -12,9 +25,12 @@ function pct(value: string | null): string {
 export default function HoldingTable({
   holdings,
   currency,
+  onRecordPrice,
 }: {
   holdings: Holding[];
   currency: string;
+  /** 缺价或价格过期时把用户带到底部的录价表单，避免再去下拉里找标的 */
+  onRecordPrice?: (instrumentId: string) => void;
 }) {
   const { t } = useTranslation('portfolios');
 
@@ -57,13 +73,23 @@ export default function HoldingTable({
               </dd>
             </dl>
             {holding.price === null ? (
-              <p className="mt-2 text-xs text-[var(--color-warning,#d3a35a)]">
+              <p className="mt-2 flex items-center gap-2 text-xs text-[var(--color-warning,#d3a35a)]">
                 {t('holdings.missing_price')}
+                {onRecordPrice && (
+                  <PriceAction onClick={() => onRecordPrice(holding.instrumentId)}>
+                    {t('instruments.add_price')}
+                  </PriceAction>
+                )}
               </p>
             ) : (
-              <p className="mt-2 text-xs text-[var(--color-content-muted)]">
-                {formatNumber(holding.price)} · {formatDate(holding.priceDate)}
+              <p className="mt-2 flex items-center gap-2 text-xs text-[var(--color-content-muted)]">
+                {formatPrice(holding.price)} · {formatDate(holding.priceDate)}
                 {holding.stale && ` · ${t('holdings.stale')}`}
+                {onRecordPrice && (
+                  <PriceAction onClick={() => onRecordPrice(holding.instrumentId)}>
+                    {t('instruments.update_price')}
+                  </PriceAction>
+                )}
               </p>
             )}
           </div>
@@ -96,16 +122,38 @@ export default function HoldingTable({
                 </td>
                 <td className="py-2 text-right tabular-nums">
                   {holding.price === null ? (
-                    <span className="text-[var(--color-warning,#d3a35a)]">
-                      {t('holdings.missing_price')}
-                    </span>
+                    <>
+                      <span className="text-[var(--color-warning,#d3a35a)]">
+                        {t('holdings.missing_price')}
+                      </span>
+                      {onRecordPrice && (
+                        <PriceAction onClick={() => onRecordPrice(holding.instrumentId)}>
+                          {t('instruments.add_price')}
+                        </PriceAction>
+                      )}
+                    </>
                   ) : (
                     <>
-                      <p>{formatNumber(holding.price)}</p>
+                      <p>{formatPrice(holding.price)}</p>
                       <p className="text-xs text-[var(--color-content-muted)]">
-                        {formatDate(holding.priceDate)}
+                        {onRecordPrice ? (
+                          <button
+                            type="button"
+                            onClick={() => onRecordPrice(holding.instrumentId)}
+                            className="underline decoration-dotted hover:text-[var(--color-accent)]"
+                          >
+                            {formatDate(holding.priceDate)}
+                          </button>
+                        ) : (
+                          formatDate(holding.priceDate)
+                        )}
                         {holding.stale && ` · ${t('holdings.stale')}`}
                       </p>
+                      {onRecordPrice && holding.stale && (
+                        <PriceAction onClick={() => onRecordPrice(holding.instrumentId)}>
+                          {t('instruments.update_price')}
+                        </PriceAction>
+                      )}
                     </>
                   )}
                 </td>

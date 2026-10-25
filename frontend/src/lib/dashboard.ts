@@ -178,9 +178,22 @@ export interface ExchangeRateRecord {
   id: string;
   baseCurrency: string;
   quoteCurrency: string;
+  /** DECIMAL(20,10) 定长字符串，展示用 formatRate */
   rate: string;
   rateDate: string;
-  source: string;
+  /** manual = 后台人工录入；provider = 外部汇率源自动写入 */
+  source: 'manual' | 'provider';
+}
+
+export interface RatePairRequestRecord {
+  id: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  reason: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
 }
 
 export interface ExchangeRatePage {
@@ -188,6 +201,10 @@ export interface ExchangeRatePage {
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 }
 
+/**
+ * 汇率只读：汇率由后台统一维护，用户不能写入。
+ * 对缺失币种对只能提交申请，由管理员决定是否纳入维护。
+ */
 export const exchangeRatesApi = {
   list: (params: { page?: number; pageSize?: number } = {}) => {
     const query = new URLSearchParams();
@@ -196,8 +213,12 @@ export const exchangeRatesApi = {
     const suffix = query.toString() ? `?${query}` : '';
     return api.get<ExchangeRatePage>(`/api/exchange-rates/manual${suffix}`);
   },
-  // 同一币种对同一天走 upsert，因此编辑与新增是同一个接口
-  create: (body: { baseCurrency: string; quoteCurrency: string; rate: string; rateDate: string }) =>
-    api.post<{ exchangeRate: ExchangeRateRecord }>('/api/exchange-rates/manual', body),
-  remove: (id: string) => api.delete<{ deleted: boolean }>(`/api/exchange-rates/manual/${id}`),
+  pairRequests: () =>
+    api.get<{ requests: RatePairRequestRecord[]; pagination: ExchangeRatePage['pagination'] }>(
+      '/api/exchange-rates/pair-requests',
+    ),
+  createPairRequest: (body: { baseCurrency: string; quoteCurrency: string; reason?: string }) =>
+    api.post<{ request: RatePairRequestRecord }>('/api/exchange-rates/pair-requests', body),
+  removePairRequest: (id: string) =>
+    api.delete<{ deleted: boolean }>(`/api/exchange-rates/pair-requests/${id}`),
 };

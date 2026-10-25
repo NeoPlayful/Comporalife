@@ -73,7 +73,8 @@ function requireSuperAdmin(request: FastifyRequest): AuthContext {
 }
 
 export default async function adminRoutes(app: FastifyInstance) {
-  // 所有管理接口都不返回任何用户财务内容；这是产品红线，测试逐字段断言
+  // 红线：管理接口不返回任何用户的余额、流水、持仓、目标、报表、导入内容。
+  // 汇率与标的元数据属于系统参考数据，后台可见可维护；标的价格仍属持仓上下文，不暴露。
 
   // ===== 仪表板 =====
   app.get('/admin/dashboard/overview', { preHandler: app.authenticate }, async (request) => {
