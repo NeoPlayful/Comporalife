@@ -20,6 +20,8 @@ import budgetsRoutes from './modules/budgets/budgets.routes.js';
 import portfoliosRoutes from './modules/portfolios/portfolios.routes.js';
 import tradesRoutes from './modules/portfolios/trades.routes.js';
 import categoriesRoutes from './modules/categories/categories.routes.js';
+import adminRatesRoutes from './modules/admin/admin-rates.routes.js';
+import marketDataRoutes from './modules/market-data/market-data.routes.js';
 import currenciesRoutes from './modules/currencies/currencies.routes.js';
 import importsRoutes from './modules/imports/imports.routes.js';
 import importsCommitRoutes from './modules/imports/imports.commit.routes.js';
@@ -139,6 +141,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     await app.register(ledgerRoutes, { prefix: API_PREFIX });
     await app.register(matchRoutes, { prefix: API_PREFIX });
     await app.register(currenciesRoutes, { prefix: API_PREFIX });
+    await app.register(adminRatesRoutes, { prefix: API_PREFIX });
+    await app.register(marketDataRoutes, { prefix: API_PREFIX });
     await app.register(dashboardRoutes, { prefix: API_PREFIX });
     await app.register(analyticsRoutes, { prefix: API_PREFIX });
     await app.register(budgetsRoutes, { prefix: API_PREFIX });

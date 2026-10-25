@@ -14,6 +14,27 @@ import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+/**
+ * 首页只提示「哪些组合有问题」，但用户真正要操作的是单个组合。
+ * 只有一个组合时直接跳进去；多个时退回列表，避免指向不明。
+ */
+function InvestmentLink({
+  items,
+  label,
+}: {
+  items: Array<{ targetType: 'portfolio' | 'asset'; targetId: string }>;
+  label: string;
+}) {
+  const only = items.length === 1 ? items[0] : null;
+  const to = only && only.targetType === 'portfolio' ? `/portfolios/${only.targetId}` : '/portfolios';
+
+  return (
+    <Link to={to} className="text-[var(--color-accent)]">
+      {label}
+    </Link>
+  );
+}
+
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { accountType, transactionType } = useEnumLabels();
@@ -201,7 +222,7 @@ export default function DashboardPage() {
             {t('dashboard:missing_rates.body', {
               currencies: overview.basis.missingRates.join(listSeparator),
             })}
-            <Link to="/settings" className="mx-1 underline">
+            <Link to="/exchange-rates" className="mx-1 underline">
               {t('dashboard:missing_rates.settings_link')}
             </Link>
             {t('dashboard:missing_rates.body_suffix')}
@@ -251,7 +272,7 @@ export default function DashboardPage() {
                 {t('dashboard:sections.cashflow_missing_rate', {
                   currencies: cashflowQuery.data!.basis.missingRates.join(listSeparator),
                 })}
-                <Link to="/settings" className="text-[var(--color-accent)]">
+                <Link to="/exchange-rates" className="text-[var(--color-accent)]">
                   {t('dashboard:sections.add_rates')}
                 </Link>
               </span>
@@ -356,9 +377,7 @@ export default function DashboardPage() {
                         .map((item) => item.name)
                         .join(listSeparator),
                     })}
-                    <Link to="/portfolios" className="text-[var(--color-accent)]">
-                      {t('dashboard:sections.add_prices')}
-                    </Link>
+                    <InvestmentLink items={quality.unpricedInvestments} label={t('dashboard:sections.add_prices')} />
                   </span>
                 </li>
               )}
@@ -369,9 +388,7 @@ export default function DashboardPage() {
                     {t('dashboard:sections.stale_valuations', {
                       names: quality.staleValuations.map((item) => item.name).join(listSeparator),
                     })}
-                    <Link to="/portfolios" className="text-[var(--color-accent)]">
-                      {t('dashboard:sections.add_prices')}
-                    </Link>
+                    <InvestmentLink items={quality.staleValuations} label={t('dashboard:sections.add_prices')} />
                   </span>
                 </li>
               )}
@@ -395,7 +412,7 @@ export default function DashboardPage() {
                     {t('dashboard:sections.missing_rate', {
                       currencies: quality.missingRateCurrencies.join(listSeparator),
                     })}
-                    <Link to="/settings" className="text-[var(--color-accent)]">
+                    <Link to="/exchange-rates" className="text-[var(--color-accent)]">
                       {t('dashboard:sections.add_rates')}
                     </Link>
                   </span>

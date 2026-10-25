@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { buildApp } from '@/app';
-import { auth, cleanupUsers, createUser, testDomain } from '../helpers';
+import { auth, cleanupUsers, clearExchangeRates, createUser, promoteToAdmin, testDomain } from '../helpers';
 
 const DOMAIN = testDomain('dashboard');
 
 let app: FastifyInstance;
 let token: string;
+let adminToken: string;
 let bankId: string;
 let cashId: string;
 let expenseCategoryId: string;
@@ -23,8 +24,14 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
+  // 汇率已全局化：残留行会让「缺少汇率」类断言失效，必须逐例清空
+  await clearExchangeRates(app);
+
   const user = await createUser(app, DOMAIN);
   token = user.token;
+
+  const admin = await createUser(app, DOMAIN, 'admin');
+  adminToken = await promoteToAdmin(app, admin.userId);
 
   const bank = await app.inject({
     method: 'POST',
@@ -348,8 +355,8 @@ describe('多币种与汇率', () => {
 
     await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7.2', rateDate: '2026-01-01' },
     });
 
@@ -367,8 +374,8 @@ describe('多币种与汇率', () => {
   it('支持反向汇率取倒数', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'CNY', quoteCurrency: 'USD', rate: '7', rateDate: '2026-01-01' },
     });
 
@@ -386,14 +393,14 @@ describe('多币种与汇率', () => {
   it('汇率按汇率日期向前取值', async () => {
     await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7', rateDate: '2026-01-01' },
     });
     await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7.5', rateDate: '2026-06-01' },
     });
 
@@ -429,8 +436,8 @@ describe('多币种与汇率', () => {
 
     await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7', rateDate: '2026-01-01' },
     });
 
@@ -520,47 +527,92 @@ describe('多币种与汇率', () => {
     expect(items.map((item) => item.from)).toContain('JPY');
   });
 
-  it('汇率增删改写入审计日志', async () => {
+  it('汇率增删改写后台审计日志，且不含数值', async () => {
     const created = await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7.1', rateDate: '2026-01-02' },
     });
+    expect(created.statusCode).toBe(201);
     const rateId = created.json().data.exchangeRate.id;
 
     // 同键再次提交即修改
     await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7.3', rateDate: '2026-01-02' },
     });
 
     await app.inject({
       method: 'DELETE',
-      url: `/api/exchange-rates/manual/${rateId}`,
-      headers: auth(token),
+      url: `/api/admin/exchange-rates/${rateId}`,
+      headers: auth(adminToken),
     });
 
     const audit = await app.inject({
       method: 'GET',
-      url: '/api/audit-logs?pageSize=50',
-      headers: auth(token),
+      url: '/api/admin/audit-logs?pageSize=50',
+      headers: auth(adminToken),
     });
-    const actions = (audit.json().data.items as Array<{ action: string }>).map((item) => item.action);
+    const items = audit.json().data.logs as Array<{
+      action: string;
+      targetId: string | null;
+      metadata: unknown;
+    }>;
+    // 汇率已全局化，其他测试文件可能同时写入；只看本次这三条
+    const mine = items.filter((item) => item.targetId === rateId);
+    const actions = mine.map((item) => item.action);
 
-    expect(actions).toContain('currency_rate.created');
-    expect(actions).toContain('currency_rate.updated');
-    expect(actions).toContain('currency_rate.deleted');
+    expect(new Set(actions)).toEqual(
+      new Set([
+        'admin.currency_rate.created',
+        'admin.currency_rate.updated',
+        'admin.currency_rate.deleted',
+      ]),
+    );
+    // 审计 metadata 不得出现汇率数值
+    expect(JSON.stringify(mine)).not.toContain('7.1');
+    expect(JSON.stringify(mine)).not.toContain('7.3');
+  });
+
+  it('用户不能写汇率，只能提交币种对申请', async () => {
+    const write = await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/manual',
+      headers: auth(token),
+      payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7', rateDate: '2026-01-02' },
+    });
+    expect(write.statusCode).toBe(403);
+    expect(write.json().error.code).toBe('RATE_WRITE_FORBIDDEN');
+
+    const request = await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/pair-requests',
+      headers: auth(token),
+      payload: { baseCurrency: 'EUR', quoteCurrency: 'CNY', reason: '持有欧元账户' },
+    });
+    expect(request.statusCode).toBe(201);
+    expect(request.json().data.request.status).toBe('pending');
+
+    // 同一币种对重复提交应被拒
+    const again = await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/pair-requests',
+      headers: auth(token),
+      payload: { baseCurrency: 'EUR', quoteCurrency: 'CNY' },
+    });
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe('RATE_PAIR_REQUEST_EXISTS');
   });
 
   it('手工汇率列表分页返回', async () => {
     for (let day = 1; day <= 12; day += 1) {
       await app.inject({
         method: 'POST',
-        url: '/api/exchange-rates/manual',
-        headers: auth(token),
+        url: '/api/admin/exchange-rates',
+        headers: auth(adminToken),
         payload: {
           baseCurrency: 'USD',
           quoteCurrency: 'CNY',
@@ -572,8 +624,8 @@ describe('多币种与汇率', () => {
 
     const first = await app.inject({
       method: 'GET',
-      url: '/api/exchange-rates/manual?page=1&pageSize=10',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates?page=1&pageSize=10',
+      headers: auth(adminToken),
     });
     const data = first.json().data;
     expect(data.exchangeRates).toHaveLength(10);
@@ -582,8 +634,8 @@ describe('多币种与汇率', () => {
 
     const second = await app.inject({
       method: 'GET',
-      url: '/api/exchange-rates/manual?page=2&pageSize=10',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates?page=2&pageSize=10',
+      headers: auth(adminToken),
     });
     expect(second.json().data.exchangeRates).toHaveLength(2);
   });
@@ -592,16 +644,16 @@ describe('多币种与汇率', () => {
     const future = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
     const futureRes = await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7', rateDate: future },
     });
     expect(futureRes.statusCode).toBe(400);
 
     const overflow = await app.inject({
       method: 'POST',
-      url: '/api/exchange-rates/manual',
-      headers: auth(token),
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
       payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '123456789012', rateDate: '2026-01-05' },
     });
     expect(overflow.statusCode).toBe(400);

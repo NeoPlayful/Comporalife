@@ -40,6 +40,24 @@ const envSchema = z.object({
   IMPORT_MAX_ROWS: z.coerce.number().int().positive().default(20_000),
   IMPORT_FILE_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   IMPORT_ROW_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
+  // ===== 外部汇率源 =====
+  // 留空表示未启用；只有 https 会被接受，避免密钥明文过网
+  RATE_PROVIDER_URL: z
+    .string()
+    .optional()
+    .refine((value) => !value || value.startsWith('https://'), 'RATE_PROVIDER_URL 必须是 https 地址'),
+  RATE_PROVIDER_ANCHOR: z.string().length(3).default('USD'),
+  // 密钥只从环境变量读，任何接口与日志都不回显
+  RATE_PROVIDER_KEY: z.string().optional(),
+  RATE_PROVIDER_KEY_PARAM: z.string().optional(),
+  RATE_PROVIDER_RATES_PATH: z.string().default('rates'),
+  RATE_PROVIDER_DATE_PATH: z.string().optional(),
+  RATE_PROVIDER_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  RATE_SYNC_STARTUP_DELAY_MS: z.coerce.number().int().nonnegative().default(60_000),
+  RATE_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
+  RATE_SYNC_LOCK_MS: z.coerce.number().int().positive().default(300_000),
+  RATE_SYNC_RUN_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  RATE_MAX_DEVIATION_PCT: z.coerce.number().positive().default(20),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -25,6 +25,7 @@ export interface Instrument {
 
 export interface InstrumentPrice {
   id: string;
+  /** DECIMAL(20,8) 定长字符串，展示用 formatPrice（8 位），不要用 formatNumber */
   price: string;
   priceDate: string;
   source: 'manual' | 'imported' | 'provider';

@@ -541,35 +541,6 @@ const ADAPTERS: Record<BackupDomain, DomainAdapter> = {
     },
   },
 
-  exchange_rates: {
-    countById: async (tx, userId, id) => (await tx.exchangeRate.count({ where: { id, userId } })) > 0,
-    // 同一币种对同一天只允许一条汇率
-    findNatural: async (tx, userId, row) => {
-      const found = await tx.exchangeRate.findFirst({
-        where: {
-          userId,
-          baseCurrency: String(row.baseCurrency),
-          quoteCurrency: String(row.quoteCurrency),
-          rateDate: toDate(row.rateDate) ?? undefined,
-        },
-        select: { id: true },
-      });
-      return found?.id ?? null;
-    },
-    deleteById: async (tx, userId, id) => {
-      await tx.exchangeRate.deleteMany({ where: { id, userId } });
-    },
-    create: async (tx, userId, row) => {
-      await tx.exchangeRate.create({ data: { ...reviveDates(row), userId } as never });
-    },
-    update: async (tx, userId, id, row) => {
-      await tx.exchangeRate.updateMany({
-        where: { id, userId },
-        data: withoutKeys(reviveDates(row), ['id', 'userId']) as never,
-      });
-    },
-  },
-
   settings: {
     countById: async (tx, userId) => (await tx.userSettings.count({ where: { userId } })) > 0,
     findNatural: async () => null,
@@ -639,6 +610,9 @@ export async function previewRestore(
     (domain) => !Object.prototype.hasOwnProperty.call(params.pkg.domains, domain),
   );
 
+  // 汇率已改为全局系统数据，旧包中的该域既不写入也不当作缺域，必须显式告知
+  const hasLegacyRates = Object.prototype.hasOwnProperty.call(params.pkg.domains, 'exchange_rates');
+
   return {
     backupId: params.backupId,
     schemaVersion: params.pkg.schemaVersion,
@@ -650,6 +624,7 @@ export async function previewRestore(
     warnings: [
       'restore_does_not_delete_current_data',
       'restore_overwrites_only_same_id',
+      ...(hasLegacyRates ? ['exchange_rates_moved_to_system'] : []),
       ...missingDomains.map((domain) => `missing_domain:${domain}`),
     ],
     requiresConfirm: 'RESTORE',

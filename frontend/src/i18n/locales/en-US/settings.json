@@ -35,8 +35,28 @@
       "pair": "Currency pair",
       "save": "Save",
       "empty_title": "No exchange rates yet",
-      "empty_description": "Add a rate to convert foreign-currency accounts and assets into your base currency.",
-      "delete_confirm": "Deleting this rate affects historical conversions. Delete?"
+      "empty_description": "No rates have been entered yet. If you hold foreign-currency accounts or assets, request the pair above.",
+      "delete_confirm": "Deleting this rate affects historical conversions. Delete?",
+      "readonly_hint": "Rates are maintained system-wide. You do not need to enter them; request missing pairs instead.",
+      "request_new": "Request a pair",
+      "request_reason": "Reason (optional)",
+      "submit_request": "Submit",
+      "source": "Source",
+      "source_manual": "Manual",
+      "source_provider": "Auto-synced",
+      "hide_pair": "Hide from my list",
+      "filter_empty": "No rates match your display preference. Restore showing all below.",
+      "filtered_hint": "Some pairs are hidden by your display preference ({{count}}). This only affects display, never conversions.",
+      "show_all": "Show all",
+      "requests_title": "My pair requests",
+      "requests_hint": "Approval adds the pair to the maintenance scope; it does not write a rate value.",
+      "requests_empty": "No requests yet",
+      "cancel_request": "Withdraw",
+      "request_status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      }
     }
   },
   "security": {

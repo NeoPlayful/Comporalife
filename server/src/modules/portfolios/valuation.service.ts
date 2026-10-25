@@ -21,6 +21,8 @@ export interface ValuationResult {
   missingPrices: MissingPrice[];
   holdingValues: Array<{
     instrumentId: string;
+    symbol: string;
+    name: string;
     quantity: Decimal;
     price: Decimal | null;
     priceDate: string | null;
@@ -110,6 +112,8 @@ export async function valueHoldings(
       }
       return {
         instrumentId: holding.instrumentId,
+        symbol: meta?.symbol ?? holding.instrumentId,
+        name: meta?.name ?? '',
         quantity: holding.quantity,
         price: null,
         priceDate: null,
@@ -127,6 +131,8 @@ export async function valueHoldings(
 
     return {
       instrumentId: holding.instrumentId,
+      symbol: meta?.symbol ?? holding.instrumentId,
+      name: meta?.name ?? '',
       quantity: holding.quantity,
       price: price.price,
       priceDate: price.priceDate,
@@ -211,6 +217,8 @@ export interface PortfolioValuationSummary {
   stale: boolean;
   isComplete: boolean;
   missingSymbols: string[];
+  /** 逐标的的价格日期，供数据质量下钻；无价标的 priceDate 为 null */
+  holdings: Array<{ instrumentId: string; symbol: string; name: string; priceDate: string | null }>;
 }
 
 /**
@@ -255,6 +263,12 @@ export async function loadAllPortfolioValuations(
       stale: valuation.stale,
       isComplete: valuation.isComplete,
       missingSymbols: valuation.missingPrices.map((item) => item.symbol),
+      holdings: valuation.holdingValues.map((item) => ({
+        instrumentId: item.instrumentId,
+        symbol: item.symbol,
+        name: item.name,
+        priceDate: item.priceDate,
+      })),
     });
   }
 

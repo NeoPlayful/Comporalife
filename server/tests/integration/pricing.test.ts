@@ -390,3 +390,83 @@ describe('审计与隔离', () => {
     expect(write.statusCode).toBe(404);
   });
 });
+
+describe('查询次数上界', () => {
+  async function countQueries(from: string, to: string) {
+    const queries: string[] = [];
+    let recording = true;
+    // 类型层只声明了 $on 的事件名联合，测试里靠运行时事件，断言集中在一处
+    const client = app.prisma as unknown as {
+      $on(event: 'query', callback: (event: { query: string }) => void): void;
+    };
+    client.$on('query', (event) => {
+      if (recording) queries.push(event.query);
+    });
+
+    try {
+      await performance(from, to);
+    } finally {
+      recording = false;
+    }
+
+    const count = (table: string) =>
+      queries.filter((sql) => sql.includes(`"${table}"`) || sql.includes(`.${table}`)).length;
+
+    return {
+      prices: count('instrument_prices'),
+      trades: count('portfolio_trades'),
+      entries: count('transaction_entries'),
+    };
+  }
+
+  it('区间翻倍后查询次数不变', async () => {
+    await buy('10', '10');
+    await setPrice('2026-01-02', '11');
+    await setPrice('2026-03-20', '12');
+
+    // 30 天与 90 天的采样点数量差三倍，但查询次数必须相同：
+    // 若有人在循环里查库，长区间会线性放大查询量
+    const short = await countQueries('2026-03-01', '2026-03-31');
+    const long = await countQueries('2026-01-01', '2026-03-31');
+
+    expect(long).toEqual(short);
+    expect(long.prices).toBeLessThanOrEqual(3);
+    expect(long.trades).toBeLessThanOrEqual(3);
+    expect(long.entries).toBeLessThanOrEqual(3);
+  });
+
+  it('90 天区间真的按日展开', async () => {
+    await buy('10', '10');
+    await setPrice('2026-01-02', '11');
+
+    const data = await performance('2026-01-01', '2026-03-31');
+    expect(data.points.length).toBeGreaterThan(80);
+  });
+});
+
+describe('数据质量下钻', () => {
+  it('过期估值返回标的级价格日期', async () => {
+    await buy('10', '10');
+    // 只录一条很旧的价格，让组合整体被判为过期
+    await setPrice('2026-01-02', '11');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/data-quality/stale-valuations',
+      headers: auth(token),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const item = (res.json().data.items as Array<{
+      targetType: string;
+      targetId: string;
+      instruments: Array<{ symbol: string; priceDate: string | null; daysStale: number | null }>;
+    }>).find((entry) => entry.targetType === 'portfolio' && entry.targetId === portfolioId);
+
+    expect(item).toBeDefined();
+    // 组合级只知道「整体过期」，明细页要能指出具体是哪个标的
+    expect(item!.instruments.length).toBeGreaterThan(0);
+    expect(item!.instruments[0]!.priceDate).toBe('2026-01-02');
+    expect(item!.instruments[0]!.daysStale).toBeGreaterThan(7);
+  });
+});

@@ -19,7 +19,8 @@ import {
   type ValuePoint,
 } from './performance.engine.js';
 import { summarizePortfolio, getPortfolioContext } from './portfolio.service.js';
-import { portfolioPositions } from './valuation.service.js';
+import { loadReplayTrades } from './valuation.service.js';
+import { replayTrades } from './holdings.engine.js';
 
 function dayKeyOf(date: Date, timezone: string): string {
   return formatInTimeZone(date, timezone, 'yyyy-MM-dd');
@@ -188,19 +189,65 @@ async function buildValueSeries(
     return null;
   }
 
+  // 交易与分录都在循环外一次取回：90 天区间在循环内按日查询会放大成上百次往返
+  const [trades, entries] = await Promise.all([
+    loadReplayTrades(prisma, {
+      userId: params.userId,
+      portfolioId: params.portfolioId,
+      asOf: latest ?? null,
+    }),
+    latest
+      ? prisma.transactionEntry.findMany({
+          where: {
+            userId: params.userId,
+            accountId: params.accountId,
+            transaction: { status: 'posted', occurredAt: { lte: latest } },
+          },
+          select: { amount: true, transaction: { select: { occurredAt: true } } },
+          orderBy: { transaction: { occurredAt: 'asc' } },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // 按日累计分录，采样时二分定位到当日收盘即可
+  const cashMovements = entries.map((entry) => ({
+    at: entry.transaction.occurredAt.getTime(),
+    amount: toDecimal(entry.amount.toString()),
+  }));
+  const cumulativeCash: Array<{ at: number; total: Decimal }> = [];
+  {
+    let running = new Decimal(0);
+    for (const movement of cashMovements) {
+      running = running.plus(movement.amount);
+      cumulativeCash.push({ at: movement.at, total: running });
+    }
+  }
+
+  function movementUpTo(asOf: Date): Decimal {
+    const cutoff = asOf.getTime();
+    let lo = 0;
+    let hi = cumulativeCash.length - 1;
+    let found = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (cumulativeCash[mid]!.at <= cutoff) {
+        found = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return found === -1 ? new Decimal(0) : cumulativeCash[found]!.total;
+  }
+
   const points: ValuePoint[] = [];
 
   for (const date of params.dates) {
     // 采样点按用户时区当日收盘，与账本口径一致
     const asOf = new Date(`${date}T23:59:59.999Z`);
 
-    const positions = await portfolioPositions(prisma, {
-      userId: params.userId,
-      portfolioId: params.portfolioId,
-      asOf,
-    });
-
-    if (!positions.ok) {
+    const outcome = replayTrades(trades, { asOf });
+    if (!outcome.ok) {
       points.push({ date, value: new Decimal(0), complete: false });
       continue;
     }
@@ -209,7 +256,7 @@ async function buildValueSeries(
     let complete = true;
     let missingPrice = false;
 
-    for (const holding of positions.holdings) {
+    for (const holding of outcome.holdings) {
       if (!holding.quantity.gt(0)) continue;
       const price = priceOn(holding.instrumentId, date);
       // 该日及以前没有价格 → 该点不完整，绝不用更晚的价格或成本价回填
@@ -238,16 +285,7 @@ async function buildValueSeries(
     }
 
     // 现金口径必须与账户余额一致：期初余额（若已到期初日）+ 截至该日的分录
-    const balance = await prisma.transactionEntry.aggregate({
-      where: {
-        userId: params.userId,
-        accountId: params.accountId,
-        transaction: { status: 'posted', occurredAt: { lte: asOf } },
-      },
-      _sum: { amount: true },
-    });
-
-    const movement = toDecimal(balance._sum.amount?.toString() ?? '0');
+    const movement = movementUpTo(asOf);
     const openingIncluded = openingDate !== null && openingDate.getTime() <= asOf.getTime();
     const cash = openingIncluded ? opening.plus(movement) : movement;
 

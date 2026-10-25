@@ -69,7 +69,10 @@ enum ContributionTiming {
 }
 
 enum RateSource {
+  /// 后台人工录入，权威值；自动同步不得覆盖同日同键的人工值
   manual
+  /// 外部汇率源自动写入
+  provider
 }
 
 enum ImportStatus {
@@ -146,7 +149,7 @@ model User {
   transactions        Transaction[]
   entries             TransactionEntry[]
   scenarios           SimulationScenario[]
-  exchangeRates       ExchangeRate[]
+  ratePairRequests    RatePairRequest[]
   reconciliations     AccountReconciliation[]
   auditLogs           AuditLog[]
   importBatches       ImportBatch[]
@@ -202,6 +205,9 @@ model UserSettings {
   theme              Theme    @default(dark)
   language           String   @default("zh-CN")
   simulationDefaults Json?    @map("simulation_defaults")
+  // 展示偏好（形如 ["USD->CNY"]），null 表示展示全部。
+  // 只影响列表展示，绝不参与折算——否则「忘勾选」会让净资产静默少算。
+  rateDisplayPairs   Json?    @map("rate_display_pairs")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -387,21 +393,91 @@ model SimulationScenario {
   @@map("simulation_scenarios")
 }
 
+// 汇率是跨用户相同的市场事实，因此全局共享、由后台统一维护。
+// 按用户存会让同一币种对同一天存在 N 份，既重复又可能不一致。
 model ExchangeRate {
   id            String     @id @default(uuid()) @db.Uuid
-  userId        String     @map("user_id") @db.Uuid
   baseCurrency  String     @map("base_currency")
   quoteCurrency String     @map("quote_currency")
   rate          Decimal    @db.Decimal(20, 10)
   rateDate      DateTime   @map("rate_date") @db.Date
   source        RateSource @default(manual)
   createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  // 单行单值意味着修正即覆盖，需要能看出这一行最后一次被改动的时间
+  updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([baseCurrency, quoteCurrency, rateDate])
+  @@index([baseCurrency, quoteCurrency, rateDate(sort: Desc)])
+  @@index([rateDate(sort: Desc)])
+  @@map("exchange_rates")
+}
+
+// 用户提交的「希望系统维护某币种对」申请。批准只表示纳入维护范围，
+// 不写入任何汇率值——批准一个币种对不等于知道它当天的汇率。
+model RatePairRequest {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @map("user_id") @db.Uuid
+  baseCurrency  String            @map("base_currency")
+  quoteCurrency String            @map("quote_currency")
+  reason        String?           @db.VarChar(200)
+  status        PairRequestStatus @default(pending)
+  reviewedBy    String?           @map("reviewed_by") @db.Uuid
+  reviewedAt    DateTime?         @map("reviewed_at") @db.Timestamptz(6)
+  reviewNote    String?           @map("review_note") @db.VarChar(200)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, baseCurrency, quoteCurrency, rateDate])
-  @@index([userId, baseCurrency, quoteCurrency, rateDate(sort: Desc)])
-  @@map("exchange_rates")
+  // 同一用户同一币种对只允许一条待审申请，避免重复提交
+  @@unique([userId, baseCurrency, quoteCurrency, status])
+  @@index([status, createdAt])
+  @@map("rate_pair_requests")
+}
+
+enum PairRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+// 每次抓取运行一行；汇率已全局化，因此不按用户拆分
+model RateSyncRun {
+  id             String      @id @default(uuid()) @db.Uuid
+  // 后台手动触发时记录管理员；定时任务为空
+  triggeredBy    String?     @map("triggered_by") @db.Uuid
+  trigger        SyncTrigger
+  provider       String
+  anchorCurrency String      @map("anchor_currency")
+  status         SyncStatus  @default(running)
+  startedAt      DateTime    @default(now()) @map("started_at") @db.Timestamptz(6)
+  finishedAt     DateTime?   @map("finished_at") @db.Timestamptz(6)
+  // 供应商返回且通过校验的币种对数量
+  fetchedPairs   Int         @default(0) @map("fetched_pairs")
+  writtenRows    Int         @default(0) @map("written_rows")
+  // 因同日已有后台人工录入而跳过的行数
+  skippedManual  Int         @default(0) @map("skipped_manual")
+  // [{ "pair": "EUR->CNY", "code": "RATE_DEVIATION" }]，不含任何数值
+  failures       Json?
+  errorCode      String?     @map("error_code")
+  // 截断到 200 字符；不得包含密钥或完整响应体
+  errorMessage   String?     @map("error_message")
+
+  @@index([startedAt(sort: Desc)])
+  @@index([status, startedAt])
+  @@map("rate_sync_runs")
+}
+
+enum SyncTrigger {
+  scheduled
+  manual
+}
+
+enum SyncStatus {
+  running
+  succeeded
+  partial
+  failed
+  skipped
 }
 
 model AuditLog {
@@ -614,13 +690,18 @@ enum CashflowKind {
 }
 
 enum PriceSource {
+  /// 手工录入，当前唯一实际写入值
   manual
+  /// 预留：CSV 批量导入
   imported
+  /// 预留：外部行情源
   provider
 }
 
 enum ValuationSource {
+  /// 预留：系统重算后的缓存，当前不生成（数据量小，重算成本低于失效维护）
   computed
+  /// 用户手工录入的组合快照，当前唯一实际写入值
   manual
 }
 

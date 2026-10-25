@@ -30,6 +30,7 @@ const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
 const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
 const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
+const AdminExchangeRatesPage = lazy(() => import('./pages/admin/AdminExchangeRatesPage'));
 const AssetsPage = lazy(() => import('./pages/AssetsPage'));
 const LiabilitiesPage = lazy(() => import('./pages/LiabilitiesPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="admins" element={<AdminAdminsPage />} />
             <Route path="audit" element={<AdminAuditPage />} />
+            <Route path="exchange-rates" element={<AdminExchangeRatesPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
         </Route>

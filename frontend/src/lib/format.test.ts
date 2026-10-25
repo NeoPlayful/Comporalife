@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, formatDateTime, formatNumber } from './format';
+import { formatDate, formatDateTime, formatNumber, formatPrice, formatRate, trimTrailingZeros } from './format';
 
 describe('formatNumber', () => {
   it('按指定小数位格式化并加千分位', () => {
@@ -43,5 +43,25 @@ describe('formatDateTime', () => {
 
   it('空值返回占位符', () => {
     expect(formatDateTime(undefined)).toBe('—');
+  });
+});
+
+describe('价格与汇率的位宽', () => {
+  it('价格保留 8 位小数，不截断为金额的默认位数', () => {
+    expect(formatPrice('0.12345678')).toBe('0.12345678');
+    expect(formatPrice('12.5')).toBe('12.5');
+  });
+
+  it('汇率保留 10 位，极小额币种对不会被抹成 0', () => {
+    expect(formatRate('0.0000001234')).toBe('0.0000001234');
+    expect(formatRate('7.1234567891')).toBe('7.1234567891');
+  });
+
+  it('编辑汇率时去掉尾零，且不出现科学计数法', () => {
+    expect(trimTrailingZeros('7.2450000000')).toBe('7.245');
+    expect(trimTrailingZeros('0.0000001200')).toBe('0.00000012');
+    // 用 Number(x).toString() 会得到 1.2e-7，提交时校验不通过
+    expect(trimTrailingZeros('0.0000001200')).not.toContain('e');
+    expect(trimTrailingZeros('100')).toBe('100');
   });
 });

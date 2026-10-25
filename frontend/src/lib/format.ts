@@ -27,6 +27,28 @@ export function formatNumber(
 }
 
 /**
+ * 价格是 DECIMAL(20,8)，汇率是 DECIMAL(20,10)。
+ * 用 formatNumber 的默认位数会截断报价的有效位，这里按字段位宽给上限。
+ */
+export function formatPrice(value: number | string | null | undefined): string {
+  return formatNumber(value, { maximumFractionDigits: 8 });
+}
+
+export function formatRate(value: number | string | null | undefined): string {
+  // 上限取字段位宽：小额币种对（如 JPY→CNY）在 6 位会被截成 0
+  return formatNumber(value, { maximumFractionDigits: 10 });
+}
+
+/**
+ * 去掉小数末尾的零，用于把接口返回的定长字符串放回输入框。
+ * 不能用 Number(x).toString()：极小汇率会被转成 1.23e-8，提交时校验不通过。
+ */
+export function trimTrailingZeros(value: string): string {
+  if (!value.includes('.')) return value;
+  return value.replace(/0+$/, '').replace(/\.$/, '');
+}
+
+/**
  * 日期按用户偏好格式输出。
  * 用户显式选择的 pattern 优先，未指定时按语言给默认顺序。
  */

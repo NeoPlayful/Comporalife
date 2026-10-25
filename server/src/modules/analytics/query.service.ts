@@ -153,7 +153,6 @@ export async function loadAnalyticsRows(
 
         if (rate === undefined) {
           const resolved = await resolveRate(prisma, {
-            userId: query.userId,
             from: currency,
             to: query.baseCurrency,
             asOf: tx.occurredAt,

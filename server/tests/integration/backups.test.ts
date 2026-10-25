@@ -116,7 +116,7 @@ describe('创建备份', () => {
     expect(detail.statusCode).toBe(200);
     const backup = detail.json().data.backup;
     expect(backup.status).toBe('ready');
-    expect(backup.schemaVersion).toBe('comporalife-backup-v2');
+    expect(backup.schemaVersion).toBe('comporalife-backup-v3');
     expect(backup.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(backup.sizeBytes).toBeGreaterThan(0);
   });

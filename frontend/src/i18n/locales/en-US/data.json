@@ -46,7 +46,10 @@
     "rate_pair": "{{from}} → {{to}} · {{status}}",
     "rate_missing": "No rate",
     "rate_days": "{{days}} days ago",
-    "load_more": "Load more"
+    "load_more": "Load more",
+    "go_record_price": "Record a price",
+    "stale_days": "{{days}}d ago",
+    "no_price_yet": "No price recorded"
   },
   "export": {
     "title": "Data export",

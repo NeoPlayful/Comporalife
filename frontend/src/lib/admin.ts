@@ -21,6 +21,28 @@ export interface AdminUser {
   coolingOffElapsed?: boolean;
 }
 
+export interface AdminExchangeRate {
+  id: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: string;
+  rateDate: string;
+  source: 'manual' | 'provider';
+  updatedAt: string;
+}
+
+export interface AdminRatePairRequest {
+  id: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  reason: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  user: { nickname: string };
+}
+
 export interface AdminAuditLog {
   id: string;
   action: string;
@@ -157,4 +179,40 @@ export const adminApi = {
   emailVerification: () => api.get<{ enabled: boolean }>('/api/admin/settings/email-verification'),
   setEmailVerification: (enabled: boolean) =>
     api.patch<{ enabled: boolean }>('/api/admin/settings/email-verification', { enabled }),
+
+  exchangeRates: (filters: {
+    page?: number;
+    pageSize?: number;
+    base?: string;
+    quote?: string;
+    source?: string;
+    from?: string;
+    to?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== '') query.set(key, String(value));
+    }
+    return api.getPaged<{ exchangeRates: AdminExchangeRate[] }>(
+      `/api/admin/exchange-rates?${query}`,
+    );
+  },
+  createExchangeRate: (body: {
+    baseCurrency: string;
+    quoteCurrency: string;
+    rate: string;
+    rateDate: string;
+  }) => api.post<{ exchangeRate: AdminExchangeRate }>('/api/admin/exchange-rates', body),
+  updateExchangeRate: (id: string, rate: string) =>
+    api.patch<{ exchangeRate: AdminExchangeRate }>(`/api/admin/exchange-rates/${id}`, { rate }),
+  deleteExchangeRate: (id: string) => api.delete<{ deleted: boolean }>(`/api/admin/exchange-rates/${id}`),
+  ratePairRequests: (filters: { page?: number; pageSize?: number; status?: string } = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== '') query.set(key, String(value));
+    }
+    return api.getPaged<{ requests: AdminRatePairRequest[] }>(`/api/admin/rate-pair-requests?${query}`);
+  },
+  reviewRatePairRequest: (id: string, body: { status: 'approved' | 'rejected'; note?: string }) =>
+    api.post<{ status: string }>(`/api/admin/rate-pair-requests/${id}/review`, body),
 };

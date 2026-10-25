@@ -440,12 +440,28 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/currencies` | 支持币种列表 |
-| GET | `/api/exchange-rates` | 指定日期/币种汇率 |
-| POST | `/api/exchange-rates/manual` | 手工维护个人汇率 |
-| DELETE | `/api/exchange-rates/manual/:id` | 删除手工汇率 |
-| GET | `/api/market-data/providers` | 已配置行情来源状态 |
-| POST | `/api/market-data/refresh` | 刷新授权范围内的行情数据 |
-| GET | `/api/market-data/status` | 行情与汇率更新状态 |
+| GET | `/api/exchange-rates` | 指定日期/币种对汇率（全局） |
+| GET | `/api/exchange-rates/manual` | 汇率列表（全局只读，分页） |
+| POST | `/api/exchange-rates/manual` | **已下线**，返回 403 `RATE_WRITE_FORBIDDEN` |
+| DELETE | `/api/exchange-rates/manual/:id` | **已下线**，返回 403 |
+| GET | `/api/exchange-rates/pair-requests` | 我的币种对申请 |
+| POST | `/api/exchange-rates/pair-requests` | 提交新增币种对申请 |
+| DELETE | `/api/exchange-rates/pair-requests/:id` | 撤销待审申请 |
+| GET | `/api/market-data/providers` | 汇率源配置状态与最近运行（管理员） |
+| POST | `/api/market-data/refresh` | 手动触发汇率同步（管理员） |
+| GET | `/api/market-data/status` | 按币种对的汇率同步状态 |
+| GET | `/api/admin/exchange-rates` | 后台汇率列表与筛选 |
+| POST | `/api/admin/exchange-rates` | 后台新增或覆盖同日同键 |
+| PATCH | `/api/admin/exchange-rates/:id` | 后台修改汇率 |
+| DELETE | `/api/admin/exchange-rates/:id` | 后台删除汇率 |
+| GET | `/api/admin/rate-pair-requests` | 币种对申请列表 |
+| POST | `/api/admin/rate-pair-requests/:id/review` | 批准或拒绝申请 |
+| GET | `/api/admin/rate-sync/settings` | 自动同步开关 |
+| PATCH | `/api/admin/rate-sync/settings` | 开启或关闭自动同步 |
+
+> **Phase 10 变更**：汇率已由「用户个人数据」改为「全局系统参考数据」，由后台统一维护。
+> 用户侧写接口下线且显式返回 403，便于前端与用户理解能力迁移。管理员可查看与维护汇率，
+> 但仍不可见任何用户的余额、流水、持仓、目标、报表与标的持仓价格。
 
 
 ## 21、数据导出、备份与恢复 (Data Management) — 已实现

@@ -66,7 +66,6 @@ export async function computeCashflow(
 
     if (rate === undefined) {
       const resolved = await resolveRate(prisma, {
-        userId: params.userId,
         from: currency,
         to: params.baseCurrency,
         asOf: occurredAt,

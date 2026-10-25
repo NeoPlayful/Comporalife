@@ -6,7 +6,7 @@ import TradeForm, { emptyTradeDraft, type TradeDraft } from '@/components/portfo
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import { translateError } from '@/lib/error-message';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatDate, formatNumber, formatPrice } from '@/lib/format';
 import {
   instrumentsApi,
   portfoliosApi,
@@ -18,7 +18,7 @@ import {
 } from '@/lib/portfolios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -57,6 +57,21 @@ export default function PortfolioDetailPage() {
     assetClass: 'etf' as AssetClass,
   });
   const [priceDraft, setPriceDraft] = useState({ instrumentId: '', priceDate: '', price: '' });
+  const priceFormRef = useRef<HTMLDivElement | null>(null);
+
+  // 从持仓行跳过来时，表单就在同一屏下方：滚动 + 聚焦比让用户自己找更直接
+  function focusPriceForm(instrumentId: string) {
+    setTab('holdings');
+    setPriceDraft({
+      instrumentId,
+      priceDate: new Date().toISOString().slice(0, 10),
+      price: '',
+    });
+    requestAnimationFrame(() => {
+      priceFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      priceFormRef.current?.querySelector<HTMLInputElement>('input[type="date"]')?.focus();
+    });
+  }
 
   const detailQuery = useQuery({
     queryKey: ['portfolio', id],
@@ -345,7 +360,11 @@ export default function PortfolioDetailPage() {
           {holdingsQuery.isLoading ? (
             <LoadingState />
           ) : (
-            <HoldingTable holdings={holdings} currency={currency} />
+            <HoldingTable
+              holdings={holdings}
+              currency={currency}
+              onRecordPrice={focusPriceForm}
+            />
           )}
 
           <div className="mt-4 space-y-3 border-t border-[var(--color-border-subtle)] pt-4">
@@ -420,7 +439,10 @@ export default function PortfolioDetailPage() {
             )}
 
             {instruments.length > 0 && (
-              <div className="grid gap-2 sm:grid-cols-4">
+              <div
+                ref={priceFormRef}
+                className="grid gap-2 sm:grid-cols-4"
+              >
                 <select
                   value={priceDraft.instrumentId}
                   onChange={(event) =>
@@ -772,7 +794,7 @@ export default function PortfolioDetailPage() {
                           {trade.quantity === null ? '—' : Number(trade.quantity)}
                         </td>
                         <td className="py-2 text-right tabular-nums">
-                          {trade.price === null ? '—' : formatNumber(trade.price)}
+                          {trade.price === null ? '—' : formatPrice(trade.price)}
                         </td>
                         <td className="py-2 text-right tabular-nums">{formatNumber(trade.amount)}</td>
                         <td className="py-2 text-right tabular-nums">{formatNumber(trade.fee)}</td>

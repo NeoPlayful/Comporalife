@@ -23,6 +23,23 @@ const simulationDefaultsSchema = z.object({
   contributionTiming: z.enum(['begin', 'end']).optional(),
 });
 
+// 展示偏好：形如 ["USD->CNY"]，只影响汇率列表展示，绝不参与折算
+const rateDisplayPairsSchema = z
+  .array(
+    z
+      .string()
+      .regex(/^[A-Z]{3}->[A-Z]{3}$/, '币种对格式应为 ABC->XYZ')
+      .refine((value) => {
+        const [from, to] = value.split('->');
+        return (
+          SUPPORTED_CURRENCIES.includes(from!) &&
+          SUPPORTED_CURRENCIES.includes(to!) &&
+          from !== to
+        );
+      }, '币种对不合法'),
+  )
+  .max(50);
+
 export const updateSettingsSchema = z
   .object({
     baseCurrency: currencySchema.optional(),
@@ -31,5 +48,6 @@ export const updateSettingsSchema = z
     theme: z.enum(['dark', 'light', 'system']).optional(),
     language: z.enum(SUPPORTED_LANGUAGES).optional(),
     simulationDefaults: simulationDefaultsSchema.nullable().optional(),
+    rateDisplayPairs: rateDisplayPairsSchema.nullable().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, '至少需要修改一项设置');

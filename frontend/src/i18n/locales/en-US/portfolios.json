@@ -67,6 +67,16 @@
     "stale": "Price stale",
     "no_price_hint": "Without a price, market value and unrealized P&L stay empty. Record a price first."
   },
+  "instruments": {
+    "title": "Instruments",
+    "add": "Add instrument",
+    "symbol": "Symbol",
+    "name": "Name",
+    "price": "Price",
+    "add_price": "Record price",
+    "update_price": "Update price",
+    "focus_price": "Record price for this instrument"
+  },
   "performance": {
     "title": "Performance",
     "empty": "No performance data",

@@ -35,8 +35,28 @@
       "pair": "币种对",
       "save": "保存",
       "empty_title": "暂无汇率记录",
-      "empty_description": "添加一条汇率后，外币账户与资产即可折算到基准币种。",
-      "delete_confirm": "删除该汇率会影响历史折算，确认删除？"
+      "empty_description": "系统尚未录入任何汇率。若你的账户或资产涉及外币，可在上方申请新增币种对。",
+      "delete_confirm": "删除该汇率会影响历史折算，确认删除？",
+      "readonly_hint": "汇率由系统统一维护，你无需录入。缺失的币种对可以提交申请。",
+      "request_new": "申请新增币种对",
+      "request_reason": "理由（可选）",
+      "submit_request": "提交申请",
+      "source": "来源",
+      "source_manual": "人工录入",
+      "source_provider": "自动同步",
+      "hide_pair": "从我的列表隐藏",
+      "filter_empty": "当前筛选条件下没有汇率；可在下方恢复显示全部。",
+      "filtered_hint": "已按展示偏好隐藏部分币种对（{{count}} 个）。这只影响显示，不影响折算。",
+      "show_all": "显示全部",
+      "requests_title": "我的币种对申请",
+      "requests_hint": "批准后该币种对会纳入维护范围，但不会自动写入汇率值。",
+      "requests_empty": "暂无申请",
+      "cancel_request": "撤销",
+      "request_status": {
+        "pending": "待审核",
+        "approved": "已批准",
+        "rejected": "已拒绝"
+      }
     }
   },
   "security": {

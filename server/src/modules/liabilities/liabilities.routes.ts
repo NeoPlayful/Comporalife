@@ -96,7 +96,6 @@ export default async function liabilitiesRoutes(app: FastifyInstance) {
         const key = `${item.currency}->${settings.baseCurrency}`;
         if (!rateCache.has(key)) {
           const found = await resolveRate(app.prisma, {
-            userId,
             from: item.currency,
             to: settings.baseCurrency,
             asOf,
