@@ -1,9 +1,11 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { fromZonedTime } from 'date-fns-tz';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { DELETION_COOLING_OFF_DAYS } from '../../config/constants.js';
+import { AUDIT_LOG_RETENTION_DAYS, DELETION_COOLING_OFF_DAYS } from '../../config/constants.js';
 import { buildPagination, ok, parsePageParams } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
+import { isMailConfigured } from '../../lib/mailer.js';
 import { retryTask } from '../jobs/task.repository.js';
 import { AuthService } from '../auth/auth.service.js';
 import { createNotification } from '../notifications/notification.service.js';
@@ -25,16 +27,19 @@ import {
   adminUserDetailSchema,
   adminUserIdSchema,
   adminUserListSchema,
+  adminUserSearchSchema,
   normalizeReveal,
 } from './admin.schema.js';
 import {
   assertRoleChangeAllowed,
+  getAdminTimezone,
   getDashboardOverview,
   getJobOverview,
   getRegistrationTrend,
   getSecurityOverview,
   getSystemMetrics,
   getUserDetail,
+  listAdminAuditLogs,
   listUsers,
   maskIp,
 } from './admin.service.js';
@@ -111,15 +116,61 @@ export default async function adminRoutes(app: FastifyInstance) {
     });
   });
 
+  /**
+   * 授予管理员前的账号检索。
+   * 返回完整邮箱：管理员看不到明文就无法确认自己在给谁提权。
+   * 每次检索都写审计，避免被当成批量枚举用户邮箱的通道。
+   */
+  app.get('/admin/users/search', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireSuperAdmin(request);
+    const { query } = adminUserSearchSchema.parse(request.query);
+
+    const rows = await app.prisma.user.findMany({
+      where: {
+        OR: [
+          { email: { contains: query, mode: 'insensitive' } },
+          ...(/^[0-9a-f-]{36}$/i.test(query) ? [{ id: query }] : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, email: true, nickname: true, role: true, status: true },
+    });
+
+    await app.prisma.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: 'admin.user_searched',
+        targetType: 'user',
+        ip: request.ip,
+      },
+    });
+
+    return ok({ users: rows }, request.id);
+  });
+
   app.get('/admin/users/:id', { preHandler: app.authenticate }, async (request) => {
-    requireAdmin(request);
+    const actor = requireAdmin(request);
     const { id } = adminUserIdSchema.parse(request.params);
     const query = adminUserDetailSchema.parse(request.query);
+    const reveal = normalizeReveal(query.reveal);
 
-    return ok(
-      { user: await getUserDetail(app.prisma, id, { reveal: normalizeReveal(query.reveal) }) },
-      request.id,
-    );
+    const user = await getUserDetail(app.prisma, id, { reveal });
+
+    // 查看完整账号属于隐私操作：必须留痕，否则谁看过明文无从追溯
+    if (reveal) {
+      await app.prisma.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'admin.user_revealed',
+          targetType: 'user',
+          targetId: id,
+          ip: request.ip,
+        },
+      });
+    }
+
+    return ok({ user }, request.id);
   });
 
   app.post('/admin/users/:id/disable', { preHandler: app.authenticate }, async (request) => {
@@ -151,8 +202,14 @@ export default async function adminRoutes(app: FastifyInstance) {
     const actor = requireAdmin(request);
     const { id } = adminUserIdSchema.parse(request.params);
 
-    const user = await app.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    const user = await app.prisma.user.findUnique({ where: { id }, select: { id: true, deletedAt: true } });
     if (!user) throw errors.notFound('用户不存在');
+
+    // 已批准注销的账号不能再启用：否则「注销」变成可撤销的普通禁用，
+    // 用户数据保留的前提也就不成立了。需要恢复请走独立的数据恢复流程。
+    if (user.deletedAt) {
+      throw errors.conflict('该账号已注销，不能重新启用', { reason: 'account_deleted' });
+    }
 
     await app.prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id }, data: { status: 'active' } });
@@ -202,19 +259,21 @@ export default async function adminRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/users/:id/login-logs', { preHandler: app.authenticate }, async (request) => {
-    requireAdmin(request);
+    const actor = requireAdmin(request);
     const { id } = adminUserIdSchema.parse(request.params);
     const query = adminLoginLogSchema.parse(request.query);
     const page = parsePageParams({ page: query.page, pageSize: query.pageSize });
+    const timezone = await getAdminTimezone(app.prisma, actor.userId);
 
     const where = {
       userId: id,
       action: { in: ['auth.login', 'auth.login_failed'] },
+      // 日期按管理员时区切日，前后端看到的是同一天
       ...(query.from || query.to
         ? {
             createdAt: {
-              ...(query.from ? { gte: new Date(`${query.from}T00:00:00.000Z`) } : {}),
-              ...(query.to ? { lte: new Date(`${query.to}T23:59:59.999Z`) } : {}),
+              ...(query.from ? { gte: fromZonedTime(`${query.from}T00:00:00.000`, timezone) } : {}),
+              ...(query.to ? { lte: fromZonedTime(`${query.to}T23:59:59.999`, timezone) } : {}),
             },
           }
         : {}),
@@ -446,38 +505,26 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   // ===== 安全与运维 =====
   app.get('/admin/audit-logs', { preHandler: app.authenticate }, async (request) => {
-    requireAdmin(request);
+    const actor = requireAdmin(request);
     const query = adminAuditQuerySchema.parse(request.query);
     const page = parsePageParams({ page: query.page, pageSize: query.pageSize });
+    const timezone = await getAdminTimezone(app.prisma, actor.userId);
 
-    const where = {
-      action: query.action ? query.action : { startsWith: 'admin.' },
-    };
-
-    const [total, rows] = await Promise.all([
-      app.prisma.auditLog.count({ where }),
-      app.prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: page.skip,
-        take: page.take,
-        select: { id: true, action: true, targetType: true, targetId: true, createdAt: true, ip: true },
-      }),
-    ]);
+    const result = await listAdminAuditLogs(app.prisma, {
+      ...(query.action ? { action: query.action } : {}),
+      ...(query.actorId ? { actorId: query.actorId } : {}),
+      ...(query.targetId ? { targetId: query.targetId } : {}),
+      ...(query.from ? { from: query.from } : {}),
+      ...(query.to ? { to: query.to } : {}),
+      timezone,
+      page: page.page,
+      pageSize: page.pageSize,
+    });
 
     return ok(
-      {
-        logs: rows.map((row) => ({
-          id: row.id,
-          action: row.action,
-          targetType: row.targetType,
-          targetId: row.targetId,
-          ip: maskIp(row.ip),
-          createdAt: row.createdAt.toISOString(),
-        })),
-      },
+      { logs: result.items },
       request.id,
-      { pagination: buildPagination(page.page, page.pageSize, total) },
+      { pagination: buildPagination(page.page, page.pageSize, result.total) },
     );
   });
 
@@ -640,6 +687,39 @@ export default async function adminRoutes(app: FastifyInstance) {
         sessions,
         uptimeSeconds: Math.floor(process.uptime()),
         memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      },
+      request.id,
+    );
+  });
+
+  /**
+   * 部署级设置总览。
+   * 只读，且不含任何密钥：密钥类配置永远只来自环境变量，不在界面上展示。
+   */
+  app.get('/admin/settings', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const [registration, emailVerification, permissions] = await Promise.all([
+      isRegistrationEnabled(app.prisma),
+      isEmailVerificationEnabled(app.prisma),
+      Promise.resolve(
+        actor.role === 'super_admin'
+          ? ['dashboard:read', 'users:read', 'users:write', 'admins:read', 'admins:write', 'system:read', 'settings:write']
+          : ['dashboard:read', 'users:read', 'users:write', 'system:read'],
+      ),
+    ]);
+
+    return ok(
+      {
+        registrationEnabled: registration,
+        emailVerificationEnabled: emailVerification,
+        // 只报「有没有配」这个事实，绝不回显主机名、账号或密码
+        mailConfigured: isMailConfigured(),
+        deletionCoolingOffDays: DELETION_COOLING_OFF_DAYS,
+        auditLogRetentionDays: AUDIT_LOG_RETENTION_DAYS,
+        capabilities: {
+          canWriteSettings: permissions.includes('settings:write'),
+          canManageAdmins: permissions.includes('admins:write'),
+        },
       },
       request.id,
     );

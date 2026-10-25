@@ -27,7 +27,8 @@ const AdminLayout = lazy(() => import('./components/layout/AdminLayout'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const AdminUsersPage = lazy(() => import('./pages/admin/AdminUsersPage'));
 const AdminAdminsPage = lazy(() => import('./pages/admin/AdminAdminsPage'));
-const AdminSystemPage = lazy(() => import('./pages/admin/AdminSystemPage'));
+const AdminAuditPage = lazy(() => import('./pages/admin/AdminAuditPage'));
+const AdminSettingsPage = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AssetsPage = lazy(() => import('./pages/AssetsPage'));
 const LiabilitiesPage = lazy(() => import('./pages/LiabilitiesPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
@@ -101,7 +102,8 @@ export default function App() {
             <Route index element={<AdminDashboardPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="admins" element={<AdminAdminsPage />} />
-            <Route path="system" element={<AdminSystemPage />} />
+            <Route path="audit" element={<AdminAuditPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
         </Route>
       </Route>

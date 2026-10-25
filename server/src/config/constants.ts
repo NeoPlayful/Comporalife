@@ -402,6 +402,12 @@ export const DELETION_COOLING_OFF_DAYS = envInt('DELETION_COOLING_OFF_DAYS', 7);
 /** 站内通知保留天数 */
 export const NOTIFICATION_RETENTION_DAYS = envInt('NOTIFICATION_RETENTION_DAYS', 90);
 
+/**
+ * 审计日志保留天数。
+ * 审计是追责依据，保留期要明显长于业务数据；一年是自部署场景下的保守下限。
+ */
+export const AUDIT_LOG_RETENTION_DAYS = envInt('AUDIT_LOG_RETENTION_DAYS', 365);
+
 /** 每用户通知条数上限，超出按时间删除最旧的 */
 export const NOTIFICATION_MAX_PER_USER = envInt('NOTIFICATION_MAX_PER_USER', 500);
 

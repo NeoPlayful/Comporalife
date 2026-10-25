@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import { NOTIFICATION_RETENTION_DAYS } from '../../config/constants.js';
+import { AUDIT_LOG_RETENTION_DAYS, NOTIFICATION_RETENTION_DAYS } from '../../config/constants.js';
 import { pruneBackups } from '../backups/backup.service.js';
 import { pruneExports } from '../exports/export.service.js';
 
@@ -14,6 +14,7 @@ export interface DataRetentionResult {
   backupsExpired: number;
   exportsExpired: number;
   notificationsDeleted: number;
+  auditLogsDeleted: number;
 }
 
 /**
@@ -28,6 +29,7 @@ export async function runDataRetentionCleanup(prisma: PrismaClient): Promise<Dat
     backupsExpired: 0,
     exportsExpired: 0,
     notificationsDeleted: 0,
+    auditLogsDeleted: 0,
   };
 
   let cursor: string | undefined;
@@ -67,6 +69,11 @@ export async function runDataRetentionCleanup(prisma: PrismaClient): Promise<Dat
   const cutoff = new Date(Date.now() - NOTIFICATION_RETENTION_DAYS * DAY_MS);
   const deleted = await prisma.notification.deleteMany({ where: { createdAt: { lt: cutoff } } });
   result.notificationsDeleted = deleted.count;
+
+  // 审计日志保留期内无限增长会拖慢按时间倒序的查询，超期后按时间清理
+  const auditCutoff = new Date(Date.now() - AUDIT_LOG_RETENTION_DAYS * DAY_MS);
+  const auditDeleted = await prisma.auditLog.deleteMany({ where: { createdAt: { lt: auditCutoff } } });
+  result.auditLogsDeleted = auditDeleted.count;
 
   return result;
 }

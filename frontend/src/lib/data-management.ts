@@ -97,12 +97,14 @@ export const dataQualityApi = {
 };
 
 export const auditApi = {
-  list: (params: { page?: number; pageSize?: number; action?: string } = {}) => {
+  list: (params: { page?: number; pageSize?: number; action?: string; from?: string; to?: string } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
     if (params.action) query.set('action', params.action);
-    return api.get<{ items: AuditLogItem[] }>(`/api/audit-logs?${query}`);
+    if (params.from) query.set('from', params.from);
+    if (params.to) query.set('to', params.to);
+    return api.getPaged<{ items: AuditLogItem[] }>(`/api/audit-logs?${query}`);
   },
   detail: (id: string) => api.get<{ auditLog: AuditLogItem }>(`/api/audit-logs/${id}`),
 };

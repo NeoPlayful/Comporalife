@@ -51,8 +51,19 @@ export const adminJobIdSchema = z.object({
 
 export const adminAuditQuerySchema = z.object({
   action: z.string().max(64).optional(),
+  /** 操作者 ID：按「谁做的」筛选，与服务端写入的 audit_logs.user_id 对应 */
+  actorId: z.string().uuid().optional(),
+  /** 目标对象 ID：按「对谁做的」筛选 */
+  targetId: z.string().uuid().optional(),
+  from: dateText.optional(),
+  to: dateText.optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+/** 管理员授予前的账号搜索：按邮箱或 ID 定位候选用户 */
+export const adminUserSearchSchema = z.object({
+  query: z.string().trim().min(2, '至少输入 2 个字符').max(120),
 });
 
 /** reveal 参数既可能是布尔也常以 query 字符串出现，统一归一 */

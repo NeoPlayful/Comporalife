@@ -3,12 +3,10 @@
   "subtitle": "Your sensitive operations. IPs are masked to a network range; amounts and transaction contents are never included.",
   "filter": {
     "action": "Filter by action",
-    "action_placeholder": "e.g. auth.login"
-  },
-  "pagination": {
-    "prev": "Previous",
-    "next": "Next",
-    "page": "Page {{page}}"
+    "action_placeholder": "e.g. auth.login",
+    "from": "From",
+    "to": "To",
+    "apply": "Search"
   },
   "actions": {
     "auth.login": "Signed in",

@@ -222,7 +222,8 @@ export default function TopBar({
         )}
       </div>
 
-      <NotificationBell />
+      {/* 后台是运维视角，个人记账通知不在这里出现 */}
+      {!adminMode && <NotificationBell />}
 
       <button
         type="button"
