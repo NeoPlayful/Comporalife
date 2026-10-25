@@ -8,6 +8,12 @@
     "to": "截止日期",
     "apply": "查询"
   },
+  "table": {
+    "time": "时间",
+    "action": "动作",
+    "target": "目标",
+    "ip": "IP 网段"
+  },
   "actions": {
     "auth.login": "登录",
     "auth.login_failed": "登录失败",

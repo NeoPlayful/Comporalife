@@ -2,6 +2,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import { adminApi } from '@/lib/admin';
 import { formatDate, formatNumber } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** 单个聚合区块：每个查询独立处理加载与失败，失败不静默显示为 0 */
@@ -52,8 +53,18 @@ export default function AdminDashboardPage() {
   const info = useQuery({ queryKey: ['admin', 'info'], queryFn: () => adminApi.systemInfo() });
   const trend = useQuery({ queryKey: ['admin', 'registrations'], queryFn: () => adminApi.registrations() });
 
-  const points = trend.data?.points ?? [];
-  // 趋势用横向条表示：管理员关心的是「哪天多」，不需要读精确刻度
+  // 服务端只返回有注册的日期，这里补成连续 14 天，缺口按 0 显示
+  const points = useMemo(() => {
+    const counts = new Map((trend.data?.points ?? []).map((point) => [point.date, point.count]));
+    const today = new Date();
+    return Array.from({ length: 14 }, (_, index) => {
+      const day = new Date(today);
+      day.setDate(today.getDate() - (13 - index));
+      const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+      return { date: key, count: counts.get(key) ?? 0 };
+    });
+  }, [trend.data]);
+
   const maxCount = points.reduce((max, point) => Math.max(max, point.count), 0);
 
   return (
@@ -113,25 +124,31 @@ export default function AdminDashboardPage() {
       </div>
 
       <Section title={t('dashboard.trend_title')} query={trend}>
-        {points.length === 0 ? (
+        {maxCount === 0 ? (
           <p className="text-xs text-[var(--color-content-muted)]">{t('dashboard.trend_empty')}</p>
         ) : (
-          <ul className="space-y-1">
-            {points.slice(-14).map((point) => (
-              <li key={point.date} className="flex items-center gap-2 text-xs">
-                <span className="w-20 shrink-0 text-[var(--color-content-muted)]">
-                  {formatDate(point.date)}
-                </span>
-                <span className="h-2 flex-1 overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
-                  <span
-                    className="block h-full rounded-full bg-[var(--color-accent)]"
-                    style={{ width: `${maxCount > 0 ? (point.count / maxCount) * 100 : 0}%` }}
-                  />
-                </span>
-                <span className="w-6 shrink-0 text-right tabular-nums">{point.count}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-stretch gap-1.5">
+            {points.slice(-14).map((point) => {
+              const ratio = maxCount > 0 ? point.count / maxCount : 0;
+              return (
+                <div key={point.date} className="group flex min-w-0 flex-1 flex-col items-center">
+                  <span className="text-[10px] tabular-nums text-[var(--color-content-muted)]">
+                    {point.count}
+                  </span>
+                  <div className="mt-1 flex h-32 w-full items-end">
+                    <span
+                      className="w-full rounded-t bg-[var(--color-accent)] transition-opacity group-hover:opacity-80"
+                      style={{ height: `${Math.max(ratio * 100, point.count > 0 ? 4 : 2)}%` }}
+                      title={`${formatDate(point.date)} · ${point.count}`}
+                    />
+                  </div>
+                  <span className="mt-1 whitespace-nowrap text-[10px] text-[var(--color-content-muted)]">
+                    {point.date.slice(5).replace('-', '/')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </Section>
 

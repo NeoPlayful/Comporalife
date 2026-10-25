@@ -118,13 +118,14 @@
       "apply": "查询",
       "reset": "重置"
     },
-    "by": "操作者 {{actor}}",
-    "target": "目标 {{type}}",
     "unknown_actor": "未知（账号已删除）",
-    "pagination": {
-      "prev": "上一页",
-      "next": "下一页",
-      "summary": "第 {{page}} 页 · 共 {{total}} 条"
+    "table": {
+      "time": "时间",
+      "action": "动作",
+      "actor": "操作者",
+      "target": "目标",
+      "ip": "IP 网段",
+      "detail": "详情"
     },
     "empty": {
       "title": "没有匹配的记录",

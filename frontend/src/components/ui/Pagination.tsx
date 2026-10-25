@@ -13,6 +13,8 @@ export default function Pagination({
   total,
   totalPages,
   onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [10, 20, 50, 100],
   /** 总数文案的命名空间键，默认「共 N 条」 */
   totalLabel,
 }: {
@@ -21,6 +23,8 @@ export default function Pagination({
   total: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  pageSizeOptions?: number[];
   totalLabel?: string;
 }) {
   const { t } = useTranslation('common');
@@ -30,14 +34,28 @@ export default function Pagination({
       return Array.from({ length: totalPages }, (_, index) => index + 1);
     }
 
-    const items: (number | 'gap')[] = [1];
-    const start = Math.max(2, page - 1);
-    const end = Math.min(totalPages - 1, page + 1);
+    // 始终显示连续三格；贴边时向内补齐，保证能跨到下一页
+    let start = page - 1;
+    let end = page + 1;
+    if (start < 1) {
+      start = 1;
+      end = 3;
+    }
+    if (end > totalPages) {
+      end = totalPages;
+      start = totalPages - 2;
+    }
 
-    if (start > 2) items.push('gap');
+    const items: (number | 'gap')[] = [];
+    if (start > 1) {
+      items.push(1);
+      if (start > 2) items.push('gap');
+    }
     for (let current = start; current <= end; current += 1) items.push(current);
-    if (end < totalPages - 1) items.push('gap');
-    items.push(totalPages);
+    if (end < totalPages) {
+      if (end < totalPages - 1) items.push('gap');
+      items.push(totalPages);
+    }
 
     return items;
   }, [page, totalPages]);
@@ -46,11 +64,27 @@ export default function Pagination({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-      <span className="text-[var(--color-content-muted)]">
-        {totalLabel
-          ? t(totalLabel, { total })
-          : t('pagination.total', { total })}
-        {pageSize > 0 && total > 0 ? ` · ${t('pagination.page', { page, totalPages })}` : ''}
+      <span className="flex items-center gap-2 text-[var(--color-content-muted)]">
+        <span>
+          {totalLabel ? t(totalLabel, { total }) : t('pagination.total', { total })}
+          {pageSize > 0 && total > 0 ? ` · ${t('pagination.page', { page, totalPages })}` : ''}
+        </span>
+        {onPageSizeChange && (
+          <label className="flex items-center gap-1">
+            <span>{t('pagination.per_page')}</span>
+            <select
+              className="input w-auto px-2 py-1"
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </span>
 
       {showPager && (

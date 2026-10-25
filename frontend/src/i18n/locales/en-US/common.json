@@ -47,6 +47,7 @@
     "total_accounts": "{{total}} accounts",
     "page": "Page {{page}}/{{totalPages}}",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "per_page": "Per page"
   }
 }

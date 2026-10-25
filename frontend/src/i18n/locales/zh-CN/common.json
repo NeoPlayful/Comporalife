@@ -47,6 +47,7 @@
     "total_accounts": "共 {{total}} 个账号",
     "page": "第 {{page}}/{{totalPages}} 页",
     "prev": "上一页",
-    "next": "下一页"
+    "next": "下一页",
+    "per_page": "每页"
   }
 }

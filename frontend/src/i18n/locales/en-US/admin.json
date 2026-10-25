@@ -118,13 +118,14 @@
       "apply": "Search",
       "reset": "Reset"
     },
-    "by": "by {{actor}}",
-    "target": "target {{type}}",
     "unknown_actor": "Unknown (account deleted)",
-    "pagination": {
-      "prev": "Previous",
-      "next": "Next",
-      "summary": "Page {{page}} · {{total}} entries"
+    "table": {
+      "time": "Time",
+      "action": "Action",
+      "actor": "Actor",
+      "target": "Target",
+      "ip": "IP range",
+      "detail": "Details"
     },
     "empty": {
       "title": "No matching entries",
