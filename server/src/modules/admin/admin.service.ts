@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient, UserRole } from '@prisma/client';
+import { fromZonedTime } from 'date-fns-tz';
 import { DELETION_COOLING_OFF_DAYS } from '../../config/constants.js';
 import { errors } from '../../lib/errors.js';
 
@@ -23,6 +24,8 @@ export interface AdminUserListItem {
   createdAt: string;
   /** 注销申请时间：管理端据此显示冷却期与审批按钮 */
   deletionRequestedAt: string | null;
+  /** 已批准注销的时间：非空表示账号已软删除，不能重新启用 */
+  deletedAt: string | null;
   /** 冷却期是否已满，由服务端算好，避免前后端各算一套 */
   coolingOffElapsed: boolean;
 }
@@ -63,6 +66,7 @@ export function toAdminUser(
     lastLoginIp: string | null;
     createdAt: Date;
     deletionRequestedAt: Date | null;
+    deletedAt: Date | null;
   },
   options: { reveal?: boolean } = {},
 ): AdminUserListItem {
@@ -81,6 +85,7 @@ export function toAdminUser(
     lastLoginIp: maskIp(user.lastLoginIp),
     createdAt: user.createdAt.toISOString(),
     deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
+    deletedAt: user.deletedAt?.toISOString() ?? null,
     coolingOffElapsed: coolingOffEndsAt ? coolingOffEndsAt <= Date.now() : false,
   };
 }
@@ -127,6 +132,7 @@ export async function listUsers(
         lastLoginIp: true,
         createdAt: true,
         deletionRequestedAt: true,
+        deletedAt: true,
       },
     }),
   ]);
@@ -156,6 +162,7 @@ export async function getUserDetail(
       lastLoginIp: true,
       createdAt: true,
       deletionRequestedAt: true,
+      deletedAt: true,
     },
   });
 
@@ -169,6 +176,107 @@ export async function getUserDetail(
     ...toAdminUser(user, options),
     sessionCount,
   };
+}
+
+export interface AdminAuditQuery {
+  action?: string;
+  actorId?: string;
+  targetId?: string;
+  from?: string;
+  to?: string;
+  timezone: string;
+  page: number;
+  pageSize: number;
+}
+
+/**
+ * 管理员操作审计。
+ *
+ * 与用户侧审计（quality 模块）分开：这里看的是「谁对谁做了什么」，
+ * 因此必须带操作者；仍然只给脱敏邮箱，不给财务内容。
+ */
+export async function listAdminAuditLogs(prisma: PrismaClient, params: AdminAuditQuery) {
+  const createdAt: Prisma.DateTimeFilter = {};
+  // 按管理员所在时区切日：否则「查某天的操作」会差几个小时
+  if (params.from) createdAt.gte = fromZonedTime(`${params.from}T00:00:00.000`, params.timezone);
+  if (params.to) createdAt.lte = fromZonedTime(`${params.to}T23:59:59.999`, params.timezone);
+
+  const where: Prisma.AuditLogWhereInput = {
+    // 管理员操作审计只包含 admin.* 动作，业务审计由用户侧页面负责
+    action: params.action ? params.action : { startsWith: 'admin.' },
+    ...(params.actorId ? { userId: params.actorId } : {}),
+    ...(params.targetId ? { targetId: params.targetId } : {}),
+    ...(Object.keys(createdAt).length > 0 ? { createdAt } : {}),
+  };
+
+  const [total, rows] = await Promise.all([
+    prisma.auditLog.count({ where }),
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (params.page - 1) * params.pageSize,
+      take: params.pageSize,
+      select: {
+        id: true,
+        action: true,
+        targetType: true,
+        targetId: true,
+        metadata: true,
+        ip: true,
+        createdAt: true,
+        user: { select: { email: true } },
+      },
+    }),
+  ]);
+
+  return {
+    total,
+    items: rows.map((row) => ({
+      id: row.id,
+      action: row.action,
+      targetType: row.targetType,
+      targetId: row.targetId,
+      // 审计元数据本身是受控写入的（只含动作参数），但仍只给标量，避免将来夹带明细
+      metadata: pickAuditMetadata(row.metadata),
+      ip: maskIp(row.ip),
+      // 操作者只给脱敏邮箱：定位到人即可，不需要明文
+      actorEmail: row.user?.email ? maskEmail(row.user.email) : null,
+      createdAt: row.createdAt.toISOString(),
+    })),
+  };
+}
+
+const AUDIT_METADATA_ALLOWED_KEYS = new Set([
+  'enabled',
+  'count',
+  'disposition',
+  'reason',
+  'action',
+  'note',
+  'attempts',
+  'kind',
+  'fields',
+  'changedFields',
+]);
+
+function pickAuditMetadata(metadata: Prisma.JsonValue | null): Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+
+  const picked: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(metadata)) {
+    if (!AUDIT_METADATA_ALLOWED_KEYS.has(key)) continue;
+    if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) picked[key] = value;
+  }
+
+  return Object.keys(picked).length > 0 ? picked : null;
+}
+
+export async function getAdminTimezone(prisma: PrismaClient, userId: string): Promise<string> {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { timezone: true },
+  });
+  return settings?.timezone ?? 'UTC';
 }
 
 export async function getDashboardOverview(prisma: PrismaClient) {
@@ -221,17 +329,35 @@ export async function getSecurityOverview(prisma: PrismaClient) {
   return { window: '7d', loginCount, failedLogins, disabledUsers };
 }
 
+/**
+ * 任务聚合。
+ *
+ * JobTask 与 MonteCarloRun 是两类独立实体，状态枚举也各自演进，
+ * 过去把同名状态相加会让「进行中」的口径说不清，这里分开返回。
+ */
 export async function getJobOverview(prisma: PrismaClient) {
   const [tasks, runs] = await Promise.all([
     prisma.jobTask.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.monteCarloRun.groupBy({ by: ['status'], _count: { _all: true } }),
   ]);
 
-  const counts: Record<string, number> = {};
-  for (const group of tasks) counts[group.status] = group._count._all;
-  for (const group of runs) counts[group.status] = (counts[group.status] ?? 0) + group._count._all;
+  const countOf = (groups: Array<{ status: string; _count: { _all: number } }>) => {
+    const counts: Record<string, number> = {};
+    for (const group of groups) counts[group.status] = group._count._all;
+    return counts;
+  };
 
-  return { counts, active: (counts.queued ?? 0) + (counts.running ?? 0) };
+  const tasksByStatus = countOf(tasks);
+  const runsByStatus = countOf(runs);
+  const activeOf = (counts: Record<string, number>) =>
+    (counts.queued ?? 0) + (counts.running ?? 0) + (counts.pending ?? 0);
+
+  return {
+    tasks: { counts: tasksByStatus, active: activeOf(tasksByStatus) },
+    runs: { counts: runsByStatus, active: activeOf(runsByStatus) },
+    // 兼容既有调用方：两者之和，仅用于「总共还有多少在跑」的粗口径
+    active: activeOf(tasksByStatus) + activeOf(runsByStatus),
+  };
 }
 
 /** 系统信息：只读进程与版本，不读数据库内容 */

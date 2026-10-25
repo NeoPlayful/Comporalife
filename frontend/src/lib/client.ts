@@ -116,7 +116,20 @@ function shouldAutoRefresh(path: string): boolean {
   return !AUTH_ENDPOINTS_WITHOUT_REFRESH.some((endpoint) => path.startsWith(endpoint));
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+/** 列表接口的完整结果：分页信息与数据一起返回，避免调用方猜「还有没有下一页」 */
+export interface PagedResult<T> {
+  data: T;
+  pagination: PaginationMeta | null;
+}
+
+async function requestFull<T>(path: string, options: RequestOptions = {}): Promise<PagedResult<T>> {
   const { body, skipRefresh = false, headers, token: explicitToken, ...rest } = options;
 
   const token = explicitToken !== undefined ? explicitToken : accessTokenGetter();
@@ -136,7 +149,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     const refreshed = await refreshOnce();
     if (refreshed) {
       onTokenRefreshed(refreshed);
-      return request<T>(path, { ...options, skipRefresh: true });
+      return requestFull<T>(path, { ...options, skipRefresh: true });
     }
     onAuthLost();
     throw new ApiError(401, 'UNAUTHORIZED', '会话已失效，请重新登录');
@@ -147,7 +160,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (!response.ok) {
       throw new ApiError(response.status, 'SYSTEM_ERROR', `请求失败（${response.status}）`);
     }
-    return undefined as T;
+    return { data: undefined as T, pagination: null };
   }
 
   const payload = (await response.json()) as ApiEnvelope<T>;
@@ -163,7 +176,13 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     );
   }
 
-  return payload.data as T;
+  const pagination = payload.meta?.pagination as PaginationMeta | undefined;
+  return { data: payload.data as T, pagination: pagination ?? null };
+}
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { data } = await requestFull<T>(path, options);
+  return data;
 }
 
 /**
@@ -213,6 +232,9 @@ async function requestMultipart<T>(path: string, form: FormData, options: Reques
 
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>(path, { ...options, method: 'GET' }),
+  /** 列表接口：同时拿到数据与服务端分页信息 */
+  getPaged: <T>(path: string, options?: RequestOptions) =>
+    requestFull<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>

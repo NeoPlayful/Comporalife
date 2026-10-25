@@ -6,7 +6,8 @@
     "badge": "运维控制台"
   },
   "dashboard": {
-    "title": "总览",
+    "title": "总览分析",
+    "accounts": "账号概况",
     "users_total": "用户总数",
     "users_active": "正常",
     "users_disabled": "已禁用",
@@ -15,13 +16,33 @@
     "sessions": "活跃会话",
     "logins_7d": "登录次数（7 天）",
     "failed_logins_7d": "登录失败（7 天）",
+    "security_title": "登录安全（近 7 天）",
+    "jobs_title": "后台任务",
+    "jobs_tasks_active": "进行中任务",
+    "jobs_runs_active": "进行中模拟",
+    "trend_title": "注册趋势（近 14 天）",
+    "trend_empty": "近 30 天没有新注册",
+    "load_failed": "加载失败",
+    "retry": "重试",
     "active_jobs": "进行中平台任务",
-    "system": "系统",
+    "system": "服务状态",
     "version": "版本",
     "node": "运行时",
     "uptime": "运行时长",
     "memory": "内存占用",
-    "database": "数据库"
+    "database": "数据库",
+    "db_status": {
+      "ok": "正常",
+      "fail": "不可用"
+    },
+    "job_status": {
+      "queued": "排队",
+      "running": "运行中",
+      "succeeded": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消",
+      "pending": "待运行"
+    }
   },
   "users": {
     "title": "用户",
@@ -36,6 +57,8 @@
     "never_logged_in": "从未登录",
     "sessions": "{{count}} 个会话",
     "reveal": "显示完整账号",
+    "expand": "详情",
+    "collapse": "收起",
     "actions": "操作",
     "disable": "禁用",
     "enable": "启用",
@@ -43,6 +66,7 @@
     "deletion_review": "批准删除申请",
     "login_logs": "登录记录",
     "audit_logs": "管理操作",
+    "load_failed": "加载失败",
     "notice_no_financial": "管理视图不包含余额、流水、持仓与目标",
     "disable_confirm": "禁用该账号？全部会话会立即失效。",
     "revoke_confirm": "撤销全部会话？已签发的令牌会立即失效。",
@@ -54,30 +78,108 @@
     "reject_deletion_confirm": "驳回 {{email}} 的注销申请？",
     "cooling_off_pending": "冷却期未满，不能批准",
     "deletion_ready": "冷却期已满，可以批准",
-    "deletion_cooling": "注销申请于 {{time}} 提交，冷却期未满"
+    "deletion_cooling": "注销申请于 {{time}} 提交，冷却期未满",
+    "deletion_done": "已于 {{time}} 注销，不可再启用",
+    "deleted_badge": "已注销（数据保留）",
+    "pagination": {
+      "prev": "上一页",
+      "next": "下一页",
+      "summary": "第 {{page}} 页 · 共 {{total}} 个账号"
+    }
   },
   "admins": {
     "title": "管理员",
     "empty": "没有管理员",
+    "current": "当前管理员",
+    "candidates": "候选账号",
+    "search": "搜索",
+    "no_candidates": "没有匹配的账号",
+    "already_admin": "已是管理员",
     "grant": "授予管理员",
     "revoke": "撤销管理员",
-    "grant_hint": "输入要授予管理员角色的用户 ID",
-    "grant_placeholder": "用户 ID",
+    "grant_hint": "输入邮箱或用户 ID 搜索账号",
+    "grant_placeholder": "邮箱或用户 ID",
+    "grant_confirm": "授予 {{email}} 管理员权限？其现有会话会立即失效。",
+    "revoke_confirm": "撤销 {{email}} 的管理员权限？",
     "self_protection": "不能修改自己的角色",
     "last_super_admin": "最后一个超级管理员不能被降级或禁用"
   },
-  "system": {
-    "title": "系统",
-    "jobs": "平台任务",
+  "audit": {
+    "title": "审计日志",
+    "subtitle": "谁对谁做了什么。操作者只显示脱敏邮箱，不含任何财务内容。",
+    "filter": {
+      "action": "动作类型",
+      "action_placeholder": "例如 admin.user_disabled",
+      "from": "起始日期",
+      "to": "截止日期",
+      "actor": "操作者 ID",
+      "target": "目标账号 ID",
+      "id_placeholder": "留空表示不限",
+      "apply": "查询",
+      "reset": "重置"
+    },
+    "by": "操作者 {{actor}}",
+    "target": "目标 {{type}}",
+    "unknown_actor": "未知（账号已删除）",
+    "pagination": {
+      "prev": "上一页",
+      "next": "下一页",
+      "summary": "第 {{page}} 页 · 共 {{total}} 条"
+    },
+    "empty": {
+      "title": "没有匹配的记录",
+      "description": "换个动作类型或放宽时间范围再试。"
+    },
+    "actions": {
+      "admin.user_disabled": "禁用账号",
+      "admin.user_enabled": "启用账号",
+      "admin.sessions_revoked": "撤销全部会话",
+      "admin.password_reset_triggered": "触发密码重置",
+      "admin.role_granted": "授予管理员",
+      "admin.role_revoked": "撤销管理员",
+      "admin.deletion_approved": "批准注销",
+      "admin.deletion_rejected": "驳回注销",
+      "admin.registration_toggled": "切换公开注册",
+      "admin.email_verification_toggled": "切换邮箱验证",
+      "admin.job_retried": "重试后台任务",
+      "admin.user_revealed": "查看完整账号",
+      "admin.user_searched": "检索账号"
+    }
+  },
+  "auditActions": {
+    "auth.login": "登录",
+    "auth.login_failed": "登录失败",
+    "admin.user_disabled": "禁用账号",
+    "admin.user_enabled": "启用账号",
+    "admin.sessions_revoked": "撤销全部会话",
+    "admin.password_reset_triggered": "触发密码重置",
+    "admin.role_granted": "授予管理员",
+    "admin.role_revoked": "撤销管理员",
+    "admin.deletion_approved": "批准注销",
+    "admin.deletion_rejected": "驳回注销",
+    "admin.user_revealed": "查看完整账号"
+  },
+  "settings": {
+    "title": "系统设置",
+    "subtitle": "部署级开关与运行参数。密钥类配置只来自环境变量，不在此处修改。",
+    "read_only": "当前角色只能查看设置，不能修改。",
+    "access": "访问控制",
+    "runtime": "运行参数",
+    "on": "已开启",
+    "off": "已关闭",
     "registration": "公开注册",
-    "registration_on": "开放",
-    "registration_off": "关闭",
-    "registration_hint": "关闭后注册接口返回 403",
-    "audit_title": "管理操作审计",
-    "job_status": "任务状态",
+    "registration_hint": "关闭后注册接口返回 403，已有账号不受影响",
+    "registration_off_confirm": "关闭公开注册后，新用户将无法自行注册。确认关闭？",
     "email_verification": "邮箱验证",
     "email_verification_hint": "开启后注册时会发送验证邮件；未验证不影响登录与记账",
-    "retry": "重试"
+    "no_mail_confirm": "当前未配置 SMTP，开启后用户收不到验证邮件。仍要开启？",
+    "mail": "邮件服务",
+    "mail_configured": "已配置",
+    "mail_not_configured": "未配置（验证与重置邮件不会发出）",
+    "cooling_off": "注销冷却期",
+    "audit_retention": "审计日志保留",
+    "days": "{{count}} 天",
+    "env_hint": "以上参数由环境变量设定，修改后需重启服务。"
   },
   "roles": {
     "super_admin": "超级管理员",

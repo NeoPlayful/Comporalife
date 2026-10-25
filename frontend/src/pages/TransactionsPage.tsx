@@ -14,6 +14,7 @@ import TransactionForm from '@/components/finance/TransactionForm';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Pagination from '@/components/ui/Pagination';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, RotateCcw, Search } from 'lucide-react';
 import { useState } from 'react';
@@ -330,34 +331,14 @@ export default function TransactionsPage() {
             </table>
           </div>
 
-          {pagination && pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--color-content-muted)]">
-                {t('transactions:pagination.summary', {
-                  total: pagination.total,
-                  page: pagination.page,
-                  totalPages: pagination.totalPages,
-                })}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={pagination.page <= 1}
-                  onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
-                  className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 disabled:opacity-40"
-                >
-                  {t('transactions:pagination.prev')}
-                </button>
-                <button
-                  type="button"
-                  disabled={pagination.page >= pagination.totalPages}
-                  onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
-                  className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 disabled:opacity-40"
-                >
-                  {t('transactions:pagination.next')}
-                </button>
-              </div>
-            </div>
+          {pagination && (
+            <Pagination
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              totalPages={pagination.totalPages}
+              onPageChange={(next) => setFilters({ ...filters, page: next })}
+            />
           )}
         </>
       )}

@@ -3,12 +3,10 @@
   "subtitle": "你的敏感操作记录，IP 已脱敏到网段，不包含金额与流水内容",
   "filter": {
     "action": "按动作类型筛选",
-    "action_placeholder": "例如 auth.login"
-  },
-  "pagination": {
-    "prev": "上一页",
-    "next": "下一页",
-    "page": "第 {{page}} 页"
+    "action_placeholder": "例如 auth.login",
+    "from": "起始日期",
+    "to": "截止日期",
+    "apply": "查询"
   },
   "actions": {
     "auth.login": "登录",

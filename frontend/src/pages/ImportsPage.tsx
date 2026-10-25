@@ -6,6 +6,7 @@ import BatchStatusBadge from '@/components/imports/BatchStatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Pagination from '@/components/ui/Pagination';
 import { translateError } from '@/lib/error-message';
 import { formatDateTime } from '@/lib/format';
 import { importsApi, type ImportStatus } from '@/lib/imports';
@@ -125,35 +126,13 @@ export default function ImportsPage() {
         </div>
       )}
 
-      {data.pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-[var(--color-content-muted)]">
-            {t('pagination.summary', {
-              page: data.pagination.page,
-              totalPages: data.pagination.totalPages,
-              total: data.pagination.total,
-            })}
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((value) => value - 1)}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1 disabled:opacity-50"
-            >
-              {t('pagination.prev')}
-            </button>
-            <button
-              type="button"
-              disabled={page >= data.pagination.totalPages}
-              onClick={() => setPage((value) => value + 1)}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1 disabled:opacity-50"
-            >
-              {t('pagination.next')}
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={data.pagination.page}
+        pageSize={data.pagination.pageSize}
+        total={data.pagination.total}
+        totalPages={data.pagination.totalPages}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

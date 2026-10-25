@@ -15,8 +15,22 @@ export interface AdminUser {
   sessionCount?: number;
   /** 注销申请时间；非空表示有待审批的申请 */
   deletionRequestedAt?: string | null;
+  /** 已批准注销的时间；非空表示账号已软删除，不能重新启用 */
+  deletedAt?: string | null;
   /** 冷却期是否已满，由服务端计算 */
   coolingOffElapsed?: boolean;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  /** 操作者脱敏邮箱 */
+  actorEmail: string | null;
+  createdAt: string;
 }
 
 export interface DashboardOverview {
@@ -24,8 +38,10 @@ export interface DashboardOverview {
   sessions: number;
 }
 
+/** 任务与风险模拟分开计数：两类实体状态枚举不同，不能相加 */
 export interface JobOverview {
-  counts: Record<string, number>;
+  tasks: { counts: Record<string, number>; active: number };
+  runs: { counts: Record<string, number>; active: number };
   active: number;
 }
 
@@ -37,9 +53,28 @@ export interface SystemMetrics {
   database: 'ok' | 'fail';
 }
 
+export interface AdminSettingsOverview {
+  registrationEnabled: boolean;
+  emailVerificationEnabled: boolean;
+  mailConfigured: boolean;
+  deletionCoolingOffDays: number;
+  auditLogRetentionDays: number;
+  capabilities: { canWriteSettings: boolean; canManageAdmins: boolean };
+}
+
 export interface AdminPermissions {
   role: 'admin' | 'super_admin';
   permissions: string[];
+}
+
+export interface AdminAuditFilters {
+  action?: string;
+  actorId?: string;
+  targetId?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export const adminApi = {
@@ -51,15 +86,21 @@ export const adminApi = {
     ),
   jobOverview: () => api.get<JobOverview>('/api/admin/dashboard/jobs'),
 
-  users: (params: { page?: number; search?: string; role?: AdminRole; status?: string; reveal?: boolean } = {}) => {
+  users: (params: { page?: number; pageSize?: number; search?: string; role?: AdminRole; status?: string; reveal?: boolean } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
+    if (params.pageSize) query.set('pageSize', String(params.pageSize));
     if (params.search) query.set('search', params.search);
     if (params.role) query.set('role', params.role);
     if (params.status) query.set('status', params.status);
     if (params.reveal) query.set('reveal', 'true');
-    return api.get<{ users: AdminUser[] }>(`/api/admin/users?${query}`);
+    return api.getPaged<{ users: AdminUser[] }>(`/api/admin/users?${query}`);
   },
+  /** 授予管理员前的候选账号检索（按邮箱或 ID） */
+  searchUsers: (query: string) =>
+    api.get<{ users: Array<{ id: string; email: string; nickname: string; role: AdminRole; status: string }> }>(
+      `/api/admin/users/search?query=${encodeURIComponent(query)}`,
+    ),
   user: (id: string, reveal = false) =>
     api.get<{ user: AdminUser }>(`/api/admin/users/${id}${reveal ? '?reveal=true' : ''}`),
   disableUser: (id: string) => api.post<{ id: string; status: string }>(`/api/admin/users/${id}/disable`, {}),
@@ -89,14 +130,22 @@ export const adminApi = {
   revoke: (id: string) => api.post<{ id: string; role: string }>(`/api/admin/admins/${id}/revoke`, {}),
   permissions: () => api.get<AdminPermissions>('/api/admin/permissions/me'),
 
-  auditLogs: (page = 1) =>
-    api.get<{ logs: Array<{ id: string; action: string; targetType: string | null; targetId: string | null; ip: string | null; createdAt: string }> }>(
-      `/api/admin/audit-logs?page=${page}`,
-    ),
+  auditLogs: (filters: AdminAuditFilters = {}) => {
+    const query = new URLSearchParams();
+    if (filters.action) query.set('action', filters.action);
+    if (filters.actorId) query.set('actorId', filters.actorId);
+    if (filters.targetId) query.set('targetId', filters.targetId);
+    if (filters.from) query.set('from', filters.from);
+    if (filters.to) query.set('to', filters.to);
+    if (filters.page) query.set('page', String(filters.page));
+    if (filters.pageSize) query.set('pageSize', String(filters.pageSize));
+    return api.getPaged<{ logs: AdminAuditLog[] }>(`/api/admin/audit-logs?${query}`);
+  },
   jobs: (page = 1, status?: string) =>
-    api.get<{ jobs: Array<{ id: string; kind: string; status: string; progress: string; failureCode: string | null; createdAt: string; finishedAt: string | null }> }>(
+    api.getPaged<{ jobs: Array<{ id: string; kind: string; status: string; progress: string; failureCode: string | null; createdAt: string; finishedAt: string | null }> }>(
       `/api/admin/jobs?page=${page}${status ? `&status=${status}` : ''}`,
     ),
+  settingsOverview: () => api.get<AdminSettingsOverview>('/api/admin/settings'),
   systemInfo: () => api.get<SystemMetrics>('/api/admin/system/info'),
   systemMetrics: () =>
     api.get<{ jobs: JobOverview; sessions: number; uptimeSeconds: number; memoryMb: number }>(

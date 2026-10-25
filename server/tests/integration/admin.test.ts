@@ -173,6 +173,40 @@ describe('用户管理', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().data.user.email).toContain('@');
     expect(res.json().data.user.email).not.toContain('***');
+
+    // 查看明文账号属于隐私操作，必须留痕，否则谁看过无从追溯
+    const log = await app.prisma.auditLog.findFirst({
+      where: { userId: adminId, action: 'admin.user_revealed', targetId: userId },
+    });
+    expect(log).not.toBeNull();
+  });
+
+  it('未 reveal 时不写查看审计', async () => {
+    await app.inject({
+      method: 'GET',
+      url: `/api/admin/users/${userId}`,
+      headers: auth(adminToken),
+    });
+
+    const log = await app.prisma.auditLog.findFirst({
+      where: { userId: adminId, action: 'admin.user_revealed' },
+    });
+    expect(log).toBeNull();
+  });
+
+  it('用户列表返回服务端分页信息', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?page=1&pageSize=2',
+      headers: auth(adminToken),
+    });
+
+    const pagination = res.json().meta.pagination;
+    expect(pagination.page).toBe(1);
+    expect(pagination.pageSize).toBe(2);
+    expect(pagination.total).toBeGreaterThanOrEqual(3);
+    expect(pagination.totalPages).toBeGreaterThanOrEqual(2);
+    expect((res.json().data.users as unknown[]).length).toBeLessThanOrEqual(2);
   });
 
   it('详情不含任何财务字段', async () => {
@@ -345,6 +379,41 @@ describe('用户管理', () => {
     expect(row.deletedAt).not.toBeNull();
   });
 
+  it('已注销的账号不能被重新启用', async () => {
+    // 直接把账号置为已批准注销的状态
+    await app.prisma.user.update({
+      where: { id: userId },
+      data: { status: 'disabled', deletedAt: new Date(), deletionRequestedAt: new Date(Date.now() - 30 * 86_400_000) },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${userId}/enable`,
+      headers: auth(adminToken),
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error.details?.reason).toBe('account_deleted');
+
+    // 状态未被改动
+    const user = await app.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { status: true } });
+    expect(user.status).toBe('disabled');
+  });
+
+  it('列表返回注销时间供前端区分「已注销」与「已禁用」', async () => {
+    const deletedAt = new Date();
+    await app.prisma.user.update({
+      where: { id: userId },
+      data: { status: 'disabled', deletedAt },
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/api/admin/users', headers: auth(adminToken) });
+    const users = res.json().data.users as Array<{ id: string; deletedAt: string | null }>;
+    const target = users.find((item) => item.id === userId);
+
+    expect(target?.deletedAt).toBeTruthy();
+  });
+
   it('驳回注销申请会清空申请时间', async () => {
     const target = await createUser(app, DOMAIN, 'reject');
     await app.inject({
@@ -461,7 +530,85 @@ describe('权限保护', () => {
   });
 });
 
+describe('管理员检索', () => {
+  it('按邮箱片段检索候选账号并返回完整邮箱', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users/search?query=plain',
+      headers: auth(superToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const users = res.json().data.users as Array<{ email: string }>;
+    expect(users.length).toBeGreaterThan(0);
+    // 提权前必须能确认对象是谁，因此这里不脱敏
+    expect(users.some((item) => item.email.includes('@') && !item.email.includes('***'))).toBe(true);
+  });
+
+  it('检索写审计，且审计里不记录检索词', async () => {
+    await app.inject({
+      method: 'GET',
+      url: '/api/admin/users/search?query=plain',
+      headers: auth(superToken),
+    });
+
+    const log = await app.prisma.auditLog.findFirstOrThrow({
+      where: { userId: superId, action: 'admin.user_searched' },
+    });
+    // 检索词本身可能包含邮箱片段，不落库
+    expect(JSON.stringify(log.metadata ?? {})).not.toContain('plain');
+  });
+
+  it('检索词过短返回 400', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users/search?query=a',
+      headers: auth(superToken),
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('普通管理员不能调用账号检索（仅超管）', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users/search?query=plain',
+      headers: auth(adminToken),
+    });
+
+    // 本用例里 adminToken 是 admin 角色，应被拒
+    expect(res.statusCode).toBe(403);
+  });
+});
+
 describe('系统与设置', () => {
+  it('设置总览只返回开关与参数，不含密钥', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/admin/settings', headers: auth(adminToken) });
+
+    expect(res.statusCode).toBe(200);
+    const data = res.json().data;
+    expect(typeof data.registrationEnabled).toBe('boolean');
+    expect(typeof data.mailConfigured).toBe('boolean');
+    expect(data.auditLogRetentionDays).toBeGreaterThan(0);
+    expect(data.capabilities.canManageAdmins).toBe(false);
+
+    const serialized = JSON.stringify(data);
+    for (const secret of ['SMTP_PASSWORD', 'SMTP_HOST', 'JWT_SECRET', 'FILE_ENCRYPTION_KEY']) {
+      expect(serialized).not.toContain(secret);
+    }
+  });
+
+  it('任务聚合把任务与模拟分开计数', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/admin/dashboard/jobs', headers: auth(adminToken) });
+
+    expect(res.statusCode).toBe(200);
+    const data = res.json().data;
+    expect(data.tasks).toBeDefined();
+    expect(data.runs).toBeDefined();
+    expect(typeof data.tasks.active).toBe('number');
+    expect(typeof data.runs.active).toBe('number');
+  });
+
   it('系统信息只读进程状态', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/admin/system/info', headers: auth(adminToken) });
 
@@ -533,5 +680,104 @@ describe('系统与设置', () => {
 
     expect(logs.length).toBeGreaterThan(0);
     expect(logs.every((item) => item.action.startsWith('admin.'))).toBe(true);
+  });
+
+  it('管理员审计带操作者脱敏邮箱，不含明文', async () => {
+    await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${userId}/disable`,
+      headers: auth(adminToken),
+    });
+
+    const res = await app.inject({ method: 'GET', url: '/api/admin/audit-logs', headers: auth(adminToken) });
+    const logs = res.json().data.logs as Array<{ action: string; actorEmail: string | null }>;
+    const entry = logs.find((item) => item.action === 'admin.user_disabled');
+
+    expect(entry).toBeDefined();
+    // 操作者是追责的核心字段，必须非空且已脱敏
+    expect(entry!.actorEmail).toBeTruthy();
+    expect(entry!.actorEmail).toContain('***');
+  });
+
+  it('审计支持按动作与操作者筛选', async () => {
+    await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${userId}/disable`,
+      headers: auth(adminToken),
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${userId}/enable`,
+      headers: auth(adminToken),
+    });
+
+    const byAction = await app.inject({
+      method: 'GET',
+      url: '/api/admin/audit-logs?action=admin.user_disabled',
+      headers: auth(adminToken),
+    });
+    const actions = byAction.json().data.logs as Array<{ action: string }>;
+    expect(actions.length).toBeGreaterThan(0);
+    expect(actions.every((item) => item.action === 'admin.user_disabled')).toBe(true);
+
+    const byActor = await app.inject({
+      method: 'GET',
+      url: `/api/admin/audit-logs?actorId=${adminId}`,
+      headers: auth(adminToken),
+    });
+    expect((byActor.json().data.logs as unknown[]).length).toBeGreaterThan(0);
+
+    // 同样的动作换成另一个操作者：本测试里超管没做过禁用，应为空
+    const otherActor = await app.inject({
+      method: 'GET',
+      url: `/api/admin/audit-logs?action=admin.user_disabled&actorId=${superId}`,
+      headers: auth(adminToken),
+    });
+    expect((otherActor.json().data.logs as unknown[]).length).toBe(0);
+  });
+
+  it('审计支持按日期区间筛选', async () => {
+    await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${userId}/disable`,
+      headers: auth(adminToken),
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const inRange = await app.inject({
+      method: 'GET',
+      url: `/api/admin/audit-logs?from=${today}&to=${today}`,
+      headers: auth(adminToken),
+    });
+    expect((inRange.json().data.logs as unknown[]).length).toBeGreaterThan(0);
+
+    // 一个明显在过去的区间应为空，证明筛选真的生效
+    const past = await app.inject({
+      method: 'GET',
+      url: '/api/admin/audit-logs?from=2000-01-01&to=2000-01-02',
+      headers: auth(adminToken),
+    });
+    expect((past.json().data.logs as unknown[]).length).toBe(0);
+  });
+
+  it('审计分页返回总数与总页数', async () => {
+    for (let index = 0; index < 3; index += 1) {
+      await app.inject({
+        method: 'POST',
+        url: `/api/admin/users/${userId}/revoke-sessions`,
+        headers: auth(adminToken),
+      });
+    }
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/audit-logs?page=1&pageSize=2',
+      headers: auth(adminToken),
+    });
+
+    const pagination = res.json().meta.pagination;
+    expect(pagination.pageSize).toBe(2);
+    expect(pagination.total).toBeGreaterThanOrEqual(3);
+    expect((res.json().data.logs as unknown[]).length).toBe(2);
   });
 });

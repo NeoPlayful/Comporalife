@@ -37,11 +37,6 @@
     "source_manual": "Manual",
     "uncategorized": "Uncategorized"
   },
-  "pagination": {
-    "summary": "{{total}} total · page {{page}}/{{totalPages}}",
-    "prev": "Previous",
-    "next": "Next"
-  },
   "detail": {
     "voided_suffix": " · reversed",
     "category": "Category",

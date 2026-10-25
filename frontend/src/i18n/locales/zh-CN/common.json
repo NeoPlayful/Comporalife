@@ -41,5 +41,12 @@
     "version": "版本 v{{version}}"
   },
   "network_error": "网络异常，请稍后重试",
-  "list_separator": "、"
+  "list_separator": "、",
+  "pagination": {
+    "total": "共 {{total}} 条",
+    "total_accounts": "共 {{total}} 个账号",
+    "page": "第 {{page}}/{{totalPages}} 页",
+    "prev": "上一页",
+    "next": "下一页"
+  }
 }

@@ -1,27 +1,48 @@
 {
-  "title": "Admin",
-  "subtitle": "Accounts and operations only — never user financial data",
+  "title": "Admin console",
+  "subtitle": "Account and operations only, never user financial data",
   "nav": {
     "back_to_app": "Back to app",
     "badge": "Operations console"
   },
   "dashboard": {
     "title": "Overview",
-    "users_total": "Users",
+    "accounts": "Accounts",
+    "users_total": "Total users",
     "users_active": "Active",
     "users_disabled": "Disabled",
-    "new_24h": "New in 24h",
-    "new_7d": "New in 7 days",
+    "new_24h": "New (24h)",
+    "new_7d": "New (7d)",
     "sessions": "Active sessions",
     "logins_7d": "Logins (7d)",
     "failed_logins_7d": "Failed logins (7d)",
+    "security_title": "Login security (last 7 days)",
+    "jobs_title": "Background jobs",
+    "jobs_tasks_active": "Running tasks",
+    "jobs_runs_active": "Running simulations",
+    "trend_title": "Registrations (last 14 days)",
+    "trend_empty": "No signups in the last 30 days",
+    "load_failed": "Failed to load",
+    "retry": "Retry",
     "active_jobs": "Active platform jobs",
-    "system": "System",
+    "system": "Service status",
     "version": "Version",
     "node": "Node",
     "uptime": "Uptime",
     "memory": "Memory",
-    "database": "Database"
+    "database": "Database",
+    "db_status": {
+      "ok": "Healthy",
+      "fail": "Unavailable"
+    },
+    "job_status": {
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "pending": "Pending"
+    }
   },
   "users": {
     "title": "Users",
@@ -35,7 +56,9 @@
     "last_login": "Last login {{time}}",
     "never_logged_in": "Never logged in",
     "sessions": "{{count}} session(s)",
-    "reveal": "Reveal identity",
+    "reveal": "Show full account",
+    "expand": "Details",
+    "collapse": "Collapse",
     "actions": "Actions",
     "disable": "Disable",
     "enable": "Enable",
@@ -43,41 +66,120 @@
     "deletion_review": "Approve deletion",
     "login_logs": "Login history",
     "audit_logs": "Admin actions",
-    "notice_no_financial": "Admin views never include balances, transactions, portfolios or goals",
-    "disable_confirm": "Disable this account? All sessions will be revoked immediately.",
-    "revoke_confirm": "Revoke all sessions? Existing tokens stop working immediately.",
-    "reset_mail": "Send reset mail",
+    "load_failed": "Failed to load",
+    "notice_no_financial": "This view contains no balances, transactions, holdings or goals",
+    "disable_confirm": "Disable this account? All sessions end immediately.",
+    "revoke_confirm": "Revoke all sessions? Issued tokens become invalid immediately.",
+    "reset_mail": "Resend reset email",
     "reset_mail_confirm": "Send a password reset email to {{email}}?",
     "approve_deletion": "Approve deletion",
-    "approve_deletion_confirm": "Approving disables {{email}} (data is kept). Continue?",
+    "approve_deletion_confirm": "{{email}} will be disabled after approval (data retained). Continue?",
     "reject_deletion": "Reject deletion",
     "reject_deletion_confirm": "Reject the deletion request from {{email}}?",
     "cooling_off_pending": "Cooling-off period not elapsed",
-    "deletion_ready": "Cooling-off period elapsed, approval allowed",
-    "deletion_cooling": "Deletion requested at {{time}}, cooling-off period not elapsed"
+    "deletion_ready": "Cooling-off elapsed, safe to approve",
+    "deletion_cooling": "Requested at {{time}}, cooling-off not elapsed",
+    "deletion_done": "Deleted at {{time}}, cannot be re-enabled",
+    "deleted_badge": "Deleted (data retained)",
+    "pagination": {
+      "prev": "Previous",
+      "next": "Next",
+      "summary": "Page {{page}} · {{total}} accounts"
+    }
   },
   "admins": {
-    "title": "Administrators",
-    "empty": "No administrators",
+    "title": "Admins",
+    "empty": "No admins",
+    "current": "Current admins",
+    "candidates": "Matching accounts",
+    "search": "Search",
+    "no_candidates": "No matching accounts",
+    "already_admin": "Already an admin",
     "grant": "Grant admin",
     "revoke": "Revoke admin",
-    "grant_hint": "Enter the user ID to grant admin role",
-    "grant_placeholder": "User ID",
-    "self_protection": "You cannot modify your own role",
-    "last_super_admin": "The last super administrator cannot be demoted or disabled"
+    "grant_hint": "Search by email or user ID",
+    "grant_placeholder": "Email or user ID",
+    "grant_confirm": "Grant admin rights to {{email}}? Their sessions end immediately.",
+    "revoke_confirm": "Revoke admin rights from {{email}}?",
+    "self_protection": "You cannot change your own role",
+    "last_super_admin": "The last super admin cannot be demoted or disabled"
   },
-  "system": {
-    "title": "System",
-    "jobs": "Platform jobs",
+  "audit": {
+    "title": "Audit log",
+    "subtitle": "Who did what to whom. Actors show a masked email and never financial content.",
+    "filter": {
+      "action": "Action",
+      "action_placeholder": "e.g. admin.user_disabled",
+      "from": "From",
+      "to": "To",
+      "actor": "Actor ID",
+      "target": "Target user ID",
+      "id_placeholder": "Leave blank for any",
+      "apply": "Search",
+      "reset": "Reset"
+    },
+    "by": "by {{actor}}",
+    "target": "target {{type}}",
+    "unknown_actor": "Unknown (account deleted)",
+    "pagination": {
+      "prev": "Previous",
+      "next": "Next",
+      "summary": "Page {{page}} · {{total}} entries"
+    },
+    "empty": {
+      "title": "No matching entries",
+      "description": "Try another action type or widen the date range."
+    },
+    "actions": {
+      "admin.user_disabled": "Disabled an account",
+      "admin.user_enabled": "Enabled an account",
+      "admin.sessions_revoked": "Revoked all sessions",
+      "admin.password_reset_triggered": "Triggered password reset",
+      "admin.role_granted": "Granted admin",
+      "admin.role_revoked": "Revoked admin",
+      "admin.deletion_approved": "Approved deletion",
+      "admin.deletion_rejected": "Rejected deletion",
+      "admin.registration_toggled": "Toggled registration",
+      "admin.email_verification_toggled": "Toggled email verification",
+      "admin.job_retried": "Retried a job",
+      "admin.user_revealed": "Viewed full account",
+      "admin.user_searched": "Searched accounts"
+    }
+  },
+  "auditActions": {
+    "auth.login": "Login",
+    "auth.login_failed": "Failed login",
+    "admin.user_disabled": "Disabled account",
+    "admin.user_enabled": "Enabled account",
+    "admin.sessions_revoked": "Revoked all sessions",
+    "admin.password_reset_triggered": "Triggered password reset",
+    "admin.role_granted": "Granted admin",
+    "admin.role_revoked": "Revoked admin",
+    "admin.deletion_approved": "Approved deletion",
+    "admin.deletion_rejected": "Rejected deletion",
+    "admin.user_revealed": "Viewed full account"
+  },
+  "settings": {
+    "title": "System settings",
+    "subtitle": "Deployment-level switches and runtime parameters. Secrets come from environment variables only.",
+    "read_only": "Your role can view settings but not change them.",
+    "access": "Access control",
+    "runtime": "Runtime parameters",
+    "on": "On",
+    "off": "Off",
     "registration": "Public registration",
-    "registration_on": "Open",
-    "registration_off": "Closed",
-    "registration_hint": "When closed, the register endpoint returns 403",
-    "audit_title": "Admin audit log",
-    "job_status": "Job status",
+    "registration_hint": "When off, the register endpoint returns 403; existing accounts are unaffected",
+    "registration_off_confirm": "With registration off, new users cannot sign up on their own. Turn it off?",
     "email_verification": "Email verification",
     "email_verification_hint": "When on, a verification email is sent at signup; unverified users can still log in and use the app",
-    "retry": "Retry"
+    "no_mail_confirm": "SMTP is not configured, so users will not receive verification emails. Turn it on anyway?",
+    "mail": "Mail service",
+    "mail_configured": "Configured",
+    "mail_not_configured": "Not configured (verification and reset emails will not be sent)",
+    "cooling_off": "Deletion cooling-off",
+    "audit_retention": "Audit log retention",
+    "days": "{{count}} days",
+    "env_hint": "These parameters come from environment variables; restart to apply changes."
   },
   "roles": {
     "super_admin": "Super admin",
@@ -87,6 +189,6 @@
   "statuses": {
     "active": "Active",
     "disabled": "Disabled",
-    "pending_verification": "Pending"
+    "pending_verification": "Pending verification"
   }
 }

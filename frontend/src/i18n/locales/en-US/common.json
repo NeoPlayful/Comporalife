@@ -41,5 +41,12 @@
     "version": "Version v{{version}}"
   },
   "network_error": "Network error, please try again",
-  "list_separator": ", "
+  "list_separator": ", ",
+  "pagination": {
+    "total": "{{total}} total",
+    "total_accounts": "{{total}} accounts",
+    "page": "Page {{page}}/{{totalPages}}",
+    "prev": "Previous",
+    "next": "Next"
+  }
 }

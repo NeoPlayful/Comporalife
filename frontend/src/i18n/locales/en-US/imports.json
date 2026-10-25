@@ -23,11 +23,6 @@
     "imported": "Imported",
     "created_at": "Created"
   },
-  "pagination": {
-    "summary": "Page {{page}} / {{totalPages}}, {{total}} total",
-    "prev": "Previous",
-    "next": "Next"
-  },
   "status": {
     "uploaded": "Uploaded",
     "parsed": "Needs mapping",
