@@ -55,6 +55,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       computeCashflow(app.prisma, {
         userId,
         timezone: settings.timezone,
+        baseCurrency: settings.baseCurrency,
         from: range.from,
         to: range.to,
       }),
@@ -106,6 +107,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     const cashflow = await computeCashflow(app.prisma, {
       userId,
       timezone: settings.timezone,
+      baseCurrency: settings.baseCurrency,
       from: range.from,
       to: range.to,
     });
@@ -126,9 +128,12 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         savingsRate: cashflow.savingsRate === null ? null : cashflow.savingsRate.toFixed(4),
         basis: {
           timezone: settings.timezone,
+          baseCurrency: settings.baseCurrency,
           from: range.from.toISOString(),
           to: range.to.toISOString(),
           isComplete: cashflow.isComplete,
+          // 缺汇率的流水被排除，金额偏低必须显式告知
+          missingRates: cashflow.missingRates,
           // 转账不计入收支，单独统计
           note: '内部转账与余额调整不计入收入或支出',
         },
@@ -449,7 +454,7 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     const settings = await getUserContext(app, userId);
     const asOf = new Date();
 
-    const [uncategorizedCount, accounts, lastReconciliations] = await Promise.all([
+    const [uncategorizedCount, accounts, lastReconciliations, assets, liabilities, portfolios] = await Promise.all([
       app.prisma.transaction.count({
         where: {
           userId,
@@ -468,19 +473,39 @@ export default async function dashboardRoutes(app: FastifyInstance) {
         distinct: ['accountId'],
         select: { accountId: true, difference: true, reconciledAt: true },
       }),
+      app.prisma.asset.findMany({
+        where: { userId, status: 'active' },
+        select: { currency: true },
+      }),
+      app.prisma.liability.findMany({
+        where: { userId, status: 'active' },
+        select: { currency: true },
+      }),
+      app.prisma.portfolio.findMany({
+        where: { userId, status: 'active' },
+        select: { currency: true },
+      }),
     ]);
 
+    // 四类实体的币种都要检查，只查账户会漏掉外币资产与外币负债
     const missingRateCurrencies = new Set<string>();
-    for (const account of accounts) {
-      if (account.currency === settings.baseCurrency) continue;
+    const involvedCurrencies = new Set<string>([
+      ...accounts.map((item) => item.currency),
+      ...assets.map((item) => item.currency),
+      ...liabilities.map((item) => item.currency),
+      ...portfolios.map((item) => item.currency),
+    ]);
+    involvedCurrencies.delete(settings.baseCurrency);
+
+    for (const currency of involvedCurrencies) {
       const conversion = await convertMany(app.prisma, {
         userId,
         baseCurrency: settings.baseCurrency,
         asOf,
-        items: [{ amount: toDecimal(0), currency: account.currency }],
+        items: [{ amount: toDecimal(0), currency }],
       });
       if (conversion.missingPairs.length > 0) {
-        missingRateCurrencies.add(account.currency);
+        missingRateCurrencies.add(currency);
       }
     }
 

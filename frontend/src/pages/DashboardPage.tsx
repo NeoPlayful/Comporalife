@@ -242,6 +242,19 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+          {(cashflowQuery.data?.basis.missingRates.length ?? 0) > 0 && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-[var(--color-negative)]">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                {t('dashboard:sections.cashflow_missing_rate', {
+                  currencies: cashflowQuery.data!.basis.missingRates.join(listSeparator),
+                })}
+                <Link to="/settings" className="text-[var(--color-accent)]">
+                  {t('dashboard:sections.add_rates')}
+                </Link>
+              </span>
+            </p>
+          )}
           <p className="mt-2 text-xs text-[var(--color-content-muted)]">
             {t('dashboard:sections.cashflow_basis', {
               note: cashflowQuery.data?.basis.note ?? '',

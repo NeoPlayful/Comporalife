@@ -352,7 +352,10 @@ export async function findStaleValuations(
 }
 
 /**
- * 汇率滞后：账户币种与基准币种不同，但最新汇率早于阈值天数，或干脆没有。
+ * 汇率滞后：任何参与折算的币种，其最新汇率早于阈值天数，或干脆没有。
+ *
+ * 账户、组合、资产、负债四类实体的币种都要检查：只看账户会让外币房产、
+ * 外币贷款缺汇率时数据质量仍显示「一切正常」，与资产页的提示互相矛盾。
  */
 export async function findRateLag(
   prisma: PrismaClient,
@@ -361,18 +364,30 @@ export async function findRateLag(
   items: Array<{ from: string; to: string; latestDate: string | null; daysLag: number | null }>;
   total: number;
 }> {
-  const accounts = await prisma.account.findMany({
-    where: { userId: context.userId, status: 'active' },
-    select: { currency: true },
-  });
-  const portfolios = await prisma.portfolio.findMany({
-    where: { userId: context.userId, status: 'active' },
-    select: { currency: true },
-  });
+  const [accounts, portfolios, assets, liabilities] = await Promise.all([
+    prisma.account.findMany({
+      where: { userId: context.userId, status: 'active' },
+      select: { currency: true },
+    }),
+    prisma.portfolio.findMany({
+      where: { userId: context.userId, status: 'active' },
+      select: { currency: true },
+    }),
+    prisma.asset.findMany({
+      where: { userId: context.userId, status: 'active' },
+      select: { currency: true },
+    }),
+    prisma.liability.findMany({
+      where: { userId: context.userId, status: 'active' },
+      select: { currency: true },
+    }),
+  ]);
 
   const currencies = new Set<string>();
   for (const account of accounts) currencies.add(account.currency);
   for (const portfolio of portfolios) currencies.add(portfolio.currency);
+  for (const asset of assets) currencies.add(asset.currency);
+  for (const liability of liabilities) currencies.add(liability.currency);
   currencies.delete(context.baseCurrency);
 
   const items: Array<{ from: string; to: string; latestDate: string | null; daysLag: number | null }> = [];

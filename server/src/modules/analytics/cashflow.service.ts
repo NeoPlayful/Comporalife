@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
 import { formatInTimeZone } from 'date-fns-tz';
 import { roundMoney } from '../../lib/money.js';
+import { resolveRate } from '../currencies/currency.service.js';
 
 export interface CashflowPoint {
   period: string;
@@ -10,6 +11,8 @@ export interface CashflowPoint {
   net: Decimal;
   /** 该月没有任何流水时可视为不完整，不能解释为零支出 */
   isComplete: boolean;
+  /** 该月因缺汇率被排除的币种对，非空时金额偏低 */
+  missingRates: string[];
 }
 
 export interface CashflowResult {
@@ -20,6 +23,8 @@ export interface CashflowResult {
   savingsRate: Decimal | null;
   transferTotal: Decimal;
   timezone: string;
+  baseCurrency: string;
+  missingRates: string[];
   isComplete: boolean;
 }
 
@@ -28,10 +33,12 @@ export interface CashflowResult {
  * - 按用户时区划分自然月
  * - 转账与调整不计入收入或支出
  * - 收入为 0 时储蓄率返回 null，而不是 0
+ * - 非基准币种的流水按交易日汇率折算；缺汇率时该笔排除并计入 missingRates，
+ *   绝不把不同币种的金额直接相加
  */
 export async function computeCashflow(
   prisma: PrismaClient,
-  params: { userId: string; timezone: string; from: Date; to: Date },
+  params: { userId: string; timezone: string; baseCurrency: string; from: Date; to: Date },
 ): Promise<CashflowResult> {
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -43,47 +50,109 @@ export async function computeCashflow(
     select: {
       type: true,
       occurredAt: true,
-      entries: { where: { accountId: { not: null } }, select: { amount: true } },
+      entries: { where: { accountId: { not: null } }, select: { amount: true, currency: true } },
     },
   });
 
-  const buckets = new Map<string, { income: Decimal; expense: Decimal; transfer: Decimal; count: number }>();
+  // 同一币种在同一天只查一次汇率
+  const rateCache = new Map<string, Decimal | null>();
+  const allMissingRates = new Set<string>();
+
+  async function toBase(amount: Decimal, currency: string, occurredAt: Date): Promise<Decimal | null> {
+    if (currency === params.baseCurrency) return amount;
+
+    const cacheKey = `${currency}|${formatInTimeZone(occurredAt, params.timezone, 'yyyy-MM-dd')}`;
+    let rate = rateCache.get(cacheKey);
+
+    if (rate === undefined) {
+      const resolved = await resolveRate(prisma, {
+        userId: params.userId,
+        from: currency,
+        to: params.baseCurrency,
+        asOf: occurredAt,
+      });
+      rate = resolved ? resolved.rate : null;
+      rateCache.set(cacheKey, rate);
+    }
+
+    if (rate === null) {
+      allMissingRates.add(`${currency}->${params.baseCurrency}`);
+      return null;
+    }
+
+    return amount.mul(rate);
+  }
+
+  const buckets = new Map<
+    string,
+    {
+      income: Decimal;
+      expense: Decimal;
+      transfer: Decimal;
+      count: number;
+      missingRates: Set<string>;
+    }
+  >();
+
+  function bucketOf(period: string) {
+    let bucket = buckets.get(period);
+    if (!bucket) {
+      bucket = {
+        income: new Decimal(0),
+        expense: new Decimal(0),
+        transfer: new Decimal(0),
+        count: 0,
+        missingRates: new Set<string>(),
+      };
+      buckets.set(period, bucket);
+    }
+    return bucket;
+  }
 
   for (const transaction of transactions) {
     const period = formatInTimeZone(transaction.occurredAt, params.timezone, 'yyyy-MM');
-    const bucket = buckets.get(period) ?? {
-      income: new Decimal(0),
-      expense: new Decimal(0),
-      transfer: new Decimal(0),
-      count: 0,
-    };
+    const bucket = bucketOf(period);
 
-    // 账户腿金额：收入为正，支出为负
-    const movement = transaction.entries.reduce(
-      (sum, entry) => sum.plus(entry.amount.toString()),
-      new Decimal(0),
-    );
+    if (transaction.type === 'adjustment') continue; // 影响余额但不进入收支统计
+
+    if (transaction.type === 'transfer') {
+      // 转账两侧一正一负、求和恒为零，必须取转出侧的绝对值才是划转金额
+      for (const entry of transaction.entries) {
+        const amount = new Decimal(entry.amount.toString());
+        if (!amount.isNegative()) continue;
+        const converted = await toBase(amount.abs(), entry.currency, transaction.occurredAt);
+        if (converted === null) {
+          bucket.missingRates.add(`${entry.currency}->${params.baseCurrency}`);
+          continue;
+        }
+        bucket.transfer = bucket.transfer.plus(converted);
+      }
+      continue;
+    }
+
+    // 逐条腿先折算到基准币种再累加，避免不同币种的金额直接相加
+    let converted = new Decimal(0);
+    let excluded = false;
+    for (const entry of transaction.entries) {
+      const amount = new Decimal(entry.amount.toString()).abs();
+      if (amount.isZero()) continue;
+      const value = await toBase(amount, entry.currency, transaction.occurredAt);
+      if (value === null) {
+        excluded = true;
+        bucket.missingRates.add(`${entry.currency}->${params.baseCurrency}`);
+        continue;
+      }
+      converted = converted.plus(value);
+    }
+
+    if (excluded) continue;
 
     if (transaction.type === 'income') {
-      bucket.income = bucket.income.plus(movement.abs());
-      bucket.count += 1;
-    } else if (transaction.type === 'expense') {
-      bucket.expense = bucket.expense.plus(movement.abs());
-      bucket.count += 1;
-    } else if (transaction.type === 'transfer') {
-      // 转账两侧一正一负、求和恒为零，必须取转出侧绝对值才是划转金额
-      const outflow = transaction.entries.reduce(
-        (sum, entry) => {
-          const amount = new Decimal(entry.amount.toString());
-          return amount.isNegative() ? sum.plus(amount.abs()) : sum;
-        },
-        new Decimal(0),
-      );
-      bucket.transfer = bucket.transfer.plus(outflow);
+      bucket.income = bucket.income.plus(converted);
+    } else {
+      bucket.expense = bucket.expense.plus(converted);
     }
-    // adjustment 计入余额变化但不进入收支统计
-
-    buckets.set(period, bucket);
+    bucket.count += 1;
   }
 
   const points: CashflowPoint[] = [];
@@ -107,7 +176,9 @@ export async function computeCashflow(
       income,
       expense,
       net: roundMoney(income.minus(expense)),
-      isComplete: (bucket?.count ?? 0) > 0,
+      // 缺汇率的月份金额偏低，不能当作完整数据参与均值或年化
+      isComplete: (bucket?.count ?? 0) > 0 && (bucket?.missingRates.size ?? 0) === 0,
+      missingRates: [...(bucket?.missingRates ?? [])],
     });
   }
 
@@ -122,6 +193,8 @@ export async function computeCashflow(
     savingsRate: totalIncome.isZero() ? null : totalNet.div(totalIncome).toDecimalPlaces(4),
     transferTotal: roundMoney(transferTotal),
     timezone: params.timezone,
+    baseCurrency: params.baseCurrency,
+    missingRates: [...allMissingRates],
     isComplete: points.length > 0 && points.every((point) => point.isComplete),
   };
 }

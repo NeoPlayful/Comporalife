@@ -47,6 +47,10 @@ const METADATA_ALLOWED_KEYS = new Set([
   'conflict',
   'rowsWritten',
   'fileCount',
+  // 汇率变更只暴露币种对与生效日期，汇率数值本身不进审计视图
+  'baseCurrency',
+  'quoteCurrency',
+  'rateDate',
 ]);
 
 export interface AuditLogItem {

@@ -82,9 +82,12 @@ export interface CashflowResponse {
   savingsRate: string | null;
   basis: {
     timezone: string;
+    baseCurrency: string;
     from: string;
     to: string;
     isComplete: boolean;
+    /** 因缺汇率被排除的币种对；非空时收支金额偏低 */
+    missingRates: string[];
     note: string;
   };
 }
@@ -167,8 +170,20 @@ export interface ExchangeRateRecord {
   source: string;
 }
 
+export interface ExchangeRatePage {
+  exchangeRates: ExchangeRateRecord[];
+  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+}
+
 export const exchangeRatesApi = {
-  list: () => api.get<{ exchangeRates: ExchangeRateRecord[] }>('/api/exchange-rates/manual'),
+  list: (params: { page?: number; pageSize?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (params.page) query.set('page', String(params.page));
+    if (params.pageSize) query.set('pageSize', String(params.pageSize));
+    const suffix = query.toString() ? `?${query}` : '';
+    return api.get<ExchangeRatePage>(`/api/exchange-rates/manual${suffix}`);
+  },
+  // 同一币种对同一天走 upsert，因此编辑与新增是同一个接口
   create: (body: { baseCurrency: string; quoteCurrency: string; rate: string; rateDate: string }) =>
     api.post<{ exchangeRate: ExchangeRateRecord }>('/api/exchange-rates/manual', body),
   remove: (id: string) => api.delete<{ deleted: boolean }>(`/api/exchange-rates/manual/${id}`),

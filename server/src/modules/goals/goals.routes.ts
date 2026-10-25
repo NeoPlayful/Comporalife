@@ -80,7 +80,7 @@ async function assertFunding(app: FastifyInstance, userId: string, body: {
  */
 async function computeInvestableSurplus(
   app: FastifyInstance,
-  params: { userId: string; timezone: string },
+  params: { userId: string; timezone: string; baseCurrency: string },
 ): Promise<{ surplus: Decimal | null; months: number; isComplete: boolean }> {
   const now = new Date();
   const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59, 999));
@@ -89,6 +89,7 @@ async function computeInvestableSurplus(
   const cashflow = await computeCashflow(app.prisma, {
     userId: params.userId,
     timezone: params.timezone,
+    baseCurrency: params.baseCurrency,
     from,
     to,
   });
@@ -168,6 +169,7 @@ export default async function goalsRoutes(app: FastifyInstance) {
     const surplus = await computeInvestableSurplus(app, {
       userId,
       timezone: settings.timezone,
+      baseCurrency: settings.baseCurrency,
     });
 
     const shortfall =

@@ -66,6 +66,7 @@ async function computeAnnualExpense(
   const cashflow = await computeCashflow(prisma, {
     userId: params.userId,
     timezone: params.timezone,
+    baseCurrency: params.baseCurrency,
     from,
     to,
   });

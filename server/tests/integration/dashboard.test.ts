@@ -411,6 +411,201 @@ describe('多币种与汇率', () => {
     });
     expect(after.json().data.rate).toBe('7.5000000000');
   });
+
+  it('外币流水按交易日汇率折算进现金流', async () => {
+    const usd = await app.inject({
+      method: 'POST',
+      url: '/api/accounts',
+      headers: auth(token),
+      payload: {
+        name: '美元现金',
+        type: 'cash',
+        currency: 'USD',
+        openingBalance: '0',
+        openingBalanceDate: '2026-01-01',
+      },
+    });
+    const usdId = usd.json().data.account.id;
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/manual',
+      headers: auth(token),
+      payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7', rateDate: '2026-01-01' },
+    });
+
+    await addTransaction('income', '1000', '2026-02-01T10:00:00Z');
+    await app.inject({
+      method: 'POST',
+      url: '/api/transactions',
+      headers: auth(token),
+      payload: {
+        type: 'income',
+        accountId: usdId,
+        categoryId: incomeCategoryId,
+        amount: '100',
+        occurredAt: '2026-02-02T10:00:00Z',
+        description: '美元收入',
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/cashflow?from=2026-02-01T00:00:00Z&to=2026-02-28T23:59:59Z',
+      headers: auth(token),
+    });
+
+    // 1000 CNY + 100 USD * 7 = 1700，不能直接相加成 1100
+    expect(res.json().data.totalIncome).toBe('1700.000000');
+    expect(res.json().data.points[0].isComplete).toBe(true);
+    expect(res.json().data.basis.missingRates).toEqual([]);
+  });
+
+  it('外币缺汇率时该笔排除、当月标记不完整并列出币种对', async () => {
+    const eur = await app.inject({
+      method: 'POST',
+      url: '/api/accounts',
+      headers: auth(token),
+      payload: {
+        name: '欧元现金',
+        type: 'cash',
+        currency: 'EUR',
+        openingBalance: '0',
+        openingBalanceDate: '2026-01-01',
+      },
+    });
+
+    await addTransaction('income', '1000', '2026-03-01T10:00:00Z');
+    await app.inject({
+      method: 'POST',
+      url: '/api/transactions',
+      headers: auth(token),
+      payload: {
+        type: 'income',
+        accountId: eur.json().data.account.id,
+        categoryId: incomeCategoryId,
+        amount: '500',
+        occurredAt: '2026-03-02T10:00:00Z',
+        description: '欧元收入',
+      },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/cashflow?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    expect(data.totalIncome).toBe('1000.000000');
+    expect(data.points[0].isComplete).toBe(false);
+    expect(data.basis.missingRates).toContain('EUR->CNY');
+  });
+
+  it('汇率滞后检查覆盖外币资产与负债', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/assets',
+      headers: auth(token),
+      payload: { name: '海外房产', kind: 'property', currency: 'JPY' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/data-quality/rate-lag',
+      headers: auth(token),
+    });
+
+    const items = res.json().data.items as Array<{ from: string }>;
+    expect(items.map((item) => item.from)).toContain('JPY');
+  });
+
+  it('汇率增删改写入审计日志', async () => {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/manual',
+      headers: auth(token),
+      payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7.1', rateDate: '2026-01-02' },
+    });
+    const rateId = created.json().data.exchangeRate.id;
+
+    // 同键再次提交即修改
+    await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/manual',
+      headers: auth(token),
+      payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7.3', rateDate: '2026-01-02' },
+    });
+
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/exchange-rates/manual/${rateId}`,
+      headers: auth(token),
+    });
+
+    const audit = await app.inject({
+      method: 'GET',
+      url: '/api/audit-logs?pageSize=50',
+      headers: auth(token),
+    });
+    const actions = (audit.json().data.items as Array<{ action: string }>).map((item) => item.action);
+
+    expect(actions).toContain('currency_rate.created');
+    expect(actions).toContain('currency_rate.updated');
+    expect(actions).toContain('currency_rate.deleted');
+  });
+
+  it('手工汇率列表分页返回', async () => {
+    for (let day = 1; day <= 12; day += 1) {
+      await app.inject({
+        method: 'POST',
+        url: '/api/exchange-rates/manual',
+        headers: auth(token),
+        payload: {
+          baseCurrency: 'USD',
+          quoteCurrency: 'CNY',
+          rate: '7',
+          rateDate: `2026-02-${String(day).padStart(2, '0')}`,
+        },
+      });
+    }
+
+    const first = await app.inject({
+      method: 'GET',
+      url: '/api/exchange-rates/manual?page=1&pageSize=10',
+      headers: auth(token),
+    });
+    const data = first.json().data;
+    expect(data.exchangeRates).toHaveLength(10);
+    expect(data.pagination.total).toBe(12);
+    expect(data.pagination.totalPages).toBe(2);
+
+    const second = await app.inject({
+      method: 'GET',
+      url: '/api/exchange-rates/manual?page=2&pageSize=10',
+      headers: auth(token),
+    });
+    expect(second.json().data.exchangeRates).toHaveLength(2);
+  });
+
+  it('拒绝未来生效日期与超长整数位汇率', async () => {
+    const future = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+    const futureRes = await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/manual',
+      headers: auth(token),
+      payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '7', rateDate: future },
+    });
+    expect(futureRes.statusCode).toBe(400);
+
+    const overflow = await app.inject({
+      method: 'POST',
+      url: '/api/exchange-rates/manual',
+      headers: auth(token),
+      payload: { baseCurrency: 'USD', quoteCurrency: 'CNY', rate: '123456789012', rateDate: '2026-01-05' },
+    });
+    expect(overflow.statusCode).toBe(400);
+  });
 });
 
 describe('资产配置与数据质量', () => {

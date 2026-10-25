@@ -28,6 +28,8 @@
     "loading_cashflow": "Loading cash flow…",
     "cashflow_failed": "Failed to load cash flow",
     "cashflow_basis": "{{note}} · Timezone {{timezone}}",
+    "cashflow_missing_rate": "Missing rates for {{currencies}}; those transactions are excluded from cashflow. ",
+
     "allocation": "Asset allocation",
     "loading_allocation": "Loading allocation…",
     "allocation_empty": "No allocatable assets",

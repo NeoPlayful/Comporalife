@@ -28,6 +28,8 @@
     "loading_cashflow": "加载现金流…",
     "cashflow_failed": "现金流加载失败",
     "cashflow_basis": "{{note}} · 时区 {{timezone}}",
+    "cashflow_missing_rate": "缺少 {{currencies}} 汇率，相关流水未计入收支，",
+
     "allocation": "资产配置",
     "loading_allocation": "加载配置…",
     "allocation_empty": "暂无可分配的资产",

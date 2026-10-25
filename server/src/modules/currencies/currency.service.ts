@@ -1,6 +1,5 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
-import { errors } from '../../lib/errors.js';
 import { roundMoney, toDecimal } from '../../lib/money.js';
 
 export interface RateLookupResult {
@@ -110,10 +109,4 @@ export async function convertMany(
   }
 
   return { total: roundMoney(total), missingPairs: [...missing] };
-}
-
-export function assertRatesComplete(missingPairs: string[]): void {
-  if (missingPairs.length > 0) {
-    throw errors.rateMissing(missingPairs);
-  }
 }
