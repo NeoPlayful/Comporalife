@@ -9,6 +9,7 @@ import { errors } from '../../lib/errors.js';
 import { moneyToString, toDecimal } from '../../lib/money.js';
 import { getUserAnalyticsContext, getCategoryAnalytics, getMerchants } from '../analytics/analytics.service.js';
 import { computeCashflow } from '../analytics/cashflow.service.js';
+import { resolveRate } from '../currencies/currency.service.js';
 import { computeNetWorth } from '../analytics/networth.service.js';
 import { loadAnalyticsRows } from '../analytics/query.service.js';
 import { computeGoalProgress } from '../goals/goal.service.js';
@@ -113,6 +114,39 @@ async function buildNetWorth(ctx: BuildContext) {
     priceDate: item.priceDate,
   }));
   completeness.unpricedSymbols = netWorth.unpriced.flatMap((item) => item.symbols);
+
+  // 明细行的折算必须与合计行同口径，否则「明细之和 ≠ 合计」
+  const convertedByAccount = new Map<string, Decimal>();
+  const rateCache = new Map<string, Decimal | null>();
+
+  for (const account of accounts) {
+    const balance = balances.get(account.id) ?? toDecimal(0);
+    if (account.currency === ctx.baseCurrency) {
+      convertedByAccount.set(account.id, balance);
+      continue;
+    }
+
+    let rate = rateCache.get(account.currency);
+    if (rate === undefined) {
+      const resolved = await resolveRate(ctx.prisma, {
+        userId: ctx.userId,
+        from: account.currency,
+        to: ctx.baseCurrency,
+        asOf,
+      });
+      rate = resolved ? resolved.rate : null;
+      rateCache.set(account.currency, rate);
+    }
+
+    if (rate === null) {
+      const pair = `${account.currency}->${ctx.baseCurrency}@${ctx.to}`;
+      if (!completeness.missingRates.includes(pair)) completeness.missingRates.push(pair);
+      continue;
+    }
+
+    convertedByAccount.set(account.id, balance.mul(rate));
+  }
+
   completeness.isComplete =
     completeness.missingRates.length === 0 &&
     completeness.staleValuations.length === 0 &&
@@ -122,13 +156,15 @@ async function buildNetWorth(ctx: BuildContext) {
     asOf: ctx.to,
     accounts: accounts.map((account) => {
       const balance = balances.get(account.id) ?? toDecimal(0);
+      const baseBalance = convertedByAccount.get(account.id);
       return {
         accountId: account.id,
         name: account.name,
         type: account.type,
         currency: account.currency,
         balance: moneyToString(balance),
-        baseBalance: moneyToString(balance),
+        // 缺汇率时留空，不能用原币冒充基准币种金额
+        baseBalance: baseBalance === undefined ? null : moneyToString(baseBalance),
         isLiability: account.type === 'credit_card' || account.type === 'loan',
       };
     }),
@@ -161,6 +197,7 @@ async function buildCashflow(ctx: BuildContext) {
   const cashflow = await computeCashflow(ctx.prisma, {
     userId: ctx.userId,
     timezone: ctx.timezone,
+    baseCurrency: ctx.baseCurrency,
     from: new Date(`${ctx.from}T00:00:00.000Z`),
     to: new Date(`${ctx.to}T23:59:59.999Z`),
   });
@@ -169,7 +206,8 @@ async function buildCashflow(ctx: BuildContext) {
 
   const completeness = emptyCompleteness();
   completeness.missingMonths = missingMonths;
-  completeness.isComplete = missingMonths.length === 0;
+  completeness.missingRates = cashflow.missingRates.map((pair) => `${pair}@${ctx.to}`);
+  completeness.isComplete = missingMonths.length === 0 && completeness.missingRates.length === 0;
 
   return {
     data: {

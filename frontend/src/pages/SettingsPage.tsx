@@ -1,9 +1,10 @@
 import type { Preferences } from '@/lib/auth';
 import { api } from '@/lib/client';
-import { exchangeRatesApi } from '@/lib/dashboard';
+import { exchangeRatesApi, type ExchangeRateRecord } from '@/lib/dashboard';
 import { formatDateTime } from '@/lib/format';
 import { translateError } from '@/lib/error-message';
 import LoadingState from '@/components/ui/LoadingState';
+import Pagination from '@/components/ui/Pagination';
 import { useUiStore } from '@/stores/ui-store';
 import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -248,19 +249,51 @@ function ExchangeRateSection() {
   const [rate, setRate] = useState('');
   const [rateDate, setRateDate] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  // 就地编辑：只允许改数值，币种对与生效日期作为行的唯一键
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingRate, setEditingRate] = useState('');
 
   const ratesQuery = useQuery({
-    queryKey: ['exchange-rates'],
-    queryFn: exchangeRatesApi.list,
+    queryKey: ['exchange-rates', page, pageSize],
+    queryFn: () => exchangeRatesApi.list({ page, pageSize }),
   });
+
+  function invalidateRates() {
+    queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
+    // 汇率变动会影响净资产、现金流与数据质量的全部统计
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    queryClient.invalidateQueries({ queryKey: ['quality'] });
+    queryClient.invalidateQueries({ queryKey: ['assets'] });
+    queryClient.invalidateQueries({ queryKey: ['liabilities'] });
+  }
 
   const createRate = useMutation({
     mutationFn: () => exchangeRatesApi.create({ baseCurrency, quoteCurrency, rate, rateDate }),
     onSuccess: () => {
       setRate('');
       setError(null);
-      queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      invalidateRates();
+    },
+    onError: (err) => setError(translateError(err, t)),
+  });
+
+  // 同键 upsert，编辑汇率直接复用新增接口
+  const updateRate = useMutation({
+    mutationFn: (record: ExchangeRateRecord) =>
+      exchangeRatesApi.create({
+        baseCurrency: record.baseCurrency,
+        quoteCurrency: record.quoteCurrency,
+        rate: editingRate,
+        rateDate: record.rateDate.slice(0, 10),
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditingRate('');
+      setError(null);
+      invalidateRates();
     },
     onError: (err) => setError(translateError(err, t)),
   });
@@ -268,12 +301,17 @@ function ExchangeRateSection() {
   const deleteRate = useMutation({
     mutationFn: (id: string) => exchangeRatesApi.remove(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      // 删掉当页最后一条时回退一页，避免停在空页
+      if ((ratesQuery.data?.exchangeRates.length ?? 0) === 1 && page > 1) {
+        setPage(page - 1);
+      }
+      invalidateRates();
     },
   });
 
   const codes = Object.keys(CURRENCY_DECIMALS);
+  const rates = ratesQuery.data?.exchangeRates ?? [];
+  const pagination = ratesQuery.data?.pagination ?? null;
 
   return (
     <section className="card space-y-3 p-5">
@@ -341,32 +379,100 @@ function ExchangeRateSection() {
 
       {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
-      {ratesQuery.data && ratesQuery.data.exchangeRates.length === 0 && (
+      {ratesQuery.data && rates.length === 0 && (
         <p className="text-sm text-[var(--color-content-muted)]">
           {t('settings:exchange_rates.empty')}
         </p>
       )}
 
-      {ratesQuery.data && ratesQuery.data.exchangeRates.length > 0 && (
+      {rates.length > 0 && (
         <ul className="divide-y divide-[var(--color-border-subtle)]">
-          {ratesQuery.data.exchangeRates.map((record) => (
-            <li key={record.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-              <span>
-                1 {record.baseCurrency} = {Number(record.rate).toFixed(6)} {record.quoteCurrency}
-              </span>
-              <span className="flex items-center gap-3 text-xs text-[var(--color-content-muted)]">
-                {record.rateDate.slice(0, 10)}
-                <button
-                  type="button"
-                  onClick={() => deleteRate.mutate(record.id)}
-                  className="hover:text-[var(--color-negative)]"
-                >
-                  {t('settings:exchange_rates.delete')}
-                </button>
-              </span>
-            </li>
-          ))}
+          {rates.map((record) => {
+            const editing = editingId === record.id;
+            return (
+              <li key={record.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="whitespace-nowrap">
+                    1 {record.baseCurrency} =
+                  </span>
+                  {editing ? (
+                    <input
+                      autoFocus
+                      inputMode="decimal"
+                      value={editingRate}
+                      onChange={(event) => setEditingRate(event.target.value)}
+                      className="input w-32 py-1 font-mono text-sm"
+                      aria-label={t('settings:exchange_rates.rate')}
+                    />
+                  ) : (
+                    <span className="font-mono">{Number(record.rate).toFixed(6)}</span>
+                  )}
+                  <span className="whitespace-nowrap">{record.quoteCurrency}</span>
+                </span>
+
+                <span className="flex items-center gap-3 text-xs text-[var(--color-content-muted)]">
+                  {record.rateDate.slice(0, 10)}
+                  {editing ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled={!editingRate.trim() || updateRate.isPending}
+                        onClick={() => updateRate.mutate(record)}
+                        className="text-[var(--color-accent)] disabled:opacity-50"
+                      >
+                        {t('settings:exchange_rates.save')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditingRate('');
+                        }}
+                      >
+                        {t('settings:exchange_rates.cancel')}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(record.id);
+                          setEditingRate(Number(record.rate).toString());
+                        }}
+                        className="hover:text-[var(--color-accent)]"
+                      >
+                        {t('settings:exchange_rates.edit')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteRate.mutate(record.id)}
+                        className="hover:text-[var(--color-negative)]"
+                      >
+                        {t('settings:exchange_rates.delete')}
+                      </button>
+                    </>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
+      )}
+
+      {pagination && (
+        <Pagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          totalPages={pagination.totalPages}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+        />
       )}
     </section>
   );

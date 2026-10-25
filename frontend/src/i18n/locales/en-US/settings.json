@@ -24,6 +24,9 @@
     "effective_date": "Effective date",
     "add": "Add",
     "empty": "No manual exchange rates yet",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
     "delete": "Delete"
   },
   "security": {
