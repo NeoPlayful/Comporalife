@@ -441,12 +441,12 @@
 |---|---|---|
 | GET | `/api/currencies` | 支持币种列表 |
 | GET | `/api/exchange-rates` | 指定日期/币种对汇率（全局） |
-| GET | `/api/exchange-rates/manual` | 汇率列表（全局只读，分页） |
 | POST | `/api/exchange-rates/manual` | **已下线**，返回 403 `RATE_WRITE_FORBIDDEN` |
 | DELETE | `/api/exchange-rates/manual/:id` | **已下线**，返回 403 |
-| GET | `/api/exchange-rates/pair-requests` | 我的币种对申请 |
-| POST | `/api/exchange-rates/pair-requests` | 提交新增币种对申请 |
-| DELETE | `/api/exchange-rates/pair-requests/:id` | 撤销待审申请 |
+| GET | `/api/exchange-rates/watchlist` | 我的自选汇率列表（含候选币种对） |
+| POST | `/api/exchange-rates/watchlist` | 添加币种对到自选 |
+| DELETE | `/api/exchange-rates/watchlist` | 从自选移除币种对 |
+| POST | `/api/exchange-rates/watchlist/reset` | 恢复默认（跟随持有币种） |
 | GET | `/api/market-data/providers` | 汇率源配置状态与最近运行（管理员） |
 | POST | `/api/market-data/refresh` | 手动触发汇率同步（管理员） |
 | GET | `/api/market-data/status` | 按币种对的汇率同步状态 |
@@ -454,14 +454,22 @@
 | POST | `/api/admin/exchange-rates` | 后台新增或覆盖同日同键 |
 | PATCH | `/api/admin/exchange-rates/:id` | 后台修改汇率 |
 | DELETE | `/api/admin/exchange-rates/:id` | 后台删除汇率 |
-| GET | `/api/admin/rate-pair-requests` | 币种对申请列表 |
-| POST | `/api/admin/rate-pair-requests/:id/review` | 批准或拒绝申请 |
 | GET | `/api/admin/rate-sync/settings` | 自动同步开关 |
 | PATCH | `/api/admin/rate-sync/settings` | 开启或关闭自动同步 |
 
-> **Phase 10 变更**：汇率已由「用户个人数据」改为「全局系统参考数据」，由后台统一维护。
-> 用户侧写接口下线且显式返回 403，便于前端与用户理解能力迁移。管理员可查看与维护汇率，
-> 但仍不可见任何用户的余额、流水、持仓、目标、报表与标的持仓价格。
+> **汇率数据与自选列表是两个概念**：汇率值是全局系统参考数据，由后台统一维护；
+> 每个用户的「自选汇率列表」只是展示偏好，不参与任何折算。
+>
+> - 未自定义时跟随默认集合：自己持有的外币 → 基准币种。
+> - 一旦增删就转为显式列表；清空是明确选择，不会退回默认。
+> - 可添加范围由服务端裁剪：只给当前真能折算的币种对（直接或反向存在汇率行），
+>   以及自己确实需要的币种对，因此加进列表的行不会凭空无值。
+> - 缺失数据的行保留并标记 `missing`，不会自动消失。
+>
+> **变更记录**：币种对申请机制（`/exchange-rates/pair-requests` 与
+> `/admin/rate-pair-requests`）已删除。自动同步的需求由全站实际持有的币种推导，
+> 申请并没有增加可抓取范围，却引入了一张表和一套审核流程。管理员改为在后台
+> 汇率管理页直接查看最近一次同步的失败币种对并补录。
 
 
 ## 21、数据导出、备份与恢复 (Data Management) — 已实现

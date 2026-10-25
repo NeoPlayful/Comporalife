@@ -9,6 +9,10 @@ import { auth, cleanupUsers, clearExchangeRates, createUser, testDomain } from '
 
 const DOMAIN = testDomain('rate-sync');
 const TODAY = '2026-10-20';
+// 抓取范围固定为本套件所需币种：集成测试共享数据库，其他套件的币种会改变写入行数
+function demandFor(...targets: string[]) {
+  return { targets, baseCurrencies: ['CNY'] };
+}
 
 let app: FastifyInstance;
 let token: string;
@@ -64,7 +68,8 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  await clearExchangeRates(app);
+  // 只清本套件使用的币种：全表清理会抹掉并行执行的其他套件正在写入的汇率
+  await clearExchangeRates(app, ['GBP', 'AUD', 'CNY']);
   await app.prisma.rateSyncRun.deleteMany({});
 
   const user = await createUser(app, DOMAIN);
@@ -81,6 +86,7 @@ describe('同步落库', () => {
       triggeredBy: userId,
       provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
     });
 
     expect(summary.status).toBe('succeeded');
@@ -110,6 +116,7 @@ describe('同步落库', () => {
       trigger: 'manual',
       provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
     });
 
     expect(summary.skippedManual).toBe(1);
@@ -133,7 +140,12 @@ describe('同步落库', () => {
         source: 'manual',
       },
     });
-    const settings = { trigger: 'manual' as const, provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]), now: () => new Date(`${TODAY}T08:00:00.000Z`) };
+    const settings = {
+      trigger: 'manual' as const,
+      provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]),
+      now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
+    };
 
     await runRateSync(app.prisma, settings);
     await app.prisma.exchangeRate.delete({ where: { id: manual.id } });
@@ -146,16 +158,6 @@ describe('同步落库', () => {
     expect(row?.source).toBe('provider');
   });
 
-  it('没有任何外币实体时不写任何行', async () => {
-    const summary = await runRateSync(app.prisma, {
-      trigger: 'manual',
-      provider: fakeProvider([q('CNY', '7.2')]),
-      now: () => new Date(`${TODAY}T08:00:00.000Z`),
-    });
-    expect(summary.writtenRows).toBe(0);
-    expect(await app.prisma.exchangeRate.count()).toBe(0);
-  });
-
   it('供应商失败时零写入并记录原因码', async () => {
     await createAccount('GBP');
 
@@ -163,11 +165,17 @@ describe('同步落库', () => {
       trigger: 'manual',
       provider: failingProvider('RATE_LIMIT'),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
     });
 
     expect(summary.status).toBe('failed');
     expect(summary.errorCode).toBe('RATE_LIMIT');
-    expect(await app.prisma.exchangeRate.count()).toBe(0);
+    // 并行执行的其他套件可能已有汇率行，只断言本套件的币种没有被写入
+    expect(
+      await app.prisma.exchangeRate.count({
+        where: { OR: [{ baseCurrency: 'GBP' }, { quoteCurrency: 'GBP' }] },
+      }),
+    ).toBe(0);
 
     const run = await app.prisma.rateSyncRun.findFirst();
     expect(run?.status).toBe('failed');
@@ -183,6 +191,7 @@ describe('同步落库', () => {
       trigger: 'manual',
       provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8'), q('AUD', '0')]),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP', 'AUD'),
     });
 
     expect(summary.status).toBe('partial');
@@ -198,6 +207,7 @@ describe('同步落库', () => {
       trigger: 'manual',
       provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
     });
 
     const lookups = await Promise.all(
@@ -219,6 +229,7 @@ describe('同步落库', () => {
       triggeredBy: userId,
       provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
     });
 
     // runRateSync 本身不写审计（由调用方/接口写），这里断言运行记录不含数值
@@ -239,6 +250,7 @@ describe('连续失败自限', () => {
         trigger: 'scheduled',
         provider: failingProvider('TIMEOUT'),
         now: () => new Date(`${TODAY}T08:00:0${i}.000Z`),
+        demand: demandFor('GBP'),
       });
     }
 

@@ -41,15 +41,6 @@ const rateListSchema = z.object({
 
 const idSchema = z.object({ id: z.string().uuid() });
 
-const reviewSchema = z.object({
-  status: z.enum(['approved', 'rejected']),
-  note: z.string().trim().max(200).optional(),
-});
-
-const requestListSchema = z.object({
-  status: z.enum(['pending', 'approved', 'rejected']).optional(),
-});
-
 /** 管理员守卫：与 admin.routes.ts 保持一致，user 一律 403 */
 function requireAdmin(request: FastifyRequest): AuthContext {
   const auth = requireAuth(request);
@@ -293,87 +284,4 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
     return ok({ enabled: body.enabled }, request.id);
   });
 
-  app.get('/admin/rate-pair-requests', { preHandler: app.authenticate }, async (request) => {
-    requireAdmin(request);
-    const query = requestListSchema.parse(request.query);
-    const page = parsePageParams(request.query as { page?: unknown; pageSize?: unknown });
-
-    const where = query.status ? { status: query.status } : {};
-
-    const [total, rows] = await Promise.all([
-      app.prisma.ratePairRequest.count({ where }),
-      app.prisma.ratePairRequest.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: page.skip,
-        take: page.take,
-        select: {
-          id: true,
-          baseCurrency: true,
-          quoteCurrency: true,
-          reason: true,
-          status: true,
-          reviewNote: true,
-          reviewedAt: true,
-          createdAt: true,
-          // 只暴露昵称，不返回邮箱与任何财务信息
-          user: { select: { nickname: true } },
-        },
-      }),
-    ]);
-
-    return ok(
-      { requests: rows, pagination: buildPagination(page.page, page.pageSize, total) },
-      request.id,
-    );
-  });
-
-  // 批准只表示「纳入维护范围」，不写入任何汇率值：
-  // 批准一个币种对不等于知道它当天的汇率，凭空造一行就是编造数据。
-  app.post(
-    '/admin/rate-pair-requests/:id/review',
-    { preHandler: app.authenticate },
-    async (request) => {
-      const actor = requireAdmin(request);
-      const { id } = idSchema.parse(request.params);
-      const body = reviewSchema.parse(request.body);
-
-      const existing = await app.prisma.ratePairRequest.findUnique({
-        where: { id },
-        select: { id: true, baseCurrency: true, quoteCurrency: true, status: true },
-      });
-      if (!existing) throw errors.notFound('申请不存在');
-      if (existing.status !== 'pending') throw errors.validation('该申请已审核');
-
-      await app.prisma.$transaction(async (tx) => {
-        await tx.ratePairRequest.update({
-          where: { id },
-          data: {
-            status: body.status,
-            reviewedBy: actor.userId,
-            reviewedAt: new Date(),
-            reviewNote: body.note ?? null,
-          },
-        });
-
-        await tx.auditLog.create({
-          data: {
-            userId: actor.userId,
-            action: 'admin.rate_pair.reviewed',
-            targetType: 'rate_pair_request',
-            targetId: id,
-            ip: request.ip,
-            userAgent: request.headers['user-agent'],
-            metadata: {
-              baseCurrency: existing.baseCurrency,
-              quoteCurrency: existing.quoteCurrency,
-              status: body.status,
-            },
-          },
-        });
-      });
-
-      return ok({ status: body.status }, request.id);
-    },
-  );
 }

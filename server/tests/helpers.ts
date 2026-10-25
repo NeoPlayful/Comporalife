@@ -63,7 +63,20 @@ export async function promoteToAdmin(
   return res.json().data.accessToken as string;
 }
 
-/** 汇率已全局化，测试之间必须清空，否则上一个用例的汇率会让「缺少汇率」类断言失效 */
-export async function clearExchangeRates(app: FastifyInstance) {
-  await app.prisma.exchangeRate.deleteMany({});
+/**
+ * 汇率已全局化，测试之间必须清空，否则上一个用例的汇率会让「缺少汇率」类断言失效。
+ *
+ * 传入 `codes` 时只清理涉及这些币种的行：并行执行的其他套件可能正在使用其他币种对，
+ * 全表删除会把它们正在写入的数据一起抹掉。
+ */
+export async function clearExchangeRates(app: FastifyInstance, codes?: string[]) {
+  if (!codes || codes.length === 0) {
+    await app.prisma.exchangeRate.deleteMany({});
+    return;
+  }
+  await app.prisma.exchangeRate.deleteMany({
+    where: {
+      OR: [{ baseCurrency: { in: codes } }, { quoteCurrency: { in: codes } }],
+    },
+  });
 }

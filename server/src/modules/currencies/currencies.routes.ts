@@ -1,31 +1,42 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { SUPPORTED_CURRENCIES } from '../../config/constants.js';
-import { buildPagination, ok, parsePageParams } from '../../lib/api-utils.js';
+import { ok } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
 import { rateToString } from '../../lib/money.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { resolveRate } from './currency.service.js';
+import {
+  addToWatchlist,
+  getWatchlist,
+  removeFromWatchlist,
+  resetWatchlist,
+  WatchlistError,
+} from './rate-watchlist.service.js';
 
 const currencySchema = z
   .string()
   .refine((value) => SUPPORTED_CURRENCIES.includes(value), '不支持的币种');
 
-const pairRequestSchema = z
+const pairSchema = z
   .object({
-    baseCurrency: currencySchema,
-    quoteCurrency: currencySchema,
-    reason: z.string().trim().max(200).optional(),
+    from: currencySchema,
+    to: currencySchema,
   })
-  .refine((value) => value.baseCurrency !== value.quoteCurrency, {
-    message: '基准币种与计价币种不能相同',
-  });
+  .refine((value) => value.from !== value.to, { message: '两个币种不能相同' });
+
+function rethrowWatchlistError(err: unknown): never {
+  if (err instanceof WatchlistError) {
+    throw errors.validation(err.message);
+  }
+  throw err;
+}
 
 /**
- * 用户侧汇率接口：只读。
+ * 用户侧汇率接口：只读 + 自选。
  *
- * 汇率是全局共享的系统参考数据，由后台统一维护（Phase 10）。用户不能写，
- * 只能查看、设置展示偏好、对缺失的币种对提交申请。
+ * 汇率本身是全局共享的系统参考数据，由后台统一维护；用户能改的只有
+ * 「我的列表里显示哪些币种对」，这与自选股票是同一个模型。
  */
 export default async function currenciesRoutes(app: FastifyInstance) {
   app.get('/exchange-rates', { preHandler: app.authenticate }, async (request) => {
@@ -58,40 +69,6 @@ export default async function currenciesRoutes(app: FastifyInstance) {
     );
   });
 
-  // 列表：全局只读。路径沿用以免前端与文档大面积改动，语义已从「我的汇率」变为「全部汇率」
-  app.get('/exchange-rates/manual', { preHandler: app.authenticate }, async (request) => {
-    const page = parsePageParams(request.query as { page?: unknown; pageSize?: unknown });
-
-    // 汇率按日累积，全量返回会让列表无限增长
-    const [total, records] = await Promise.all([
-      app.prisma.exchangeRate.count(),
-      app.prisma.exchangeRate.findMany({
-        orderBy: [{ rateDate: 'desc' }, { baseCurrency: 'asc' }, { quoteCurrency: 'asc' }],
-        skip: page.skip,
-        take: page.take,
-        select: {
-          id: true,
-          baseCurrency: true,
-          quoteCurrency: true,
-          rate: true,
-          rateDate: true,
-          source: true,
-        },
-      }),
-    ]);
-
-    return ok(
-      {
-        exchangeRates: records.map((record) => ({
-          ...record,
-          rate: rateToString(record.rate.toString()),
-        })),
-        pagination: buildPagination(page.page, page.pageSize, total),
-      },
-      request.id,
-    );
-  });
-
   // 写入能力已迁移到后台。返回 403 而不是 404，便于前端与用户理解「能力去哪了」
   app.post('/exchange-rates/manual', { preHandler: app.authenticate }, async () => {
     throw errors.rateWriteForbidden();
@@ -101,86 +78,38 @@ export default async function currenciesRoutes(app: FastifyInstance) {
     throw errors.rateWriteForbidden();
   });
 
-  app.get('/exchange-rates/pair-requests', { preHandler: app.authenticate }, async (request) => {
+  /** 自选列表：当前展示的币种对、各自最新汇率与状态、可添加的候选 */
+  app.get('/exchange-rates/watchlist', { preHandler: app.authenticate }, async (request) => {
     const { userId } = requireAuth(request);
-    const page = parsePageParams(request.query as { page?: unknown; pageSize?: unknown });
-
-    const [total, requests] = await Promise.all([
-      app.prisma.ratePairRequest.count({ where: { userId } }),
-      app.prisma.ratePairRequest.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        skip: page.skip,
-        take: page.take,
-        select: {
-          id: true,
-          baseCurrency: true,
-          quoteCurrency: true,
-          reason: true,
-          status: true,
-          reviewNote: true,
-          reviewedAt: true,
-          createdAt: true,
-        },
-      }),
-    ]);
-
-    return ok(
-      { requests, pagination: buildPagination(page.page, page.pageSize, total) },
-      request.id,
-    );
+    return ok(await getWatchlist(app.prisma, userId), request.id);
   });
 
-  app.post('/exchange-rates/pair-requests', { preHandler: app.authenticate }, async (request, reply) => {
+  app.post('/exchange-rates/watchlist', { preHandler: app.authenticate }, async (request, reply) => {
     const { userId } = requireAuth(request);
-    const body = pairRequestSchema.parse(request.body);
+    const body = pairSchema.parse(request.body);
 
-    const existing = await app.prisma.ratePairRequest.findFirst({
-      where: {
-        userId,
-        baseCurrency: body.baseCurrency,
-        quoteCurrency: body.quoteCurrency,
-        status: 'pending',
-      },
-      select: { id: true },
-    });
-    if (existing) throw errors.ratePairRequestExists();
-
-    const created = await app.prisma.ratePairRequest.create({
-      data: {
-        userId,
-        baseCurrency: body.baseCurrency,
-        quoteCurrency: body.quoteCurrency,
-        reason: body.reason ?? null,
-      },
-      select: {
-        id: true,
-        baseCurrency: true,
-        quoteCurrency: true,
-        reason: true,
-        status: true,
-        createdAt: true,
-      },
-    });
-
-    return reply.status(201).send(ok({ request: created }, request.id));
-  });
-
-  // 只允许撤销自己的待审申请；已审核的记录删掉会让审核痕迹消失
-  app.delete('/exchange-rates/pair-requests/:id', { preHandler: app.authenticate }, async (request) => {
-    const { userId } = requireAuth(request);
-    const { id } = request.params as { id: string };
-
-    const existing = await app.prisma.ratePairRequest.findFirst({
-      where: { id, userId },
-      select: { id: true, status: true },
-    });
-    if (!existing) throw errors.notFound('申请不存在');
-    if (existing.status !== 'pending') {
-      throw errors.validation('已审核的申请不能撤销');
+    try {
+      const view = await addToWatchlist(app.prisma, userId, body.from, body.to);
+      return reply.status(201).send(ok(view, request.id));
+    } catch (err) {
+      rethrowWatchlistError(err);
     }
+  });
 
-    await app.prisma.ratePairRequest.delete({ where: { id } });
-    return ok({ deleted: true }, request.id);
+  app.delete('/exchange-rates/watchlist', { preHandler: app.authenticate }, async (request) => {
+    const { userId } = requireAuth(request);
+    const body = pairSchema.parse(request.body);
+
+    try {
+      return ok(await removeFromWatchlist(app.prisma, userId, body.from, body.to), request.id);
+    } catch (err) {
+      rethrowWatchlistError(err);
+    }
+  });
+
+  /** 恢复默认：清空偏好，重新跟随自己持有币种的默认集合 */
+  app.post('/exchange-rates/watchlist/reset', { preHandler: app.authenticate }, async (request) => {
+    const { userId } = requireAuth(request);
+    return ok(await resetWatchlist(app.prisma, userId), request.id);
   });
 }

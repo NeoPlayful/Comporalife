@@ -217,10 +217,19 @@
     "filter_source": "Filter source",
     "filter_from": "From",
     "filter_to": "To",
-    "requests_title": "Pair requests",
-    "requests_hint": "Approving only adds the pair to the maintenance scope; it does not write a rate value.",
-    "requests_empty": "No pending requests",
-    "approve": "Approve",
-    "reject": "Reject"
+    "sync_title": "Pairs not covered by auto-sync",
+    "sync_hint": "Pairs that failed the last sync or were rejected by validation. Fill them in manually to avoid users seeing \"No data\".",
+    "sync_empty": "The last sync had no failures.",
+    "sync_provider_state": "Sync status: {{state}}",
+    "sync_not_configured": "No external provider configured, so rates must be maintained manually.",
+    "sync_fill": "Fill in",
+    "sync_status": {
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "partial": "Partial",
+      "failed": "Failed",
+      "skipped": "Skipped",
+      "never": "Never run"
+    }
   }
 }

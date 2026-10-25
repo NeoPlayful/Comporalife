@@ -2,6 +2,7 @@ import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
 import { validateQuotes, convertToBasePairs, preciseRatio } from '@/modules/market-data/rate-validation';
 import { createGenericJsonProvider } from '@/modules/market-data/rate-provider';
+import { collectRateDemand } from '@/modules/market-data/rate-sync.service';
 
 function quote(base: string, target: string, rate: string, date = '2026-10-20') {
   return { base, quote: target, rate: new Decimal(rate), date };
@@ -243,5 +244,56 @@ describe('通用 JSON 适配器', () => {
         })) as unknown as typeof fetch,
     });
     await expect(provider.fetch('2026-10-20', ['CNY'])).rejects.toMatchObject({ code: 'TIMEOUT' });
+  });
+});
+
+describe('抓取范围推导', () => {
+  /**
+   * 全站没有外币实体时不应产生任何外部调用。
+   *
+   * 这条断言放在单元层用假 prisma 验证：集成测试共享全局汇率表，
+   * 并行执行的其他套件随时可能引入外币账户或被批准的币种对，
+   * 「全局无需求」这个前提在那里无法稳定成立。
+   */
+  it('没有任何外币实体时不请求供应商', async () => {
+    const prisma = {
+      account: { findMany: async () => [] },
+      portfolio: { findMany: async () => [] },
+      asset: { findMany: async () => [] },
+      liability: { findMany: async () => [] },
+      userSettings: { findMany: async () => [{ baseCurrency: 'CNY' }] },
+    } as never;
+
+    const { targets, baseCurrencies } = await collectRateDemand(prisma);
+    expect(targets).toEqual([]);
+    expect(baseCurrencies).toEqual(['CNY']);
+  });
+
+  it('只持有基准币种时同样不产生目标', async () => {
+    const prisma = {
+      account: { findMany: async () => [{ currency: 'CNY' }] },
+      portfolio: { findMany: async () => [] },
+      asset: { findMany: async () => [] },
+      liability: { findMany: async () => [] },
+      userSettings: { findMany: async () => [{ baseCurrency: 'CNY' }] },
+    } as never;
+
+    const { targets } = await collectRateDemand(prisma);
+    // 目标集合包含账户币种，但 runRateSync 会把「与所有基准币相同」的项过滤掉
+    expect(targets).toEqual(['CNY']);
+  });
+
+  it('多用户不同基准币种时合并去重', async () => {
+    const prisma = {
+      account: { findMany: async () => [{ currency: 'USD' }, { currency: 'USD' }] },
+      portfolio: { findMany: async () => [{ currency: 'EUR' }] },
+      asset: { findMany: async () => [] },
+      liability: { findMany: async () => [{ currency: 'USD' }] },
+      userSettings: { findMany: async () => [{ baseCurrency: 'CNY' }, { baseCurrency: 'CNY' }] },
+    } as never;
+
+    const { targets, baseCurrencies } = await collectRateDemand(prisma);
+    expect(targets).toEqual(['EUR', 'USD']);
+    expect(baseCurrencies).toEqual(['CNY']);
   });
 });

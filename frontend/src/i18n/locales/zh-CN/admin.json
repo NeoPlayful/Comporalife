@@ -217,10 +217,19 @@
     "filter_source": "筛选来源",
     "filter_from": "起始日期",
     "filter_to": "结束日期",
-    "requests_title": "币种对申请",
-    "requests_hint": "批准只表示纳入维护范围，不会自动写入汇率值；数值仍需人工录入或等自动同步。",
-    "requests_empty": "暂无待审核申请",
-    "approve": "批准",
-    "reject": "拒绝"
+    "sync_title": "自动同步未覆盖的币种对",
+    "sync_hint": "最近一次同步失败或被校验拦下的币种对。可直接补录，避免用户看到「暂无数据」。",
+    "sync_empty": "最近一次同步没有失败项。",
+    "sync_provider_state": "同步状态：{{state}}",
+    "sync_not_configured": "尚未配置外部汇率源，只能人工维护。",
+    "sync_fill": "补录",
+    "sync_status": {
+      "running": "进行中",
+      "succeeded": "成功",
+      "partial": "部分成功",
+      "failed": "失败",
+      "skipped": "已跳过",
+      "never": "尚未运行"
+    }
   }
 }
