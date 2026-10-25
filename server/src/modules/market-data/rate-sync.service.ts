@@ -56,24 +56,18 @@ export function buildProvider(): RateProvider {
 export async function collectRateDemand(
   prisma: PrismaClient,
 ): Promise<{ targets: string[]; baseCurrencies: string[] }> {
-  const [accounts, portfolios, assets, liabilities, settings, approved] = await Promise.all([
+  const [accounts, portfolios, assets, liabilities, settings] = await Promise.all([
     prisma.account.findMany({ where: { status: 'active' }, select: { currency: true } }),
     prisma.portfolio.findMany({ where: { status: 'active' }, select: { currency: true } }),
     prisma.asset.findMany({ where: { status: 'active' }, select: { currency: true } }),
     prisma.liability.findMany({ where: { status: 'active' }, select: { currency: true } }),
     prisma.userSettings.findMany({ select: { baseCurrency: true } }),
-    prisma.ratePairRequest.findMany({ where: { status: 'approved' }, select: { baseCurrency: true, quoteCurrency: true } }),
   ]);
 
   const baseCurrencies = [...new Set(settings.map((item) => item.baseCurrency))];
   const targets = new Set<string>();
   for (const row of [...accounts, ...portfolios, ...assets, ...liabilities]) {
     targets.add(row.currency);
-  }
-  // 已批准的申请也纳入：供应商标不支持时，用户仍可看到状态提示
-  for (const row of approved) {
-    targets.add(row.baseCurrency);
-    targets.add(row.quoteCurrency);
   }
 
   return { targets: [...targets].sort(), baseCurrencies: baseCurrencies.sort() };
@@ -116,6 +110,13 @@ export interface RunSyncOptions {
   /** 测试注入；默认按环境变量构造 */
   provider?: RateProvider;
   now?: () => Date;
+  /**
+   * 测试注入：覆盖抓取范围。
+   *
+   * 生产环境的范围是全站并集，但集成测试共享同一个数据库，其他套件的币种
+   * 会让「写入了几行」无法稳定断言。注入后只按给定集合执行。
+   */
+  demand?: { targets: string[]; baseCurrencies: string[] };
 }
 
 /**
@@ -163,7 +164,7 @@ export async function runRateSync(
     select: { id: true },
   });
 
-  const { targets, baseCurrencies } = await collectRateDemand(prisma);
+  const { targets, baseCurrencies } = options.demand ?? (await collectRateDemand(prisma));
 
   // 没有任何外币实体时不需要外部调用，也不该产生一次「失败」
   const baseSet = new Set(baseCurrencies.length > 0 ? baseCurrencies : [env.RATE_PROVIDER_ANCHOR]);

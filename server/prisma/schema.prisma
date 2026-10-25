@@ -149,7 +149,6 @@ model User {
   transactions        Transaction[]
   entries             TransactionEntry[]
   scenarios           SimulationScenario[]
-  ratePairRequests    RatePairRequest[]
   reconciliations     AccountReconciliation[]
   auditLogs           AuditLog[]
   importBatches       ImportBatch[]
@@ -410,34 +409,6 @@ model ExchangeRate {
   @@index([baseCurrency, quoteCurrency, rateDate(sort: Desc)])
   @@index([rateDate(sort: Desc)])
   @@map("exchange_rates")
-}
-
-// 用户提交的「希望系统维护某币种对」申请。批准只表示纳入维护范围，
-// 不写入任何汇率值——批准一个币种对不等于知道它当天的汇率。
-model RatePairRequest {
-  id            String            @id @default(uuid()) @db.Uuid
-  userId        String            @map("user_id") @db.Uuid
-  baseCurrency  String            @map("base_currency")
-  quoteCurrency String            @map("quote_currency")
-  reason        String?           @db.VarChar(200)
-  status        PairRequestStatus @default(pending)
-  reviewedBy    String?           @map("reviewed_by") @db.Uuid
-  reviewedAt    DateTime?         @map("reviewed_at") @db.Timestamptz(6)
-  reviewNote    String?           @map("review_note") @db.VarChar(200)
-  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // 同一用户同一币种对只允许一条待审申请，避免重复提交
-  @@unique([userId, baseCurrency, quoteCurrency, status])
-  @@index([status, createdAt])
-  @@map("rate_pair_requests")
-}
-
-enum PairRequestStatus {
-  pending
-  approved
-  rejected
 }
 
 // 每次抓取运行一行；汇率已全局化，因此不按用户拆分

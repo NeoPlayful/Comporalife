@@ -174,51 +174,47 @@ export const dashboardApi = {
   goalProgress: () => api.get<GoalProgressResponse>('/api/dashboard/goal-progress'),
 };
 
-export interface ExchangeRateRecord {
-  id: string;
-  baseCurrency: string;
-  quoteCurrency: string;
-  /** DECIMAL(20,10) 定长字符串，展示用 formatRate */
-  rate: string;
-  rateDate: string;
-  /** manual = 后台人工录入；provider = 外部汇率源自动写入 */
-  source: 'manual' | 'provider';
+export type WatchlistState = 'fresh' | 'stale' | 'missing';
+
+export interface WatchlistEntry {
+  from: string;
+  to: string;
+  /** 缺失时为 null */
+  rate: string | null;
+  rateDate: string | null;
+  source: 'manual' | 'provider' | null;
+  state: WatchlistState;
+  daysLag: number | null;
+  /** 是否来自自己账户/资产/负债的币种需求 */
+  required: boolean;
 }
 
-export interface RatePairRequestRecord {
-  id: string;
-  baseCurrency: string;
-  quoteCurrency: string;
-  reason: string | null;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewNote: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
+export interface WatchlistCandidate {
+  from: string;
+  to: string;
+  required: boolean;
 }
 
-export interface ExchangeRatePage {
-  exchangeRates: ExchangeRateRecord[];
-  pagination: { page: number; pageSize: number; total: number; totalPages: number };
+export interface WatchlistView {
+  baseCurrency: string;
+  /** false 表示跟随默认集合，true 表示用户增删过 */
+  custom: boolean;
+  limit: number;
+  entries: WatchlistEntry[];
+  candidates: WatchlistCandidate[];
 }
 
 /**
- * 汇率只读：汇率由后台统一维护，用户不能写入。
- * 对缺失币种对只能提交申请，由管理员决定是否纳入维护。
+ * 汇率只读 + 自选。
+ *
+ * 汇率由后台统一维护，用户能改的只有「列表里显示哪些币种对」。
+ * 可添加的候选由服务端决定：只给出当前真能折算的币种对，以及自己确实需要的币种对。
  */
 export const exchangeRatesApi = {
-  list: (params: { page?: number; pageSize?: number } = {}) => {
-    const query = new URLSearchParams();
-    if (params.page) query.set('page', String(params.page));
-    if (params.pageSize) query.set('pageSize', String(params.pageSize));
-    const suffix = query.toString() ? `?${query}` : '';
-    return api.get<ExchangeRatePage>(`/api/exchange-rates/manual${suffix}`);
-  },
-  pairRequests: () =>
-    api.get<{ requests: RatePairRequestRecord[]; pagination: ExchangeRatePage['pagination'] }>(
-      '/api/exchange-rates/pair-requests',
-    ),
-  createPairRequest: (body: { baseCurrency: string; quoteCurrency: string; reason?: string }) =>
-    api.post<{ request: RatePairRequestRecord }>('/api/exchange-rates/pair-requests', body),
-  removePairRequest: (id: string) =>
-    api.delete<{ deleted: boolean }>(`/api/exchange-rates/pair-requests/${id}`),
+  watchlist: () => api.get<WatchlistView>('/api/exchange-rates/watchlist'),
+  addPair: (body: { from: string; to: string }) =>
+    api.post<WatchlistView>('/api/exchange-rates/watchlist', body),
+  removePair: (body: { from: string; to: string }) =>
+    api.delete<WatchlistView>('/api/exchange-rates/watchlist', { body }),
+  resetWatchlist: () => api.post<WatchlistView>('/api/exchange-rates/watchlist/reset'),
 };

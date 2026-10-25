@@ -28,7 +28,7 @@ export default async function settingsRoutes(app: FastifyInstance) {
     const { userId } = requireAuth(request);
     const body = updateSettingsSchema.parse(request.body);
 
-    const { simulationDefaults, rateDisplayPairs, ...rest } = body;
+    const { simulationDefaults, ...rest } = body;
 
     const settings = await app.prisma.userSettings.update({
       where: { userId },
@@ -39,11 +39,6 @@ export default async function settingsRoutes(app: FastifyInstance) {
           : {
               simulationDefaults:
                 simulationDefaults === null ? Prisma.JsonNull : simulationDefaults,
-            }),
-        ...(rateDisplayPairs === undefined
-          ? {}
-          : {
-              rateDisplayPairs: rateDisplayPairs === null ? Prisma.JsonNull : rateDisplayPairs,
             }),
       },
       select: {

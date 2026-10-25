@@ -1,116 +1,81 @@
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
-import Pagination from '@/components/ui/Pagination';
-import { authApi, type Preferences } from '@/lib/auth';
-import { exchangeRatesApi, type ExchangeRateRecord, type RatePairRequestRecord } from '@/lib/dashboard';
+import { exchangeRatesApi, type WatchlistEntry } from '@/lib/dashboard';
 import { translateError } from '@/lib/error-message';
 import { formatDate, formatRate } from '@/lib/format';
 import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const PAGE_SIZE = 20;
 const CODES = Object.keys(CURRENCY_DECIMALS);
 
 /**
- * 汇率指标（只读）。
+ * 汇率指标（自选）。
  *
- * 汇率是全局共享的系统参考数据，由后台统一维护，用户不能新增或修改。
- * 这里只做三件事：查看、选择想看的币种对、对缺失的币种对提交申请。
- *
- * 展示偏好只影响这张表显示什么，不影响任何折算结果——折算需要哪些币种
- * 由账户、资产、负债的实际币种自动决定。
+ * 汇率本身由后台维护，用户只能决定列表里显示哪些币种对——与自选股票同理。
+ * 可添加范围由服务端给出：只包含当前真能折算的币种对，因此不会出现
+ * 「加进来却永远没有值」的行。折算逻辑完全不读这个列表。
  */
 export default function ExchangeRatesPage() {
   const { t } = useTranslation('settings');
   const queryClient = useQueryClient();
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [requesting, setRequesting] = useState(false);
-  const [draft, setDraft] = useState({ baseCurrency: 'EUR', quoteCurrency: 'CNY', reason: '' });
+  const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ from: 'USD', to: 'CNY' });
 
-  const listQuery = useQuery({
-    queryKey: ['exchange-rates', page, pageSize],
-    queryFn: () => exchangeRatesApi.list({ page, pageSize }),
+  const queryKey = ['exchange-rates', 'watchlist'];
+  const viewQuery = useQuery({
+    queryKey,
+    queryFn: () => exchangeRatesApi.watchlist(),
   });
 
-  const requestsQuery = useQuery({
-    queryKey: ['exchange-rates', 'pair-requests'],
-    queryFn: () => exchangeRatesApi.pairRequests(),
-  });
+  const view = viewQuery.data;
+  const entries = view?.entries ?? [];
+  const candidates = useMemo(() => view?.candidates ?? [], [view]);
 
-  const settingsQuery = useQuery({
-    queryKey: ['settings'],
-    queryFn: () => authApi.preferences(),
-  });
+  // 只有出现在候选里的组合才能添加：服务端已按「可折算 + 自己需要」裁剪过
+  const draftAddable = candidates.some(
+    (item) => item.from === draft.from && item.to === draft.to,
+  );
+  const draftSameCurrency = draft.from === draft.to;
 
-  const preferences: Preferences | null = settingsQuery.data?.preferences ?? null;
-  const displayPairs = preferences?.rateDisplayPairs ?? null;
+  function onWriteSuccess(next: typeof view) {
+    if (next) queryClient.setQueryData(queryKey, next);
+    // 汇率变化会影响诊断与统计，缓存一并失效
+    void queryClient.invalidateQueries({ queryKey: ['market-data', 'status'] });
+    setError(null);
+  }
 
-  // 用户没设置过就是「展示全部」，而不是「什么都不展示」
-  const visibleRows = useMemo(() => {
-    const rows = listQuery.data?.exchangeRates ?? [];
-    if (!displayPairs || displayPairs.length === 0) return rows;
-    const allowed = new Set(displayPairs);
-    return rows.filter((row) => allowed.has(`${row.baseCurrency}->${row.quoteCurrency}`));
-  }, [listQuery.data, displayPairs]);
-
-  const savePreference = useMutation({
-    mutationFn: (pairs: string[] | null) => authApi.updatePreferences({ rateDisplayPairs: pairs }),
-    onSuccess: () => {
-      setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['settings'] });
+  const add = useMutation({
+    mutationFn: (body: { from: string; to: string }) => exchangeRatesApi.addPair(body),
+    onSuccess: (next) => {
+      onWriteSuccess(next);
+      // 加入成功后关闭面板：列表本身已经给出结果，留着面板反而挡住内容
+      setPicking(false);
     },
     onError: (err) => setError(translateError(err, t)),
   });
 
-  const createRequest = useMutation({
-    mutationFn: () =>
-      exchangeRatesApi.createPairRequest({
-        baseCurrency: draft.baseCurrency,
-        quoteCurrency: draft.quoteCurrency,
-        ...(draft.reason.trim() ? { reason: draft.reason.trim() } : {}),
-      }),
-    onSuccess: () => {
-      setRequesting(false);
-      setDraft({ baseCurrency: 'EUR', quoteCurrency: 'CNY', reason: '' });
-      setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['exchange-rates', 'pair-requests'] });
-    },
+  const remove = useMutation({
+    mutationFn: (body: { from: string; to: string }) => exchangeRatesApi.removePair(body),
+    onSuccess: (next) => onWriteSuccess(next),
     onError: (err) => setError(translateError(err, t)),
   });
 
-  const removeRequest = useMutation({
-    mutationFn: (id: string) => exchangeRatesApi.removePairRequest(id),
-    onSuccess: () => {
-      setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['exchange-rates', 'pair-requests'] });
-    },
+  const reset = useMutation({
+    mutationFn: () => exchangeRatesApi.resetWatchlist(),
+    onSuccess: (next) => onWriteSuccess(next),
     onError: (err) => setError(translateError(err, t)),
   });
 
-  const requests: RatePairRequestRecord[] = requestsQuery.data?.requests ?? [];
-  const pagination = listQuery.data?.pagination ?? null;
+  const busy = add.isPending || remove.isPending || reset.isPending;
 
-  useEffect(() => {
-    // 筛选后当前页可能超出范围，回退到最后一页而不是停在空白页
-    if (pagination && pagination.totalPages > 0 && page > pagination.totalPages) {
-      setPage(pagination.totalPages);
-    }
-  }, [pagination, page]);
-
-  function togglePair(pair: string) {
-    const current = displayPairs ?? [];
-    const next = current.includes(pair)
-      ? current.filter((item) => item !== pair)
-      : [...current, pair];
-    // 取消全部等于「展示全部」，因此全不选时存 null
-    savePreference.mutate(next.length === 0 ? null : next);
+  function pairLabel(from: string, to: string) {
+    return `1 ${from} → ${to}`;
   }
 
   return (
@@ -119,207 +84,267 @@ export default function ExchangeRatesPage() {
         <div>
           <h1 className="text-xl font-semibold">{t('exchange_rates.page.title')}</h1>
           <p className="mt-1 text-sm text-[var(--color-content-muted)]">
-            {t('exchange_rates.page.readonly_hint')}
+            {t('exchange_rates.page.watchlist_hint')}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setRequesting((prev) => !prev)}
-          className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
-        >
-          <Plus className="size-4" aria-hidden />
-          {t('exchange_rates.page.request_new')}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {view?.custom && (
+            <button
+              type="button"
+              onClick={() => reset.mutate()}
+              disabled={busy}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
+            >
+              <RotateCcw className="size-4" aria-hidden />
+              {t('exchange_rates.page.restore_default')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setPicking((prev) => !prev)}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+          >
+            <Plus className="size-4" aria-hidden />
+            {t('exchange_rates.page.add_pair')}
+          </button>
+        </div>
       </header>
 
-      {requesting && (
-        <div className="card grid gap-2 p-3 sm:grid-cols-4">
-          <select
-            className="input"
-            value={draft.baseCurrency}
-            onChange={(event) => setDraft({ ...draft, baseCurrency: event.target.value })}
-            aria-label={t('exchange_rates.base_currency')}
-          >
-            {CODES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
-          <select
-            className="input"
-            value={draft.quoteCurrency}
-            onChange={(event) => setDraft({ ...draft, quoteCurrency: event.target.value })}
-            aria-label={t('exchange_rates.quote_currency')}
-          >
-            {CODES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
-          <input
-            className="input"
-            placeholder={t('exchange_rates.page.request_reason')}
-            value={draft.reason}
-            onChange={(event) => setDraft({ ...draft, reason: event.target.value })}
-          />
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={draft.baseCurrency === draft.quoteCurrency || createRequest.isPending}
-              onClick={() => createRequest.mutate()}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {t('exchange_rates.page.submit_request')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setRequesting(false)}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
-            >
-              {t('exchange_rates.cancel')}
-            </button>
+      {picking && (
+        <section className="card space-y-3 p-3">
+          <div>
+            <p className="text-sm font-medium">{t('exchange_rates.page.add_title')}</p>
+            <p className="mt-1 text-xs text-[var(--color-content-muted)]">
+              {t('exchange_rates.page.add_hint')}
+            </p>
           </div>
-        </div>
+
+          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+            <label className="text-xs text-[var(--color-content-muted)]">
+              <span className="mb-1 block">{t('exchange_rates.base_currency')}</span>
+              <select
+                className="input"
+                value={draft.from}
+                onChange={(event) => setDraft({ ...draft, from: event.target.value })}
+              >
+                {CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-[var(--color-content-muted)]">
+              <span className="mb-1 block">{t('exchange_rates.quote_currency')}</span>
+              <select
+                className="input"
+                value={draft.to}
+                onChange={(event) => setDraft({ ...draft, to: event.target.value })}
+              >
+                {CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-end">
+              <button
+                type="button"
+                disabled={busy || draftSameCurrency || !draftAddable}
+                onClick={() => add.mutate({ from: draft.from, to: draft.to })}
+                className="w-full rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
+              >
+                {t('exchange_rates.page.confirm_add')}
+              </button>
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => setPicking(false)}
+                className="w-full rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm sm:w-auto"
+              >
+                {t('exchange_rates.page.cancel')}
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs">
+            {draftSameCurrency ? (
+              <span className="text-[var(--color-negative)]">
+                {t('exchange_rates.page.same_currency')}
+              </span>
+            ) : draftAddable ? (
+              <span className="text-[var(--color-content-muted)]">
+                {t('exchange_rates.page.draft_ready')}
+              </span>
+            ) : (
+              <span className="text-[var(--color-content-muted)]">
+                {t('exchange_rates.page.draft_unavailable')}
+              </span>
+            )}
+          </p>
+
+          <div className="space-y-2 border-t border-[var(--color-border-subtle)] pt-3">
+            <p className="text-xs font-medium text-[var(--color-content-muted)]">
+              {t('exchange_rates.page.candidates_title')}
+            </p>
+            {candidates.length === 0 ? (
+              <p className="text-sm text-[var(--color-content-muted)]">
+                {t('exchange_rates.page.no_candidates')}
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {candidates.map((item) => {
+                  const selected = item.from === draft.from && item.to === draft.to;
+                  return (
+                    <button
+                      key={`${item.from}->${item.to}`}
+                      type="button"
+                      disabled={busy}
+                      // 点候选只填入上面的选择框，真正的写入由「确定添加」完成
+                      onClick={() => setDraft({ from: item.from, to: item.to })}
+                      className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs disabled:opacity-50 ${
+                        selected
+                          ? 'border-[var(--color-accent)] text-[var(--color-accent)]'
+                          : 'border-[var(--color-border-subtle)] hover:border-[var(--color-accent)]'
+                      }`}
+                    >
+                      {pairLabel(item.from, item.to)}
+                      {item.required && (
+                        <span className="text-[var(--color-accent)]">
+                          {t('exchange_rates.page.required_badge')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
-      {listQuery.isLoading && <LoadingState />}
-      {listQuery.isError && <ErrorState onRetry={() => void listQuery.refetch()} />}
+      {viewQuery.isLoading && <LoadingState />}
+      {viewQuery.isError && <ErrorState onRetry={() => void viewQuery.refetch()} />}
 
-      {listQuery.data && visibleRows.length === 0 && (
+      {view && entries.length === 0 && (
         <EmptyState
           title={t('exchange_rates.page.empty_title')}
-          description={
-            listQuery.data.exchangeRates.length === 0
-              ? t('exchange_rates.page.empty_description')
-              : t('exchange_rates.page.filter_empty')
+          description={t('exchange_rates.page.empty_description')}
+          action={
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            >
+              {t('exchange_rates.page.add_pair')}
+            </button>
           }
         />
       )}
 
-      {visibleRows.length > 0 && (
-        <div className="card overflow-x-auto">
-          <table className="w-full min-w-[620px] text-sm">
-            <thead className="border-b border-[var(--color-border-subtle)] text-left text-xs text-[var(--color-content-muted)]">
-              <tr>
-                <th className="px-3 py-2">{t('exchange_rates.page.pair')}</th>
-                <th className="px-3 py-2">{t('exchange_rates.rate')}</th>
-                <th className="px-3 py-2">{t('exchange_rates.effective_date')}</th>
-                <th className="px-3 py-2">{t('exchange_rates.page.source')}</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-subtle)]">
-              {visibleRows.map((row: ExchangeRateRecord) => {
-                const pair = `${row.baseCurrency}->${row.quoteCurrency}`;
-                return (
-                  <tr key={row.id} className="hover:bg-black/5 dark:hover:bg-white/5">
+      {entries.length > 0 && (
+        <>
+          {/* 移动端卡片：自选行数少，逐张可读优于横向滚动表格 */}
+          <ul className="space-y-2 sm:hidden">
+            {entries.map((entry) => (
+              <li key={`${entry.from}->${entry.to}`} className="card space-y-1 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-mono text-sm">{pairLabel(entry.from, entry.to)}</span>
+                  <button
+                    type="button"
+                    onClick={() => remove.mutate({ from: entry.from, to: entry.to })}
+                    disabled={busy}
+                    aria-label={t('exchange_rates.page.remove_pair')}
+                    className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)] disabled:opacity-50"
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                  </button>
+                </div>
+                <p className="font-mono text-lg tabular-nums">{entry.rate ? formatRate(entry.rate) : '—'}</p>
+                <p className="text-xs text-[var(--color-content-muted)]">
+                  {entry.rate
+                    ? `${formatDate(entry.rateDate!)} · ${t(`exchange_rates.page.state.${entry.state}`)}`
+                    : t('exchange_rates.page.state.missing_hint')}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <div className="card hidden overflow-x-auto sm:block">
+            <table className="w-full min-w-[620px] text-sm">
+              <thead className="border-b border-[var(--color-border-subtle)] text-left text-xs text-[var(--color-content-muted)]">
+                <tr>
+                  <th className="px-3 py-2">{t('exchange_rates.page.pair')}</th>
+                  <th className="px-3 py-2">{t('exchange_rates.rate')}</th>
+                  <th className="px-3 py-2">{t('exchange_rates.effective_date')}</th>
+                  <th className="px-3 py-2">{t('exchange_rates.page.source')}</th>
+                  <th className="px-3 py-2">{t('exchange_rates.page.status')}</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border-subtle)]">
+                {entries.map((entry: WatchlistEntry) => (
+                  <tr key={`${entry.from}->${entry.to}`} className="hover:bg-black/5 dark:hover:bg-white/5">
                     <td className="whitespace-nowrap px-3 py-2">
-                      1 {row.baseCurrency} → {row.quoteCurrency}
+                      {pairLabel(entry.from, entry.to)}
+                      {entry.required && (
+                        <span className="ml-2 text-xs text-[var(--color-accent)]">
+                          {t('exchange_rates.page.required_badge')}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-3 py-2 font-mono tabular-nums">{formatRate(row.rate)}</td>
+                    <td className="px-3 py-2 font-mono tabular-nums">
+                      {entry.rate ? formatRate(entry.rate) : '—'}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2 text-[var(--color-content-muted)]">
-                      {formatDate(row.rateDate)}
+                      {entry.rateDate ? formatDate(entry.rateDate) : '—'}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs">
-                      {row.source === 'provider'
+                      {entry.source === 'provider'
                         ? t('exchange_rates.page.source_provider')
-                        : t('exchange_rates.page.source_manual')}
+                        : entry.source === 'manual'
+                          ? t('exchange_rates.page.source_manual')
+                          : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs">
+                      <span
+                        className={
+                          entry.state === 'missing'
+                            ? 'text-[var(--color-negative)]'
+                            : 'text-[var(--color-content-muted)]'
+                        }
+                      >
+                        {t(`exchange_rates.page.state.${entry.state}`)}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-xs">
                       <button
                         type="button"
-                        onClick={() => togglePair(pair)}
-                        disabled={savePreference.isPending}
+                        onClick={() => remove.mutate({ from: entry.from, to: entry.to })}
+                        disabled={busy}
                         className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)] disabled:opacity-50"
-                        aria-label={t('exchange_rates.page.hide_pair')}
+                        aria-label={t('exchange_rates.page.remove_pair')}
                       >
-                        <X className="size-3.5" aria-hidden />
+                        <Trash2 className="size-3.5" aria-hidden />
                       </button>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
-      {pagination && (
-        <Pagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          total={pagination.total}
-          totalPages={pagination.totalPages}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-          pageSizeOptions={[20, 50, 100]}
-        />
+      {entries.some((entry) => entry.state === 'missing') && (
+        <p className="text-xs text-[var(--color-content-muted)]">
+          {t('exchange_rates.page.missing_hint')}
+        </p>
       )}
-
-      {displayPairs !== null && displayPairs.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-content-muted)]">
-          <span>{t('exchange_rates.page.filtered_hint', { count: displayPairs.length })}</span>
-          <button
-            type="button"
-            onClick={() => savePreference.mutate(null)}
-            className="text-[var(--color-accent)] underline"
-          >
-            {t('exchange_rates.page.show_all')}
-          </button>
-        </div>
-      )}
-
-      <section className="card space-y-3">
-        <div>
-          <h2 className="text-sm font-medium">{t('exchange_rates.page.requests_title')}</h2>
-          <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-            {t('exchange_rates.page.requests_hint')}
-          </p>
-        </div>
-
-        {requestsQuery.isLoading && <LoadingState />}
-
-        {requestsQuery.data && requests.length === 0 && (
-          <p className="text-sm text-[var(--color-content-muted)]">
-            {t('exchange_rates.page.requests_empty')}
-          </p>
-        )}
-
-        {requests.length > 0 && (
-          <ul className="divide-y divide-[var(--color-border-subtle)]">
-            {requests.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                <span className="font-mono">
-                  1 {item.baseCurrency} → {item.quoteCurrency}
-                </span>
-                <span className="text-xs text-[var(--color-content-muted)]">
-                  {t(`exchange_rates.page.request_status.${item.status}`)} ·{' '}
-                  {formatDate(item.createdAt)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-content-muted)]">
-                  {item.reviewNote ?? item.reason ?? ''}
-                </span>
-                {item.status === 'pending' && (
-                  <button
-                    type="button"
-                    onClick={() => removeRequest.mutate(item.id)}
-                    className="text-xs text-[var(--color-negative)]"
-                  >
-                    {t('exchange_rates.page.cancel_request')}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

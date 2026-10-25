@@ -24,8 +24,9 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  // 汇率已全局化：残留行会让「缺少汇率」类断言失效，必须逐例清空
-  await clearExchangeRates(app);
+  // 汇率已全局化：残留行会让「缺少汇率」类断言失效，必须逐例清空。
+  // 只清本文件用到的币种，避免抹掉并行执行的其他套件正在写的汇率。
+  await clearExchangeRates(app, ['USD', 'CNY', 'EUR', 'JPY']);
 
   const user = await createUser(app, DOMAIN);
   token = user.token;
@@ -577,7 +578,7 @@ describe('多币种与汇率', () => {
     expect(JSON.stringify(mine)).not.toContain('7.3');
   });
 
-  it('用户不能写汇率，只能提交币种对申请', async () => {
+  it('用户不能写汇率', async () => {
     const write = await app.inject({
       method: 'POST',
       url: '/api/exchange-rates/manual',
@@ -586,25 +587,6 @@ describe('多币种与汇率', () => {
     });
     expect(write.statusCode).toBe(403);
     expect(write.json().error.code).toBe('RATE_WRITE_FORBIDDEN');
-
-    const request = await app.inject({
-      method: 'POST',
-      url: '/api/exchange-rates/pair-requests',
-      headers: auth(token),
-      payload: { baseCurrency: 'EUR', quoteCurrency: 'CNY', reason: '持有欧元账户' },
-    });
-    expect(request.statusCode).toBe(201);
-    expect(request.json().data.request.status).toBe('pending');
-
-    // 同一币种对重复提交应被拒
-    const again = await app.inject({
-      method: 'POST',
-      url: '/api/exchange-rates/pair-requests',
-      headers: auth(token),
-      payload: { baseCurrency: 'EUR', quoteCurrency: 'CNY' },
-    });
-    expect(again.statusCode).toBe(409);
-    expect(again.json().error.code).toBe('RATE_PAIR_REQUEST_EXISTS');
   });
 
   it('手工汇率列表分页返回', async () => {

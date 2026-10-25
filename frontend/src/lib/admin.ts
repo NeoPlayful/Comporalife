@@ -31,16 +31,29 @@ export interface AdminExchangeRate {
   updatedAt: string;
 }
 
-export interface AdminRatePairRequest {
-  id: string;
-  baseCurrency: string;
-  quoteCurrency: string;
-  reason: string | null;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewNote: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-  user: { nickname: string };
+export interface RateSyncFailure {
+  pair: string;
+  code: string;
+}
+
+export interface RateProviderStatus {
+  configured: boolean;
+  provider: string;
+  anchorCurrency: string;
+  keyConfigured: boolean;
+  enabled: boolean;
+  lastRun: {
+    startedAt: string;
+    finishedAt: string | null;
+    status: 'running' | 'succeeded' | 'partial' | 'failed' | 'skipped';
+    fetchedPairs: number;
+    writtenRows: number;
+    skippedManual: number;
+    failures: RateSyncFailure[] | null;
+    errorCode: string | null;
+    errorMessage: string | null;
+  } | null;
+  disabledReason: string | null;
 }
 
 export interface AdminAuditLog {
@@ -206,13 +219,5 @@ export const adminApi = {
   updateExchangeRate: (id: string, rate: string) =>
     api.patch<{ exchangeRate: AdminExchangeRate }>(`/api/admin/exchange-rates/${id}`, { rate }),
   deleteExchangeRate: (id: string) => api.delete<{ deleted: boolean }>(`/api/admin/exchange-rates/${id}`),
-  ratePairRequests: (filters: { page?: number; pageSize?: number; status?: string } = {}) => {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(filters)) {
-      if (value !== undefined && value !== '') query.set(key, String(value));
-    }
-    return api.getPaged<{ requests: AdminRatePairRequest[] }>(`/api/admin/rate-pair-requests?${query}`);
-  },
-  reviewRatePairRequest: (id: string, body: { status: 'approved' | 'rejected'; note?: string }) =>
-    api.post<{ status: string }>(`/api/admin/rate-pair-requests/${id}/review`, body),
+  rateProviderStatus: () => api.get<RateProviderStatus>('/api/market-data/providers'),
 };

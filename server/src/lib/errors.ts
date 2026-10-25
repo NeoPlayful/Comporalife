@@ -80,7 +80,6 @@ export const ErrorCode = {
   VALUATION_DATE_EXISTS: 'VALUATION_DATE_EXISTS',
   // ===== 汇率（全局参考数据）=====
   RATE_WRITE_FORBIDDEN: 'RATE_WRITE_FORBIDDEN',
-  RATE_PAIR_REQUEST_EXISTS: 'RATE_PAIR_REQUEST_EXISTS',
   RATE_PROVIDER_NOT_CONFIGURED: 'RATE_PROVIDER_NOT_CONFIGURED',
   RATE_SYNC_IN_PROGRESS: 'RATE_SYNC_IN_PROGRESS',
   RATE_SYNC_DISABLED: 'RATE_SYNC_DISABLED',
@@ -222,7 +221,6 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   CASHFLOW_AMOUNT_INVALID: 422,
   VALUATION_DATE_EXISTS: 409,
   RATE_WRITE_FORBIDDEN: 403,
-  RATE_PAIR_REQUEST_EXISTS: 409,
   RATE_PROVIDER_NOT_CONFIGURED: 400,
   RATE_SYNC_IN_PROGRESS: 409,
   RATE_SYNC_DISABLED: 409,
@@ -324,9 +322,7 @@ export const errors = {
   rateMissing: (pairs: string[]) =>
     new AppError(ErrorCode.CURRENCY_RATE_MISSING, '缺少折算所需汇率', { missingPairs: pairs }),
   rateWriteForbidden: () =>
-    new AppError(ErrorCode.RATE_WRITE_FORBIDDEN, '汇率由系统统一维护，请在「汇率指标」页提交申请'),
-  ratePairRequestExists: () =>
-    new AppError(ErrorCode.RATE_PAIR_REQUEST_EXISTS, '该币种对已有待审核的申请'),
+    new AppError(ErrorCode.RATE_WRITE_FORBIDDEN, '汇率由系统统一维护，你可以在汇率指标页自选要查看的币种对'),
   rateProviderNotConfigured: () =>
     new AppError(ErrorCode.RATE_PROVIDER_NOT_CONFIGURED, '未配置外部汇率源'),
   rateSyncInProgress: () =>

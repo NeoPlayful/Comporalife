@@ -36,7 +36,7 @@ export interface Preferences {
   theme: 'dark' | 'light' | 'system';
   language: 'zh-CN' | 'en-US';
   simulationDefaults: Record<string, unknown> | null;
-  /** 汇率列表展示偏好（形如 ["USD->CNY"]），null 表示展示全部。不参与折算。 */
+  /** 自选汇率列表（形如 ["USD->CNY"]），null 表示跟随默认集合。不参与折算。 */
   rateDisplayPairs?: string[] | null;
 }
 

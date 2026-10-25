@@ -6,7 +6,6 @@ import { errors } from '../../lib/errors.js';
 import { requireAuth, type AuthContext } from '../../plugins/auth.js';
 import {
   acquireSyncLock,
-  collectRateDemand,
   isRateProviderConfigured,
   isRateSyncEnabled,
   releaseSyncLock,

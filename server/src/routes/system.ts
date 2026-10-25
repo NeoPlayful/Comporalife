@@ -43,8 +43,6 @@ const VERSION = (() => {
   }
 })();
 
-const PHASE = 'phase-10';
-
 export default async function systemRoutes(app: FastifyInstance) {
   // 存活探针：不访问任何外部依赖，用于容器重启判断
   app.get('/health', async (request) => {
@@ -75,14 +73,13 @@ export default async function systemRoutes(app: FastifyInstance) {
   });
 
   app.get('/version', async (request) => {
-    return ok({ name: 'comporalife', version: VERSION, phase: PHASE, node: process.version }, request.id);
+    return ok({ name: 'comporalife', version: VERSION, node: process.version }, request.id);
   });
 
   // 能力声明：前端据此决定是否渲染尚未交付的入口
   app.get('/capabilities', async (request) => {
     return ok(
       {
-        phase: PHASE,
         available: [
           'auth',
           'accounts',

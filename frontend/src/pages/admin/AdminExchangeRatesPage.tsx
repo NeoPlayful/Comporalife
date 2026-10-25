@@ -1,7 +1,7 @@
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import Pagination from '@/components/ui/Pagination';
-import { adminApi, type AdminExchangeRate, type AdminRatePairRequest } from '@/lib/admin';
+import { adminApi, type AdminExchangeRate } from '@/lib/admin';
 import { translateError } from '@/lib/error-message';
 import { formatDate, formatDateTime, formatRate, trimTrailingZeros } from '@/lib/format';
 import { CURRENCY_DECIMALS } from '@/utils/constants';
@@ -42,14 +42,15 @@ export default function AdminExchangeRatesPage() {
     queryFn: () => adminApi.exchangeRates({ page, pageSize, ...filter }),
   });
 
-  const requestsQuery = useQuery({
-    queryKey: ['admin', 'rate-pair-requests', 'pending'],
-    queryFn: () => adminApi.ratePairRequests({ status: 'pending', pageSize: 20 }),
+  // 自动同步失败的币种对：管理员据此知道该补哪几对，取代了原来的用户申请列表
+  const providerQuery = useQuery({
+    queryKey: ['admin', 'rate-provider'],
+    queryFn: () => adminApi.rateProviderStatus(),
   });
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates'] });
-    void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-pair-requests'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-provider'] });
     // 汇率变化影响所有用户的统计，本地缓存必须一起失效
     void queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -96,19 +97,10 @@ export default function AdminExchangeRatesPage() {
     onError: (err) => setError(translateError(err, t)),
   });
 
-  const review = useMutation({
-    mutationFn: (input: { id: string; status: 'approved' | 'rejected' }) =>
-      adminApi.reviewRatePairRequest(input.id, { status: input.status }),
-    onSuccess: () => {
-      setError(null);
-      invalidate();
-    },
-    onError: (err) => setError(translateError(err, t)),
-  });
-
   const rows: AdminExchangeRate[] = listQuery.data?.data.exchangeRates ?? [];
   const pagination = listQuery.data?.pagination ?? null;
-  const pending: AdminRatePairRequest[] = requestsQuery.data?.data.requests ?? [];
+  const provider = providerQuery.data ?? null;
+  const syncFailures = provider?.lastRun?.failures ?? [];
 
   return (
     <div className="space-y-5">
@@ -405,55 +397,69 @@ export default function AdminExchangeRatesPage() {
       <section className="card space-y-3">
         <div>
           <h2 className="text-sm font-medium">
-            {t('exchangeRates.requests_title')}
-            {pending.length > 0 && (
-              <span className="ml-2 rounded-full bg-[var(--color-accent)] px-2 py-0.5 text-xs text-white">
-                {pending.length}
+            {t('exchangeRates.sync_title')}
+            {syncFailures.length > 0 && (
+              <span className="ml-2 rounded-full bg-[var(--color-negative)] px-2 py-0.5 text-xs text-white">
+                {syncFailures.length}
               </span>
             )}
           </h2>
           <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-            {t('exchangeRates.requests_hint')}
+            {t('exchangeRates.sync_hint')}
           </p>
         </div>
 
-        {requestsQuery.isLoading && <LoadingState />}
+        {providerQuery.isLoading && <LoadingState />}
 
-        {requestsQuery.data && pending.length === 0 && (
-          <p className="text-sm text-[var(--color-content-muted)]">
-            {t('exchangeRates.requests_empty')}
-          </p>
+        {provider && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-content-muted)]">
+            <span>
+              {t('exchangeRates.sync_provider_state', {
+                state: t(`exchangeRates.sync_status.${provider.lastRun?.status ?? 'never'}`),
+              })}
+            </span>
+            {provider.lastRun?.finishedAt && (
+              <span>{formatDateTime(provider.lastRun.finishedAt)}</span>
+            )}
+            {!provider.configured && <span>{t('exchangeRates.sync_not_configured')}</span>}
+          </div>
         )}
 
-        {pending.length > 0 && (
+        {provider?.lastRun?.errorMessage && (
+          <p className="text-xs text-[var(--color-negative)]">{provider.lastRun.errorMessage}</p>
+        )}
+
+        {provider && syncFailures.length === 0 && (
+          <p className="text-sm text-[var(--color-content-muted)]">{t('exchangeRates.sync_empty')}</p>
+        )}
+
+        {syncFailures.length > 0 && (
           <ul className="divide-y divide-[var(--color-border-subtle)]">
-            {pending.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                <span className="font-mono">
-                  1 {item.baseCurrency} → {item.quoteCurrency}
-                </span>
-                <span className="text-xs text-[var(--color-content-muted)]">
-                  {item.user.nickname} · {formatDate(item.createdAt)}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-content-muted)]">
-                  {item.reason ?? ''}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => review.mutate({ id: item.id, status: 'approved' })}
-                  className="rounded border border-[var(--color-border-subtle)] px-2 py-1 text-xs hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  {t('exchangeRates.approve')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => review.mutate({ id: item.id, status: 'rejected' })}
-                  className="rounded border border-[var(--color-border-subtle)] px-2 py-1 text-xs text-[var(--color-negative)]"
-                >
-                  {t('exchangeRates.reject')}
-                </button>
-              </li>
-            ))}
+            {syncFailures.map((failure) => {
+              const [from, to] = failure.pair.split('->');
+              return (
+                <li key={failure.pair} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                  <span className="font-mono">1 {from} → {to}</span>
+                  <span className="text-xs text-[var(--color-content-muted)]">{failure.code}</span>
+                  <span className="min-w-0 flex-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreating(true);
+                      setDraft({
+                        baseCurrency: from ?? 'USD',
+                        quoteCurrency: to ?? 'CNY',
+                        rate: '',
+                        rateDate: new Date().toISOString().slice(0, 10),
+                      });
+                    }}
+                    className="rounded border border-[var(--color-border-subtle)] px-2 py-1 text-xs hover:bg-black/5 dark:hover:bg-white/5"
+                  >
+                    {t('exchangeRates.sync_fill')}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
