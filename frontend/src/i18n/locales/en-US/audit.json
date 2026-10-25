@@ -8,6 +8,12 @@
     "to": "To",
     "apply": "Search"
   },
+  "table": {
+    "time": "Time",
+    "action": "Action",
+    "target": "Target",
+    "ip": "IP range"
+  },
   "actions": {
     "auth.login": "Signed in",
     "auth.login_failed": "Failed sign-in",

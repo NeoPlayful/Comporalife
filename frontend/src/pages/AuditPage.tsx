@@ -8,41 +8,55 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 /** 只展示白名单字段：不出现金额、流水内容或原始 IP */
-function AuditItem({ item }: { item: AuditLogItem }) {
+function AuditRow({ item }: { item: AuditLogItem }) {
   const { t } = useTranslation('audit');
 
   return (
-    <li className="card p-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-medium">{t(`actions.${item.action}`, { defaultValue: item.action })}</p>
-        <p className="text-xs text-[var(--color-content-muted)]">{formatDateTime(item.createdAt)}</p>
-      </div>
-      <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-        {item.targetType ?? '—'}
-        {item.targetId ? ` · ${item.targetId.slice(0, 8)}…` : ''}
-        {item.ip ? ` · ${item.ip}` : ''}
-      </p>
-    </li>
+    <tr className="align-top hover:bg-black/5 dark:hover:bg-white/5">
+      <td className="whitespace-nowrap px-3 py-2 text-[var(--color-content-muted)]">
+        {formatDateTime(item.createdAt)}
+      </td>
+      <td className="px-3 py-2">
+        <span className="font-medium">{t(`actions.${item.action}`, { defaultValue: item.action })}</span>
+        <span className="ml-1.5 font-mono text-xs text-[var(--color-content-muted)]">· {item.action}</span>
+      </td>
+      <td className="px-3 py-2">
+        {item.targetType ? (
+          <>
+            <span className="text-xs text-[var(--color-content-muted)]">{item.targetType}</span>
+            {item.targetId && (
+              <span className="ml-1 font-mono text-xs">· {item.targetId.slice(0, 8)}…</span>
+            )}
+          </>
+        ) : (
+          <span className="text-[var(--color-content-muted)]">—</span>
+        )}
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 font-mono text-xs text-[var(--color-content-muted)]">
+        {item.ip ?? '—'}
+      </td>
+    </tr>
   );
 }
 
 export default function AuditPage() {
   const { t } = useTranslation('audit');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [action, setAction] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [applied, setApplied] = useState({ action: '', from: '', to: '' });
 
   const query = useQuery({
-    queryKey: ['audit', page, applied],
+    queryKey: ['audit', page, pageSize, applied],
     queryFn: () =>
       auditApi.list({
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         ...(applied.action ? { action: applied.action } : {}),
         ...(applied.from ? { from: applied.from } : {}),
         ...(applied.to ? { to: applied.to } : {}),
@@ -110,11 +124,23 @@ export default function AuditPage() {
       )}
 
       {items.length > 0 && (
-        <ul className="space-y-1.5">
-          {items.map((item) => (
-            <AuditItem key={item.id} item={item} />
-          ))}
-        </ul>
+        <div className="card overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="border-b border-[var(--color-border-subtle)] text-left text-xs text-[var(--color-content-muted)]">
+              <tr>
+                <th className="whitespace-nowrap px-3 py-2">{t('table.time')}</th>
+                <th className="px-3 py-2">{t('table.action')}</th>
+                <th className="px-3 py-2">{t('table.target')}</th>
+                <th className="px-3 py-2">{t('table.ip')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--color-border-subtle)]">
+              {items.map((item) => (
+                <AuditRow key={item.id} item={item} />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {pagination && (
@@ -124,6 +150,10 @@ export default function AuditPage() {
           total={pagination.total}
           totalPages={pagination.totalPages}
           onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
         />
       )}
     </div>
