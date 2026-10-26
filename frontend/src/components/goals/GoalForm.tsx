@@ -23,16 +23,20 @@ interface Props {
   onCancel: () => void;
   submitting?: boolean;
   error?: string | null;
+  /** 放在弹窗里时由弹窗外壳的 footer 提供按钮，表单自己只渲染字段 */
+  embedded?: boolean;
+  /** 嵌入模式下的原生 form id，供 footer 的提交按钮关联 */
+  formId?: string;
+  /** 表单内容相对初始值是否被改动过，供弹窗判断关闭是否需要确认 */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function GoalForm({ initial, onSubmit, onCancel, submitting, error }: Props) {
-  const { t } = useTranslation('goals');
-
-  const [form, setForm] = useState<GoalInput>({
+function buildForm(initial?: Props['initial']): GoalInput {
+  return {
     name: initial?.name ?? '',
     type: initial?.type ?? 'savings',
     targetAmount: initial?.targetAmount ?? '',
@@ -49,12 +53,34 @@ export default function GoalForm({ initial, onSubmit, onCancel, submitting, erro
     portfolioId: initial?.portfolioId ?? null,
     priority: initial?.priority ?? 1,
     note: initial?.note ?? null,
-  });
+  };
+}
+
+export default function GoalForm({
+  initial,
+  onSubmit,
+  onCancel,
+  submitting,
+  error,
+  embedded = false,
+  formId,
+  onDirtyChange,
+}: Props) {
+  const { t } = useTranslation('goals');
+
+  // 初始快照只算一次：每次 patch 都与它比较，判断表单是否被改动
+  const [initialForm] = useState(() => buildForm(initial));
+  const [form, setForm] = useState<GoalInput>(initialForm);
 
   const accountsQuery = useQuery({ queryKey: ['accounts', 'active'], queryFn: () => accountsApi.list({ status: 'active' as const }) });
   const portfoliosQuery = useQuery({ queryKey: ['portfolios', 'active'], queryFn: () => portfoliosApi.list('active') });
 
-  const patch = (values: Partial<GoalInput>) => setForm((prev) => ({ ...prev, ...values }));
+  const patch = (values: Partial<GoalInput>) =>
+    setForm((prev) => {
+      const next = { ...prev, ...values };
+      onDirtyChange?.(JSON.stringify(next) !== JSON.stringify(initialForm));
+      return next;
+    });
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -71,7 +97,11 @@ export default function GoalForm({ initial, onSubmit, onCancel, submitting, erro
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-[var(--color-border-subtle)] p-4">
+    <form
+      id={formId}
+      onSubmit={handleSubmit}
+      className={embedded ? 'space-y-4' : 'space-y-4 rounded-xl border border-[var(--color-border-subtle)] p-4'}
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('form.name')}>
           <input
@@ -268,14 +298,16 @@ export default function GoalForm({ initial, onSubmit, onCancel, submitting, erro
         </p>
       )}
 
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5">
-          {t('common:actions.cancel', { ns: 'common' })}
-        </button>
-        <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-          {submitting ? t('common:state.saving', { ns: 'common' }) : t('form.submit')}
-        </button>
-      </div>
+      {!embedded && (
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5">
+            {t('common:actions.cancel', { ns: 'common' })}
+          </button>
+          <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            {submitting ? t('common:state.saving', { ns: 'common' }) : t('form.submit')}
+          </button>
+        </div>
+      )}
     </form>
   );
 }

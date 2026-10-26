@@ -1,5 +1,5 @@
+import Modal from '@/components/ui/Modal';
 import { currencyName, formatRate } from '@/lib/format';
-import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,8 @@ export interface BulkDraft {
   quoteCurrency: string;
   currentRate: string | null;
 }
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 /**
  * 批量录入抽屉：统一生效日期，逐对填写后一次提交。
@@ -34,13 +36,13 @@ export default function RateBulkDrawer({
 }) {
   const { t } = useTranslation('admin');
 
-  const [rateDate, setRateDate] = useState(new Date().toISOString().slice(0, 10));
+  const [rateDate, setRateDate] = useState(today());
   const [values, setValues] = useState<Record<string, string>>({});
 
   // 每次打开都以传入的选中行为准，上次没提交的草稿不应该残留
   useEffect(() => {
     if (!open) return;
-    setRateDate(new Date().toISOString().slice(0, 10));
+    setRateDate(today());
     setValues(
       Object.fromEntries(
         drafts.map((draft) => [
@@ -50,15 +52,6 @@ export default function RateBulkDrawer({
       ),
     );
   }, [open, drafts]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
 
   const rows = useMemo(
     () =>
@@ -75,127 +68,106 @@ export default function RateBulkDrawer({
     [drafts, values],
   );
 
-  if (!open) return null;
-
   const filledCount = rows.filter((row) => row.valid).length;
   const canSubmit = filledCount > 0 && !saving;
 
-  return (
-    <div className="fixed inset-0 z-50">
-      <button
-        type="button"
-        aria-label={t('exchangeRates.bulk.close')}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50"
-      />
+  // 预填的是已有值，只有改过某个数字或日期才算脏
+  const dirty =
+    rateDate !== today() ||
+    rows.some((row) => row.value !== (row.draft.currentRate ?? ''));
 
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('exchangeRates.bulk.title')}
-        className="absolute inset-y-0 right-0 flex w-full max-w-lg flex-col border-l border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] shadow-2xl"
-      >
-        <header className="flex items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold">{t('exchangeRates.bulk.title')}</h2>
-            <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-              {t('exchangeRates.bulk.subtitle', { count: drafts.length })}
-            </p>
-          </div>
+  return (
+    <Modal
+      open={open}
+      variant="drawer"
+      size="lg"
+      title={t('exchangeRates.bulk.title')}
+      description={t('exchangeRates.bulk.subtitle', { count: drafts.length })}
+      dirty={dirty}
+      busy={saving}
+      onClose={onClose}
+      footer={
+        <>
+          <span className="mr-auto text-xs text-[var(--color-content-muted)]">
+            {t('exchangeRates.bulk.filled', { filled: filledCount, total: rows.length })}
+          </span>
           <button
             type="button"
             onClick={onClose}
-            aria-label={t('exchangeRates.bulk.close')}
-            className="-mr-1 shrink-0 rounded-lg p-1.5 text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
           >
-            <X className="size-4" aria-hidden />
+            {t('exchangeRates.cancel')}
           </button>
-        </header>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() =>
+              onSubmit({
+                rateDate,
+                rates: rows
+                  .filter((row) => row.valid)
+                  .map((row) => ({
+                    baseCurrency: row.draft.baseCurrency,
+                    quoteCurrency: row.draft.quoteCurrency,
+                    rate: row.value.trim(),
+                  })),
+              })
+            }
+            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {saving ? t('exchangeRates.bulk.saving') : t('exchangeRates.bulk.submit')}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">{t('exchangeRates.rate_date')}</span>
+          <input
+            data-autofocus
+            type="date"
+            value={rateDate}
+            onChange={(event) => setRateDate(event.target.value)}
+            className="input"
+          />
+        </label>
 
-        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">{t('exchangeRates.rate_date')}</span>
-            <input
-              type="date"
-              value={rateDate}
-              onChange={(event) => setRateDate(event.target.value)}
-              className="input"
-            />
-          </label>
+        <ul className="divide-y divide-[var(--color-border-subtle)] rounded-lg border border-[var(--color-border-subtle)]">
+          {rows.map(({ key, draft, value, valid }) => (
+            <li key={key} className="flex items-center gap-3 px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-sm">
+                  1 {draft.baseCurrency} → {draft.quoteCurrency}
+                </p>
+                <p className="truncate text-xs text-[var(--color-content-muted)]">
+                  {currencyName(draft.baseCurrency)} → {currencyName(draft.quoteCurrency)}
+                  {draft.currentRate !== null &&
+                    ` · ${t('exchangeRates.bulk.current', {
+                      rate: formatRate(draft.currentRate),
+                    })}`}
+                </p>
+              </div>
+              <input
+                inputMode="decimal"
+                value={value}
+                onChange={(event) =>
+                  setValues((prev) => ({ ...prev, [key]: event.target.value }))
+                }
+                placeholder={t('exchangeRates.bulk.placeholder')}
+                aria-label={`1 ${draft.baseCurrency} → ${draft.quoteCurrency}`}
+                aria-invalid={value.trim() !== '' && !valid}
+                className={`input w-32 py-1 font-mono ${
+                  value.trim() !== '' && !valid ? 'border-[var(--color-negative)]' : ''
+                }`}
+              />
+            </li>
+          ))}
+        </ul>
 
-          <ul className="divide-y divide-[var(--color-border-subtle)] rounded-lg border border-[var(--color-border-subtle)]">
-            {rows.map(({ key, draft, value, valid }) => (
-              <li key={key} className="flex items-center gap-3 px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-sm">
-                    1 {draft.baseCurrency} → {draft.quoteCurrency}
-                  </p>
-                  <p className="truncate text-xs text-[var(--color-content-muted)]">
-                    {currencyName(draft.baseCurrency)} → {currencyName(draft.quoteCurrency)}
-                    {draft.currentRate !== null &&
-                      ` · ${t('exchangeRates.bulk.current', {
-                        rate: formatRate(draft.currentRate),
-                      })}`}
-                  </p>
-                </div>
-                <input
-                  inputMode="decimal"
-                  value={value}
-                  onChange={(event) =>
-                    setValues((prev) => ({ ...prev, [key]: event.target.value }))
-                  }
-                  placeholder={t('exchangeRates.bulk.placeholder')}
-                  aria-label={`1 ${draft.baseCurrency} → ${draft.quoteCurrency}`}
-                  aria-invalid={value.trim() !== '' && !valid}
-                  className={`input w-32 py-1 font-mono ${
-                    value.trim() !== '' && !valid ? 'border-[var(--color-negative)]' : ''
-                  }`}
-                />
-              </li>
-            ))}
-          </ul>
-
-          {drafts.length === 0 && (
-            <p className="text-sm text-[var(--color-content-muted)]">
-              {t('exchangeRates.bulk.empty')}
-            </p>
-          )}
-        </div>
-
-        <footer className="flex items-center justify-between gap-2 border-t border-[var(--color-border-subtle)] px-5 py-3">
-          <span className="text-xs text-[var(--color-content-muted)]">
-            {t('exchangeRates.bulk.filled', { filled: filledCount, total: rows.length })}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
-            >
-              {t('exchangeRates.cancel')}
-            </button>
-            <button
-              type="button"
-              disabled={!canSubmit}
-              onClick={() =>
-                onSubmit({
-                  rateDate,
-                  rates: rows
-                    .filter((row) => row.valid)
-                    .map((row) => ({
-                      baseCurrency: row.draft.baseCurrency,
-                      quoteCurrency: row.draft.quoteCurrency,
-                      rate: row.value.trim(),
-                    })),
-                })
-              }
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {saving ? t('exchangeRates.bulk.saving') : t('exchangeRates.bulk.submit')}
-            </button>
-          </div>
-        </footer>
+        {drafts.length === 0 && (
+          <p className="text-sm text-[var(--color-content-muted)]">{t('exchangeRates.bulk.empty')}</p>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }

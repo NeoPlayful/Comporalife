@@ -1,5 +1,6 @@
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import { accountsApi, type Account } from '@/lib/accounts';
 import { translateError } from '@/lib/error-message';
 import { formatDate, formatNumber } from '@/lib/format';
@@ -96,69 +97,88 @@ export default function PortfoliosPage() {
       )}
 
       {creating && (
-        <section className="card space-y-3">
-          <h2 className="text-base font-medium">{t('create.title')}</h2>
+        <Modal
+          open
+          title={t('create.title')}
+          size="lg"
+          dirty={name.trim() !== '' || accountId !== ''}
+          busy={createMutation.isPending}
+          onClose={() => {
+            setCreating(false);
+            setError(null);
+            setName('');
+            setAccountId('');
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreating(false);
+                  setError(null);
+                  setName('');
+                  setAccountId('');
+                }}
+                className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+              >
+                {t('create.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={!accountId || !name.trim() || createMutation.isPending}
+                onClick={() => createMutation.mutate()}
+                className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {createMutation.isPending ? t('create.saving') : t('create.submit')}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
-          {availableAccounts.length === 0 ? (
-            <p className="text-sm text-[var(--color-content-muted)]">
-              {t('create.account_empty')}{' '}
-              <Link to="/accounts" className="underline">
-                {t('create.account')}
-              </Link>
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm">
-                <span className="text-[var(--color-content-muted)]">{t('create.account')}</span>
-                <select
-                  value={accountId}
-                  onChange={(event) => setAccountId(event.target.value)}
-                  className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5"
-                >
-                  <option value="">—</option>
-                  {availableAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} ({account.currency})
-                    </option>
-                  ))}
-                </select>
-                <span className="block text-xs text-[var(--color-content-muted)]">
-                  {t('create.account_hint')}
-                </span>
-              </label>
+            {availableAccounts.length === 0 ? (
+              <p className="text-sm text-[var(--color-content-muted)]">
+                {t('create.account_empty')}{' '}
+                <Link to="/accounts" className="underline">
+                  {t('create.account')}
+                </Link>
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-sm">
+                  <span className="text-[var(--color-content-muted)]">{t('create.account')}</span>
+                  <select
+                    data-autofocus
+                    value={accountId}
+                    onChange={(event) => setAccountId(event.target.value)}
+                    className="input"
+                  >
+                    <option value="">—</option>
+                    {availableAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name} ({account.currency})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="block text-xs text-[var(--color-content-muted)]">
+                    {t('create.account_hint')}
+                  </span>
+                </label>
 
-              <label className="space-y-1 text-sm">
-                <span className="text-[var(--color-content-muted)]">{t('create.name')}</span>
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5"
-                />
-              </label>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={!accountId || !name.trim() || createMutation.isPending}
-              onClick={() => createMutation.mutate()}
-              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {createMutation.isPending ? t('create.saving') : t('create.submit')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCreating(false);
-                setError(null);
-              }}
-              className="rounded-lg px-4 py-2 text-sm text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              {t('create.cancel')}
-            </button>
+                <label className="space-y-1 text-sm">
+                  <span className="text-[var(--color-content-muted)]">{t('create.name')}</span>
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    maxLength={60}
+                    className="input"
+                  />
+                </label>
+              </div>
+            )}
           </div>
-        </section>
+        </Modal>
       )}
 
       {listQuery.isLoading ? (

@@ -158,18 +158,28 @@ async function main() {
     })()
   `);
   await sleep(400);
+  // 先断言同币种提示确实出现，再换回不同币种供后续提交使用
   report.sameCurrencyBlocked = await evaluate(`
     (() => {
       const d = document.querySelector('[role="dialog"]');
-      const rect = d.querySelectorAll('select');
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
-      // 换回一个不同的币种，避免影响后续提交
-      const other = [...rect[1].options].map(o => o.value).find(v => v !== rect[0].value);
-      setter.call(rect[1], other);
-      rect[1].dispatchEvent(new Event('change', { bubbles: true }));
-      return d.innerText.includes('不能相同');
+      const selects = d.querySelectorAll('select');
+      const shown = d.innerText.includes('不能相同');
+      const saveBtn = [...d.querySelectorAll('button')].find(x => x.textContent.trim() === '保存');
+      return { shown, saveDisabled: saveBtn ? saveBtn.disabled : 'no-save' };
     })()
   `);
+  await evaluate(`
+    (() => {
+      const d = document.querySelector('[role="dialog"]');
+      const selects = d.querySelectorAll('select');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value').set;
+      const other = [...selects[1].options].map(o => o.value).find(v => v !== selects[0].value);
+      setter.call(selects[1], other);
+      selects[1].dispatchEvent(new Event('change', { bubbles: true }));
+      return other;
+    })()
+  `);
+  await sleep(300);
 
   // 填一个合法汇率并提交
   const today = new Date().toISOString().slice(0, 10);

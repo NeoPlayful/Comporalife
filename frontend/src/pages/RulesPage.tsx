@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import { accountsApi } from '@/lib/accounts';
 import { useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
@@ -21,6 +22,7 @@ export default function RulesPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation('imports');
   const [editing, setEditing] = useState<ClassificationRule | 'new' | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ rule: ClassificationRule; matched: number } | null>(null);
 
@@ -101,7 +103,10 @@ export default function RulesPage() {
           </button>
           <button
             type="button"
-            onClick={() => setEditing('new')}
+            onClick={() => {
+              setEditing('new');
+              setEditorDirty(false);
+            }}
             className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"
           >
             {t('rules.new')}
@@ -115,16 +120,49 @@ export default function RulesPage() {
         </p>
       )}
 
-      {editing && (
-        <RuleEditor
-          rule={editing === 'new' ? null : editing}
-          categories={flatCategories}
-          accounts={accounts}
-          saving={saveRule.isPending}
-          onCancel={() => setEditing(null)}
-          onSave={(payload) => saveRule.mutate({ rule: editing, payload })}
-        />
-      )}
+      <Modal
+        open={editing !== null}
+        title={editing === 'new' ? t('rules.editor.title_new') : t('rules.editor.title_edit')}
+        size="xl"
+        dirty={editorDirty}
+        busy={saveRule.isPending}
+        onClose={() => {
+          setEditing(null);
+          setEditorDirty(false);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null);
+                setEditorDirty(false);
+              }}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('rules.editor.cancel')}
+            </button>
+            <button
+              type="submit"
+              form="rule-editor-form"
+              disabled={saveRule.isPending}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {saveRule.isPending ? t('rules.editor.saving') : t('rules.editor.save')}
+            </button>
+          </>
+        }
+      >
+        {editing && (
+          <RuleEditor
+            rule={editing === 'new' ? null : editing}
+            categories={flatCategories}
+            accounts={accounts}
+            onSave={(payload) => saveRule.mutate({ rule: editing, payload })}
+            onDirtyChange={setEditorDirty}
+          />
+        )}
+      </Modal>
 
       {testResult && (
         <p className="rounded-lg bg-sky-500/10 px-3 py-2 text-sm text-sky-500">
@@ -161,7 +199,14 @@ export default function RulesPage() {
                 <button type="button" onClick={() => testRule.mutate(rule)} className="text-[var(--color-accent)]">
                   {t('rules.test')}
                 </button>
-                <button type="button" onClick={() => setEditing(rule)} className="text-[var(--color-accent)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(rule);
+                    setEditorDirty(false);
+                  }}
+                  className="text-[var(--color-accent)]"
+                >
                   {t('rules.edit_action')}
                 </button>
                 <button
@@ -194,16 +239,14 @@ function RuleEditor({
   rule,
   categories,
   accounts,
-  saving,
-  onCancel,
   onSave,
+  onDirtyChange,
 }: {
   rule: ClassificationRule | null;
   categories: Array<{ id: string; name: string; kind: string; parentId: string | null }>;
   accounts: Array<{ id: string; name: string }>;
-  saving: boolean;
-  onCancel: () => void;
   onSave: (payload: RulePayload) => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const { t } = useTranslation('imports');
   const { categoryKind } = useEnumLabels();
@@ -215,6 +258,21 @@ function RuleEditor({
   const [minAmount, setMinAmount] = useState(rule?.conditions.amount?.min ?? '');
   const [maxAmount, setMaxAmount] = useState(rule?.conditions.amount?.max ?? '');
   const [accountId, setAccountId] = useState(rule?.conditions.accountIds?.[0] ?? '');
+
+  // 字段多且分散，逐个 setter 埋 onDirtyChange 容易漏；统一在渲染后比对初值
+  useEffect(() => {
+    const initial = rule;
+    onDirtyChange(
+      name !== (initial?.name ?? '') ||
+        priority !== (initial?.priority ?? 100) ||
+        merchant !== (initial?.conditions.merchant?.value ?? '') ||
+        description !== (initial?.conditions.description?.value ?? '') ||
+        categoryId !== (initial?.actions.categoryId ?? '') ||
+        minAmount !== (initial?.conditions.amount?.min ?? '') ||
+        maxAmount !== (initial?.conditions.amount?.max ?? '') ||
+        accountId !== (initial?.conditions.accountIds?.[0] ?? ''),
+    );
+  }, [name, priority, merchant, description, categoryId, minAmount, maxAmount, accountId, rule, onDirtyChange]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -237,11 +295,7 @@ function RuleEditor({
   }
 
   return (
-    <form onSubmit={submit} className="card space-y-3 p-4">
-      <h2 className="text-sm font-medium">
-        {rule ? t('rules.editor.title_edit') : t('rules.editor.title_new')}
-      </h2>
-
+    <form onSubmit={submit} id="rule-editor-form" className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('rules.editor.name')}>
           <input
@@ -333,23 +387,6 @@ function RuleEditor({
       </div>
 
       <p className="text-xs text-[var(--color-content-muted)]">{t('rules.editor.hint')}</p>
-
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {saving ? t('rules.editor.saving') : t('rules.editor.save')}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
-        >
-          {t('rules.editor.cancel')}
-        </button>
-      </div>
     </form>
   );
 }

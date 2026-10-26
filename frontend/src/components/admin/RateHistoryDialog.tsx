@@ -1,4 +1,5 @@
 import EmptyState from '@/components/ui/EmptyState';
+import Modal from '@/components/ui/Modal';
 import '@/components/charts/echarts';
 import { adminApi, type AdminRateHistoryPoint } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
@@ -6,7 +7,6 @@ import { translateError } from '@/lib/error-message';
 import { formatRate } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import ReactECharts from 'echarts-for-react';
-import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -42,15 +42,6 @@ export default function RateHistoryDialog({
   useEffect(() => {
     setDetailPage(1);
   }, [pair?.from, pair?.to, range]);
-
-  useEffect(() => {
-    if (!pair) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [pair, onClose]);
 
   if (!pair) return null;
 
@@ -108,33 +99,21 @@ export default function RateHistoryDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="card flex max-h-[90vh] w-full max-w-2xl flex-col">
-        <header className="flex items-start justify-between gap-3 border-b border-[var(--color-border-subtle)] px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold">
-              {t('exchangeRates.history.title')}
-              <span className="ml-2 font-mono text-xs text-[var(--color-content-muted)]">
-                1 {pair.from} → {pair.to}
-              </span>
-            </h2>
-            {inverted && (
-              <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-                {t('exchangeRates.history.inverted_hint')}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('exchangeRates.history.close')}
-            className="text-[var(--color-content-muted)] hover:text-[var(--color-content-strong)]"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        </header>
-
-        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-2">
+    <Modal
+      open
+      size="2xl"
+      title={
+        <>
+          {t('exchangeRates.history.title')}
+          <span className="ml-2 font-mono text-xs font-normal text-[var(--color-content-muted)]">
+            1 {pair.from} → {pair.to}
+          </span>
+        </>
+      }
+      description={inverted ? t('exchangeRates.history.inverted_hint') : undefined}
+      onClose={onClose}
+    >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           {RANGES.map((value) => (
             <button
               key={value}
@@ -151,7 +130,7 @@ export default function RateHistoryDialog({
           ))}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div>
           {query.isPending && (
             <p className="py-12 text-center text-sm text-[var(--color-content-muted)]">
               {t('exchangeRates.history.loading')}
@@ -232,7 +211,6 @@ export default function RateHistoryDialog({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

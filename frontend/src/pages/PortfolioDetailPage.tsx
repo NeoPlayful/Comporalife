@@ -367,6 +367,10 @@ export default function PortfolioDetailPage() {
             />
           )}
 
+          {/*
+            交易、标的、价格、现金流刻意保持内联：这里是一条连续录入流，
+            录一条立刻能在下方表格看到结果，弹窗会打断这个来回。
+          */}
           <div className="mt-4 space-y-3 border-t border-[var(--color-border-subtle)] pt-4">
             <div className="flex flex-wrap gap-2">
               <button

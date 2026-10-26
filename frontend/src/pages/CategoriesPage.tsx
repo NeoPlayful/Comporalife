@@ -102,6 +102,7 @@ export default function CategoriesPage() {
 
           <button
             type="button"
+            // 单输入快加保持行内：为一个名称框加遮罩与焦点陷阱，成本大于收益
             onClick={() => {
               setAddingUnder('root');
               setNewName('');

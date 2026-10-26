@@ -2,6 +2,7 @@ import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import { assetsApi, type Asset, type AssetKind, type ValuationBasis } from '@/lib/assets';
 import { translateError } from '@/lib/error-message';
 import { formatDate } from '@/lib/format';
@@ -55,18 +56,52 @@ function AssetForm({ onClose }: { onClose: () => void }) {
     onError: (err) => setError(translateError(err, t)),
   });
 
-  return (
-    <form
-      className="card space-y-3 p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (!form.name.trim()) return;
-        create.mutate();
-      }}
-    >
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+  // 只要动过任何一个字段就算脏，关闭前需要确认，避免误触遮罩把填好的内容丢掉
+  const dirty =
+    form.name.trim() !== '' ||
+    form.purchaseDate !== '' ||
+    form.purchasePrice !== '' ||
+    form.note !== '';
 
-      <div className="grid gap-3 sm:grid-cols-2">
+  return (
+    <Modal
+      open
+      title={t('form.title')}
+      dirty={dirty}
+      busy={create.isPending}
+      onClose={onClose}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+          >
+            {t('form.cancel')}
+          </button>
+          <button
+            type="submit"
+            form="asset-create-form"
+            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            disabled={create.isPending || !form.name.trim()}
+          >
+            {create.isPending ? t('form.saving') : t('form.save')}
+          </button>
+        </>
+      }
+    >
+      <form
+        id="asset-create-form"
+        className="space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!form.name.trim()) return;
+          create.mutate();
+        }}
+      >
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+        <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
           {t('form.name')}
           <input
@@ -134,17 +169,9 @@ function AssetForm({ onClose }: { onClose: () => void }) {
             maxLength={500}
           />
         </label>
-      </div>
-
-      <div className="flex gap-2">
-        <button type="submit" className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60" disabled={create.isPending || !form.name.trim()}>
-          {create.isPending ? t('form.saving') : t('form.save')}
-        </button>
-        <button type="button" className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm" onClick={onClose}>
-          {t('form.cancel')}
-        </button>
-      </div>
-    </form>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

@@ -9,6 +9,7 @@ import RateTable, { type RateTableMode } from '@/components/admin/RateTable';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import {
   adminApi,
@@ -660,47 +661,46 @@ export default function AdminExchangeRatesPage() {
         onSave={(next) => saveSyncSettings.mutate(next)}
       />
 
-      {canDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="card w-full max-w-sm space-y-4 p-4">
-            <div>
-              <p className="text-sm font-semibold">
-                {deleteTargets.length > 1
-                  ? t('exchangeRates.bulk.delete_title', { count: deleteTargets.length })
-                  : t('exchangeRates.delete')}
-              </p>
-              <p className="mt-1 text-sm text-[var(--color-content-muted)]">
-                {t('exchangeRates.delete_confirm')}
-              </p>
-              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto font-mono text-xs">
-                {deleteTargets.slice(0, 10).map((target) => (
-                  <li key={target.id}>
-                    1 {target.baseCurrency} → {target.quoteCurrency} ({target.rateDate.slice(0, 10)})
-                  </li>
-                ))}
-                {deleteTargets.length > 10 && <li>… +{deleteTargets.length - 10}</li>}
-              </ul>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteTargets(null)}
-                className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm"
-              >
-                {t('exchangeRates.cancel')}
-              </button>
-              <button
-                type="button"
-                disabled={remove.isPending}
-                onClick={() => remove.mutate(deleteTargets)}
-                className="rounded-lg bg-[var(--color-negative)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {t('exchangeRates.delete')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={canDelete}
+        size="sm"
+        title={
+          deleteTargets && deleteTargets.length > 1
+            ? t('exchangeRates.bulk.delete_title', { count: deleteTargets.length })
+            : t('exchangeRates.delete')
+        }
+        description={t('exchangeRates.delete_confirm')}
+        busy={remove.isPending}
+        onClose={() => setDeleteTargets(null)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setDeleteTargets(null)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('exchangeRates.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={remove.isPending}
+              onClick={() => deleteTargets && remove.mutate(deleteTargets)}
+              className="rounded-lg bg-[var(--color-negative)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {t('exchangeRates.delete')}
+            </button>
+          </>
+        }
+      >
+        <ul className="max-h-48 space-y-1 overflow-y-auto font-mono text-xs">
+          {(deleteTargets ?? []).slice(0, 10).map((target) => (
+            <li key={target.id}>
+              1 {target.baseCurrency} → {target.quoteCurrency} ({target.rateDate.slice(0, 10)})
+            </li>
+          ))}
+          {(deleteTargets?.length ?? 0) > 10 && <li>… +{(deleteTargets?.length ?? 0) - 10}</li>}
+        </ul>
+      </Modal>
     </div>
   );
 }

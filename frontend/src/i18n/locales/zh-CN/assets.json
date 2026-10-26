@@ -22,6 +22,7 @@
     "market": "市场参考价"
   },
   "form": {
+    "title": "登记资产",
     "name": "资产名称",
     "kind": "类别",
     "currency": "币种",
