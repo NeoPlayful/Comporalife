@@ -1,6 +1,6 @@
 {
   "name": "comporalife-frontend",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,6 +15,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-virtual": "^3.14.21",
+    "country-flag-icons": "^1.6.20",
     "date-fns": "^4.1.0",
     "echarts": "^6.0.0",
     "echarts-for-react": "^3.0.2",
@@ -29,20 +30,20 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
     "@types/node": "^26.6.5",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0",
+    "jsdom": "^26.1.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.7.3",
-    "vite": "^6.1.0",
-    "eslint": "^9.39.0",
-    "globals": "^15.15.0",
     "typescript-eslint": "^8.72.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "vitest": "^3.2.7",
-    "jsdom": "^26.1.0",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/jest-dom": "^6.8.0"
+    "vite": "^6.1.0",
+    "vitest": "^3.2.7"
   }
 }

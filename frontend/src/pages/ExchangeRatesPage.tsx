@@ -1,17 +1,18 @@
+import CurrencyPair from '@/components/finance/CurrencyPair';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { exchangeRatesApi, type WatchlistEntry } from '@/lib/dashboard';
 import { translateError } from '@/lib/error-message';
-import { formatDate, formatRate } from '@/lib/format';
-import { CURRENCY_DECIMALS } from '@/utils/constants';
+import { currencyName, formatDate, formatRate } from '@/lib/format';
+import { sortedCurrencyCodes } from '@/components/finance/CurrencyFlag';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const CODES = Object.keys(CURRENCY_DECIMALS);
+const CODES = sortedCurrencyCodes();
 
 /**
  * 汇率指标（自选）。
@@ -74,10 +75,6 @@ export default function ExchangeRatesPage() {
   });
 
   const busy = add.isPending || remove.isPending || reset.isPending;
-
-  function pairLabel(from: string, to: string) {
-    return `1 ${from} → ${to}`;
-  }
 
   return (
     <div className="space-y-5">
@@ -150,7 +147,7 @@ export default function ExchangeRatesPage() {
               >
                 {CODES.map((code) => (
                   <option key={code} value={code}>
-                    {code}
+                    {code} · {currencyName(code)}
                   </option>
                 ))}
               </select>
@@ -164,7 +161,7 @@ export default function ExchangeRatesPage() {
               >
                 {CODES.map((code) => (
                   <option key={code} value={code}>
-                    {code}
+                    {code} · {currencyName(code)}
                   </option>
                 ))}
               </select>
@@ -214,7 +211,7 @@ export default function ExchangeRatesPage() {
                           : 'border-[var(--color-border-subtle)] hover:border-[var(--color-accent)]'
                       }`}
                     >
-                      {pairLabel(item.from, item.to)}
+                      <CurrencyPair from={item.from} to={item.to} />
                       {item.required && (
                         <span className="text-[var(--color-accent)]">
                           {t('exchange_rates.page.required_badge')}
@@ -257,7 +254,7 @@ export default function ExchangeRatesPage() {
             {entries.map((entry) => (
               <li key={`${entry.from}->${entry.to}`} className="card space-y-1 p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-mono text-sm">{pairLabel(entry.from, entry.to)}</span>
+                  <CurrencyPair from={entry.from} to={entry.to} className="text-sm" />
                   <button
                     type="button"
                     onClick={() => remove.mutate({ from: entry.from, to: entry.to })}
@@ -294,7 +291,7 @@ export default function ExchangeRatesPage() {
                 {entries.map((entry: WatchlistEntry) => (
                   <tr key={`${entry.from}->${entry.to}`} className="hover:bg-black/5 dark:hover:bg-white/5">
                     <td className="whitespace-nowrap px-3 py-2">
-                      {pairLabel(entry.from, entry.to)}
+                      <CurrencyPair from={entry.from} to={entry.to} />
                       {entry.required && (
                         <span className="ml-2 text-xs text-[var(--color-accent)]">
                           {t('exchange_rates.page.required_badge')}

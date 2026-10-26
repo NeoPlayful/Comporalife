@@ -3,7 +3,7 @@ import { CURRENCY_NAMES } from '@/utils/constants';
 
 export type DateFormatPattern = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY';
 
-function currentLocale(): string {
+export function currentLocale(): string {
   return i18n.resolvedLanguage ?? i18n.language ?? 'zh-CN';
 }
 

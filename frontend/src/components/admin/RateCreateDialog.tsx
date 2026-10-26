@@ -1,11 +1,11 @@
 import Modal from '@/components/ui/Modal';
 import { currencyName } from '@/lib/format';
-import { CURRENCY_DECIMALS } from '@/utils/constants';
+import { sortedCurrencyCodes } from '@/components/finance/CurrencyFlag';
 import { Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const CODES = Object.keys(CURRENCY_DECIMALS);
+const CODES = sortedCurrencyCodes();
 const today = () => new Date().toISOString().slice(0, 10);
 
 export interface RateCreateInput {

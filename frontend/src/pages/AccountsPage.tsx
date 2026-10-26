@@ -6,12 +6,12 @@ import {
 } from '@/lib/accounts';
 import { ACCOUNT_TYPES, useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
+import CurrencySelect from '@/components/finance/CurrencySelect';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
-import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Plus, RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -334,17 +334,10 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
             </Field>
 
             <Field label={t('accounts:dialog.currency')}>
-              <select
+              <CurrencySelect
                 value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value })}
-                className="input"
-              >
-                {Object.keys(CURRENCY_DECIMALS).map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
-              </select>
+                onChange={(currency) => setForm({ ...form, currency })}
+              />
             </Field>
           </div>
 

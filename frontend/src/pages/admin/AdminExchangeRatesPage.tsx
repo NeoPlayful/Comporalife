@@ -4,7 +4,7 @@ import RateEditDrawer from '@/components/admin/RateEditDrawer';
 import RateHistoryDialog from '@/components/admin/RateHistoryDialog';
 import RateStats from '@/components/admin/RateStats';
 import RateSyncBar from '@/components/admin/RateSyncBar';
-import RateSyncDrawer from '@/components/admin/RateSyncDrawer';
+import RateSyncDrawer, { type SyncDrawerSave } from '@/components/admin/RateSyncDrawer';
 import RateTable, { type RateTableMode } from '@/components/admin/RateTable';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
@@ -15,17 +15,17 @@ import {
   adminApi,
   type AdminExchangeRate,
   type AdminLatestExchangeRate,
-  type RateSyncFrequency,
 } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
-import { CURRENCY_DECIMALS } from '@/utils/constants';
+import { currencyName } from '@/lib/format';
+import { sortedCurrencyCodes } from '@/components/finance/CurrencyFlag';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, RefreshCw, Settings2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const CODES = Object.keys(CURRENCY_DECIMALS);
+const CODES = sortedCurrencyCodes();
 const SEARCH_DEBOUNCE_MS = 300;
 
 type RateRow = AdminExchangeRate | AdminLatestExchangeRate;
@@ -128,6 +128,18 @@ export default function AdminExchangeRatesPage() {
     queryKey: ['admin', 'rate-sync-settings'],
     queryFn: () => adminApi.rateSyncSettings(),
   });
+
+  const providerConfigQuery = useQuery({
+    queryKey: ['admin', 'rate-provider-config'],
+    queryFn: () => adminApi.rateProvider(),
+  });
+
+  // 数据源写操作只对超管开放，前端隐藏入口只能算体验，真正的边界在服务端
+  const settingsOverviewQuery = useQuery({
+    queryKey: ['admin', 'settings'],
+    queryFn: () => adminApi.settingsOverview(),
+  });
+  const canEditProvider = settingsOverviewQuery.data?.capabilities.canManageAdmins ?? false;
 
   const rows: RateRow[] = useMemo(
     () =>
@@ -251,11 +263,44 @@ export default function AdminExchangeRatesPage() {
   });
 
   const saveSyncSettings = useMutation({
-    mutationFn: (input: { enabled: boolean; frequency: RateSyncFrequency }) =>
-      adminApi.updateRateSyncSettings(input),
-    onSuccess: (next) => {
-      queryClient.setQueryData(['admin', 'rate-sync-settings'], next);
-      // 频率变更后调度器已按新间隔重排，下次运行时间必须重新取
+    mutationFn: async (input: SyncDrawerSave) => {
+      // 数据源只在真的改过时才写：每次都 PATCH 会把「密钥保持不变」也当成一次改动，
+      // 超管之外的管理员只改频率时会因此被 403 挡住。
+      const sourceChanged =
+        (providerConfigQuery.data?.provider ?? null) !== input.provider ||
+        (providerConfigQuery.data?.anchorCurrency ?? null) !== input.anchorCurrency ||
+        (providerConfigQuery.data?.customUrl ?? '') !== input.customUrl ||
+        (providerConfigQuery.data?.ratesPath || 'rates') !== (input.ratesPath || 'rates') ||
+        (providerConfigQuery.data?.datePath ?? '') !== input.datePath ||
+        input.apiKey !== undefined;
+
+      if (sourceChanged) {
+        await adminApi.updateRateProvider({
+          provider: input.provider,
+          anchorCurrency: input.anchorCurrency,
+          ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+          customUrl: input.customUrl,
+          ratesPath: input.ratesPath,
+          datePath: input.datePath,
+        });
+      }
+
+      const settingsChanged =
+        (syncSettingsQuery.data?.enabled ?? null) !== input.enabled ||
+        (syncSettingsQuery.data?.frequency ?? null) !== input.frequency;
+      if (settingsChanged) {
+        await adminApi.updateRateSyncSettings({
+          enabled: input.enabled,
+          frequency: input.frequency,
+        });
+      }
+
+      return { sourceChanged, settingsChanged };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-sync-settings'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-provider-config'] });
+      // 数据源或频率变更后调度器已重排，下次运行时间与可用性必须重新取
       void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-provider'] });
       setSyncDrawerOpen(false);
       setError(null);
@@ -433,7 +478,7 @@ export default function AdminExchangeRatesPage() {
             <option value="">{t('exchangeRates.filter_base')}</option>
             {CODES.map((code) => (
               <option key={code} value={code}>
-                {code}
+                {code} · {currencyName(code)}
               </option>
             ))}
           </select>
@@ -447,7 +492,7 @@ export default function AdminExchangeRatesPage() {
             <option value="">{t('exchangeRates.filter_quote')}</option>
             {CODES.map((code) => (
               <option key={code} value={code}>
-                {code}
+                {code} · {currencyName(code)}
               </option>
             ))}
           </select>
@@ -656,6 +701,8 @@ export default function AdminExchangeRatesPage() {
         open={syncDrawerOpen}
         settings={syncSettingsQuery.data ?? null}
         provider={provider}
+        config={providerConfigQuery.data ?? null}
+        canEdit={canEditProvider}
         saving={saveSyncSettings.isPending}
         onClose={() => setSyncDrawerOpen(false)}
         onSave={(next) => saveSyncSettings.mutate(next)}

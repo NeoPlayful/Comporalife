@@ -5,6 +5,7 @@ import {
   CURRENCY_NAMES,
   RATE_STALE_DAYS,
   RATE_SYNC_FREQUENCIES,
+  RATE_PROVIDERS,
   SUPPORTED_CURRENCIES,
 } from '../../config/constants.js';
 import { buildPagination, ok, parsePageParams } from '../../lib/api-utils.js';
@@ -12,6 +13,7 @@ import { errors } from '../../lib/errors.js';
 import { rateToString, toDecimal } from '../../lib/money.js';
 import { requireAuth, type AuthContext } from '../../plugins/auth.js';
 import { isRateSyncEnabled, setRateSyncEnabled } from '../market-data/rate-sync.service.js';
+import { getRateProviderView, saveRateProviderConfig } from '../market-data/rate-provider-config.service.js';
 import { getRateSyncFrequency, setRateSyncFrequency } from '../settings/system-settings.service.js';
 
 const currencySchema = z
@@ -70,6 +72,35 @@ function requireAdmin(request: FastifyRequest): AuthContext {
   }
   return auth;
 }
+
+/** 超级管理员守卫：改写数据源会把全站汇率引向外部服务，只留给超管 */
+function requireSuperAdmin(request: FastifyRequest): AuthContext {
+  const auth = requireAdmin(request);
+  if (auth.role !== 'super_admin') {
+    throw errors.forbidden('仅超级管理员可执行该操作');
+  }
+  return auth;
+}
+
+/**
+ * 数据源配置的写入校验。
+ *
+ * 地址必须是 https：密钥会随请求发出，明文 HTTP 等于把密钥交给链路上的每一跳。
+ * 长度上限是防御性的——这些字段来自表单，超长值只会让同步失败并污染日志。
+ */
+const rateProviderSchema = z.object({
+  provider: z.enum(RATE_PROVIDERS),
+  anchorCurrency: currencySchema,
+  apiKey: z.string().trim().max(200).optional(),
+  customUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((value) => value === '' || value.startsWith('https://'), '自定义地址必须是 https 地址')
+    .optional(),
+  ratesPath: z.string().trim().max(120).optional(),
+  datePath: z.string().trim().max(120).optional(),
+});
 
 function dayStart(text: string): Date {
   return new Date(`${text}T00:00:00.000Z`);
@@ -138,7 +169,8 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
    *
    * 上面那个接口是「按日期的流水」，管理员想知道「现在生效的是多少」要翻页找。
    * 这里先按币种对聚合出最大 rateDate，再取对应行；币种对数量受支持币种数平方
-   * 约束（十余个币种，最多一百多对），因此整体载入后筛选分页是安全且简单的做法。
+   * 约束（32 个币种，理论上限约一千对，实际同时存在的远少于此），
+   * 因此整体载入后筛选分页仍然是安全且简单的做法。
    * 统计数字在筛选之前算，反映的是全局覆盖情况，不受当前筛选影响。
    */
   app.get('/admin/exchange-rates/latest', { preHandler: app.authenticate }, async (request) => {
@@ -585,6 +617,50 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
     ]);
 
     return ok({ enabled, frequency, frequencies: RATE_SYNC_FREQUENCIES }, request.id);
+  });
+
+  /**
+   * 数据源与密钥。
+   *
+   * 读：所有管理员都能看到当前数据源与「密钥配没配、末四位」，因为同步失败时
+   * 需要判断方向；但看不到明文与密文。
+   * 写：仅超级管理员。密钥一旦能被普通管理员改掉，就等同于任何人都能把它指向
+   * 自己的服务端，把全站折算结果引到外部。
+   */
+  app.get('/admin/rate-sync/provider', { preHandler: app.authenticate }, async (request) => {
+    requireAdmin(request);
+    return ok(await getRateProviderView(app.prisma), request.id);
+  });
+
+  app.patch('/admin/rate-sync/provider', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireSuperAdmin(request);
+    const body = rateProviderSchema.parse(request.body);
+
+    const before = await getRateProviderView(app.prisma);
+    const view = await saveRateProviderConfig(app.prisma, body, actor.userId);
+
+    // 审计只记数据源与「密钥是被设置、清除还是保持不变」，绝不记密钥本身
+    const keyAction =
+      body.apiKey === undefined ? 'kept' : body.apiKey.trim().length === 0 ? 'cleared' : 'set';
+    await app.prisma.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: 'admin.rate_provider_updated',
+        targetType: 'system_setting',
+        metadata: {
+          provider: view.provider,
+          previousProvider: before.provider,
+          anchorCurrency: view.anchorCurrency,
+          keyAction,
+          customUrlChanged: before.customUrl !== view.customUrl,
+        },
+      },
+    });
+
+    // 数据源换了之后的下一轮必须按新配置跑，不能等旧定时器到期
+    await app.rateSyncScheduler?.reschedule();
+
+    return ok(view, request.id);
   });
 
   app.patch('/admin/rate-sync/settings', { preHandler: app.authenticate }, async (request) => {

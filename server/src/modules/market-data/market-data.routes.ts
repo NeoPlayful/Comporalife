@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { randomUUID } from 'node:crypto';
-import { env } from '../../config/env.js';
 import { ok } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
 import { requireAuth, type AuthContext } from '../../plugins/auth.js';
@@ -13,6 +12,10 @@ import {
   setRateSyncEnabled,
   shouldAutoDisable,
 } from './rate-sync.service.js';
+import {
+  getRateProviderView,
+  isRateProviderAvailable,
+} from './rate-provider-config.service.js';
 import { getRateSyncSchedule } from './rate-sync.scheduler.js';
 import { getRateSyncFrequency } from '../settings/system-settings.service.js';
 import { RATE_STALE_DAYS } from '../../config/constants.js';
@@ -32,9 +35,11 @@ export default async function marketDataRoutes(app: FastifyInstance) {
   app.get('/market-data/providers', { preHandler: app.authenticate }, async (request) => {
     requireAdmin(request);
 
-    const [enabled, frequency, lastRun] = await Promise.all([
+    const [enabled, frequency, providerView, available, lastRun] = await Promise.all([
       isRateSyncEnabled(app.prisma),
       getRateSyncFrequency(app.prisma),
+      getRateProviderView(app.prisma),
+      isRateProviderAvailable(app.prisma),
       app.prisma.rateSyncRun.findFirst({
         orderBy: { startedAt: 'desc' },
         select: {
@@ -58,11 +63,15 @@ export default async function marketDataRoutes(app: FastifyInstance) {
 
     return ok(
       {
-        configured: isRateProviderConfigured(),
-        provider: 'generic-json',
-        anchorCurrency: env.RATE_PROVIDER_ANCHOR,
-        // 只返回布尔：密钥的值永远不出现在任何响应里
-        keyConfigured: Boolean(env.RATE_PROVIDER_KEY),
+        configured: available,
+        provider: providerView.provider,
+        anchorCurrency: providerView.anchorCurrency,
+        // 只返回布尔与末四位：密钥明文与密文永远不出现在任何响应里
+        keyConfigured: providerView.keyConfigured,
+        keyHint: providerView.keyHint,
+        // 数据源来自数据库还是部署环境（回退），用来解释「为什么改了页面却没用」
+        configSource: providerView.source,
+        customUrlConfigured: providerView.customUrl.length > 0,
         enabled,
         frequency,
         // 由调度器给出：环境变量现算的估值与实际定时器无关，会误导管理员
@@ -161,7 +170,7 @@ export default async function marketDataRoutes(app: FastifyInstance) {
   app.post('/market-data/refresh', { preHandler: app.authenticate }, async (request) => {
     const actor = requireAdmin(request);
 
-    if (!isRateProviderConfigured()) {
+    if (!(await isRateProviderConfigured(app.prisma))) {
       throw errors.rateProviderNotConfigured();
     }
 

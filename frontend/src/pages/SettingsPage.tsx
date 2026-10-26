@@ -2,9 +2,9 @@ import type { Preferences } from '@/lib/auth';
 import { api } from '@/lib/client';
 import { formatDateTime } from '@/lib/format';
 import { translateError } from '@/lib/error-message';
+import CurrencySelect from '@/components/finance/CurrencySelect';
 import LoadingState from '@/components/ui/LoadingState';
 import { useUiStore } from '@/stores/ui-store';
-import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -104,17 +104,10 @@ export default function SettingsPage() {
             <span className="mb-1 block text-[var(--color-content-muted)]">
               {t('settings:base_currency')}
             </span>
-            <select
+            <CurrencySelect
               value={form.baseCurrency}
-              onChange={(e) => setForm({ ...form, baseCurrency: e.target.value })}
-              className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]"
-            >
-              {Object.keys(CURRENCY_DECIMALS).map((code) => (
-                <option key={code} value={code} className="bg-[var(--color-surface-raised)]">
-                  {code}
-                </option>
-              ))}
-            </select>
+              onChange={(baseCurrency) => setForm({ ...form, baseCurrency })}
+            />
             <span className="mt-1 block text-xs text-[var(--color-content-muted)]">
               {t('settings:base_currency_hint')}
             </span>

@@ -11,6 +11,10 @@ export const BULK_OPERATION_LIMIT = 500;
 /**
  * 币种精度：用于展示层小数位与舍入。
  * 账务存储统一 DECIMAL(20,6)，此处只影响展示与输入校验。
+ *
+ * 位数取自 CLDR：多数币种 2 位，日元/韩元/越南盾/印尼盾等 0 位，
+ * 科威特第纳尔等海湾币种 3 位。缺条目会退化成 2 位，
+ * 对 0 位与 3 位币种都是错的，因此新增币种必须在这里显式登记。
  */
 export const CURRENCY_DECIMALS: Record<string, number> = {
   CNY: 2,
@@ -25,6 +29,26 @@ export const CURRENCY_DECIMALS: Record<string, number> = {
   KRW: 0,
   CHF: 2,
   TWD: 2,
+  NZD: 2,
+  SEK: 2,
+  NOK: 2,
+  DKK: 2,
+  INR: 2,
+  THB: 2,
+  MYR: 2,
+  PHP: 2,
+  IDR: 0,
+  VND: 0,
+  BRL: 2,
+  MXN: 2,
+  ZAR: 2,
+  TRY: 2,
+  AED: 2,
+  SAR: 2,
+  PLN: 2,
+  CZK: 2,
+  HUF: 0,
+  ILS: 2,
 };
 
 export const SUPPORTED_CURRENCIES = Object.keys(CURRENCY_DECIMALS);
@@ -46,8 +70,35 @@ export const CURRENCY_NAMES: Record<string, { zh: string; en: string }> = {
   KRW: { zh: '韩元', en: 'South Korean Won' },
   CHF: { zh: '瑞士法郎', en: 'Swiss Franc' },
   TWD: { zh: '新台币', en: 'New Taiwan Dollar' },
+  NZD: { zh: '新西兰元', en: 'New Zealand Dollar' },
+  SEK: { zh: '瑞典克朗', en: 'Swedish Krona' },
+  NOK: { zh: '挪威克朗', en: 'Norwegian Krone' },
+  DKK: { zh: '丹麦克朗', en: 'Danish Krone' },
+  INR: { zh: '印度卢比', en: 'Indian Rupee' },
+  THB: { zh: '泰铢', en: 'Thai Baht' },
+  MYR: { zh: '马来西亚林吉特', en: 'Malaysian Ringgit' },
+  PHP: { zh: '菲律宾比索', en: 'Philippine Peso' },
+  IDR: { zh: '印尼盾', en: 'Indonesian Rupiah' },
+  VND: { zh: '越南盾', en: 'Vietnamese Dong' },
+  BRL: { zh: '巴西雷亚尔', en: 'Brazilian Real' },
+  MXN: { zh: '墨西哥比索', en: 'Mexican Peso' },
+  ZAR: { zh: '南非兰特', en: 'South African Rand' },
+  TRY: { zh: '土耳其里拉', en: 'Turkish Lira' },
+  AED: { zh: '阿联酋迪拉姆', en: 'UAE Dirham' },
+  SAR: { zh: '沙特里亚尔', en: 'Saudi Riyal' },
+  PLN: { zh: '波兰兹罗提', en: 'Polish Zloty' },
+  CZK: { zh: '捷克克朗', en: 'Czech Koruna' },
+  HUF: { zh: '匈牙利福林', en: 'Hungarian Forint' },
+  ILS: { zh: '以色列新谢克尔', en: 'Israeli New Shekel' },
 };
 
+/**
+ * 币种符号。
+ *
+ * 多个币种共用同一个符号（$ 同时是美元、加元、澳元、新加坡元、港币、
+ * 新台币、墨西哥比索的符号），因此这里给的是带前缀的消歧写法，
+ * 而不是符号本身。
+ */
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   CNY: '¥',
   USD: '$',
@@ -61,6 +112,26 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   KRW: '₩',
   CHF: 'CHF',
   TWD: 'NT$',
+  NZD: 'NZ$',
+  SEK: 'kr',
+  NOK: 'kr',
+  DKK: 'kr',
+  INR: '₹',
+  THB: '฿',
+  MYR: 'RM',
+  PHP: '₱',
+  IDR: 'Rp',
+  VND: '₫',
+  BRL: 'R$',
+  MXN: 'MX$',
+  ZAR: 'R',
+  TRY: '₺',
+  AED: 'د.إ',
+  SAR: '﷼',
+  PLN: 'zł',
+  CZK: 'Kč',
+  HUF: 'Ft',
+  ILS: '₪',
 };
 
 export const SUPPORTED_LANGUAGES = ['zh-CN', 'en-US'] as const;
@@ -425,6 +496,49 @@ export const SETTING_RATE_SYNC_ENABLED = 'rate_sync_enabled';
 
 /** 汇率同步频率在 system_settings 中的键 */
 export const SETTING_RATE_SYNC_FREQUENCY = 'rate_sync_frequency';
+
+/**
+ * 外部汇率源配置在 system_settings 中的键。
+ *
+ * 与频率不同，这里含密钥：入库前用 FILE_ENCRYPTION_KEY 加密，
+ * 接口只回显末四位。密钥放在库里是为了让管理员不必改环境变量重启服务，
+ * 代价是必须假定数据库读权限者可能看到密文，因此不能明文落库。
+ */
+export const SETTING_RATE_PROVIDER = 'rate_provider';
+
+/** 密文绑定的用途标签：挪到别的字段上会解不开 */
+export const RATE_PROVIDER_KEY_PURPOSE = 'rate-provider';
+
+/**
+ * 可选的数据源预设。
+ *
+ * 三个预设覆盖公开免密钥、需 app_id、自建端点三类场景；各自的
+ * 地址与响应解析固化在代码里，页面上只填密钥与（自定义源）地址，
+ * 不让运维用 URL 模板拼出半个脚本语言。
+ */
+export const RATE_PROVIDERS = ['exchangerate-api', 'openexchangerates', 'custom'] as const;
+
+export type RateProviderId = (typeof RATE_PROVIDERS)[number];
+
+export const DEFAULT_RATE_PROVIDER: RateProviderId = 'exchangerate-api';
+
+/** 预设的显示名，后台下拉与审计共用同一份口径 */
+export const RATE_PROVIDER_LABELS: Record<RateProviderId, string> = {
+  'exchangerate-api': 'ExchangeRate API',
+  openexchangerates: 'Open Exchange Rates',
+  custom: '自定义 API',
+};
+
+/** 哪些预设必须提供密钥：缺了就直接报错，不发出无意义的请求 */
+export const RATE_PROVIDER_REQUIRES_KEY: Record<RateProviderId, boolean> = {
+  'exchangerate-api': false,
+  openexchangerates: true,
+  custom: false,
+};
+
+export function isRateProviderId(value: unknown): value is RateProviderId {
+  return typeof value === 'string' && (RATE_PROVIDERS as readonly string[]).includes(value);
+}
 
 /**
  * 可选的同步频率。
