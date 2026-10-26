@@ -3,9 +3,9 @@
 > **对应项目**：Comporalife（复利人生）Personal 开源个人版
 > **上游计划**：`docs/plan-phase1.md`（S1–S7，v0.1.0）、`docs/plan-phase2.md`（P1–P8，v0.1.1）、`docs/plan-phase3.md`（A1–A7，v0.1.4）、`docs/plan-phase4.md`（B1–B7，v0.1.5）、`docs/plan-phase5.md`（C1–C7，v0.1.6）、`docs/plan-phase6.md`（D1–D7，v0.1.7）、`docs/plan-phase7.md`（E1–E7，v0.1.8）、`docs/plan-phase8.md`（F1–F7，v0.1.11）、`docs/plan-phase9.md`（G1–G6，v0.1.15）
 > **技术栈**：沿用前九阶段：Fastify 5 + TypeScript + Prisma 6 + PostgreSQL 16 + Redis 7 + React 19 + Vite 6 + Tailwind CSS 4 + ECharts 6
-> **文档版本**：v10.5-delivered
-> **交付状态**：已交付（v0.1.16），自选汇率修订随 v0.1.17 发布，后台运维闭环与同步设置抽屉随 v0.1.18 发布
-> **计划交付版本**：v0.1.16 / v0.1.17 / v0.1.18
+> **文档版本**：v10.6-delivered
+> **交付状态**：已交付（v0.1.16），自选汇率修订随 v0.1.17 发布，后台运维闭环与同步设置抽屉随 v0.1.18 发布，后台汇率页重排随 v0.1.19 发布
+> **计划交付版本**：v0.1.16 / v0.1.17 / v0.1.18 / v0.1.19
 
 > **范围决策（v10.3 修订）**：汇率由「每用户各存一份」改为**全局共享的系统参考数据**，由**后台统一维护与存档**；用户端从「维护汇率」改为「只读查看 + 自选列表」，放弃 v10.2 的「提交币种对申请」。在此之上接入外部汇率源自动同步。**不做**股票与 ETF 行情接入、不做实时推送、不做跨币种转账、不放开链式套算、不做历史回填、不允许用户直接写汇率。
 >
@@ -14,6 +14,8 @@
 > **v10.4 变更摘要（后台运维闭环，v0.1.18）**：此前 `GET/PATCH /admin/rate-sync/settings` 与 `POST /market-data/refresh` 三个接口已实现但前端从未调用，导致全新部署时自动同步恒为关闭、且后台无法手动触发。本次补齐前端接线：自动同步开关、立即同步、同步运行状态；后台汇率页拆为「当前汇率」（每币种对一行，取最新一条）与「同步记录」（按日期流水）两个视图；新增覆盖统计卡片与单币种对汇率走势图（7/30/90 天）。共新增两个只读接口 `/admin/exchange-rates/latest` 与 `/admin/exchange-rates/history`，不改数据模型、不改折算内核。
 >
 > **v10.5 变更摘要（同步设置抽屉与频率入库，v0.1.18）**：同步间隔从环境变量 `RATE_SYNC_INTERVAL_MS` 迁到 `SystemSetting.rate_sync_frequency`（`hourly` / `daily` / `weekly`，默认 `daily`），可在后台「同步设置」右侧抽屉内在线调整，改完立即重排、无需重启。调度器由固定 `setInterval` 改为链式自调度并记录 `nextRunAt`，`/market-data/providers` 与 `/market-data/status` 均改为返回该真实值，不再用「当前时间 + 间隔」现算。抽屉只包含启用开关与频率：数据源地址、API Key、自定义 URL 仍只来自环境变量，页面不展示也不允许写入。
+>
+> **v10.6 变更摘要（后台汇率页重排，v0.1.19）**：页面骨架改为「头部动作 → 统计卡 → 一行工具栏 → 表格」，同步状态压缩为头部第二行摘要；新增滞后统计（超过 `RATE_STALE_DAYS` 的币种对数）与阈值字段；当前汇率视图增加滞后列并改为卡片式小屏列表；搜索支持按币种中英文名匹配并加防抖；编辑改为右侧抽屉，`PATCH /admin/exchange-rates/:id` 支持显式 `source`（把一行交还自动同步），`POST /admin/exchange-rates` 返回 `replaced` 标记覆盖写入；新增 `POST /admin/exchange-rates/bulk` 单事务批量录入（任一非法整批回滚，只记一条不含数值的审计）；历史弹窗明细加分页并修正空数据下误显示反向提示；修复手动同步成功后同步设置缓存不失效、抽屉会把开关写回关闭的问题。新增汇率改为居中弹窗。
 
 ---
 

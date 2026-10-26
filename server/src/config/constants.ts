@@ -29,6 +29,25 @@ export const CURRENCY_DECIMALS: Record<string, number> = {
 
 export const SUPPORTED_CURRENCIES = Object.keys(CURRENCY_DECIMALS);
 
+/**
+ * 币种显示名。后台按名称搜索时要能匹配「人民币」「日元」这类说法，
+ * 只靠三字母代码对非技术管理员不可用。展示与搜索共用这一份。
+ */
+export const CURRENCY_NAMES: Record<string, { zh: string; en: string }> = {
+  CNY: { zh: '人民币', en: 'Chinese Yuan' },
+  USD: { zh: '美元', en: 'US Dollar' },
+  EUR: { zh: '欧元', en: 'Euro' },
+  GBP: { zh: '英镑', en: 'British Pound' },
+  JPY: { zh: '日元', en: 'Japanese Yen' },
+  HKD: { zh: '港币', en: 'Hong Kong Dollar' },
+  AUD: { zh: '澳元', en: 'Australian Dollar' },
+  CAD: { zh: '加元', en: 'Canadian Dollar' },
+  SGD: { zh: '新加坡元', en: 'Singapore Dollar' },
+  KRW: { zh: '韩元', en: 'South Korean Won' },
+  CHF: { zh: '瑞士法郎', en: 'Swiss Franc' },
+  TWD: { zh: '新台币', en: 'New Taiwan Dollar' },
+};
+
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   CNY: '¥',
   USD: '$',

@@ -1,7 +1,11 @@
+import RateBulkDrawer, { type BulkDraft } from '@/components/admin/RateBulkDrawer';
+import RateCreateDialog from '@/components/admin/RateCreateDialog';
+import RateEditDrawer from '@/components/admin/RateEditDrawer';
 import RateHistoryDialog from '@/components/admin/RateHistoryDialog';
 import RateStats from '@/components/admin/RateStats';
 import RateSyncBar from '@/components/admin/RateSyncBar';
 import RateSyncDrawer from '@/components/admin/RateSyncDrawer';
+import RateTable, { type RateTableMode } from '@/components/admin/RateTable';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -14,23 +18,34 @@ import {
 } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
-import { formatDate, formatDateTime, formatRate, trimTrailingZeros } from '@/lib/format';
 import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { LineChart, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Plus, RefreshCw, Settings2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const PAGE_SIZE = 20;
 const CODES = Object.keys(CURRENCY_DECIMALS);
+const SEARCH_DEBOUNCE_MS = 300;
 
-type View = 'latest' | 'records';
+type RateRow = AdminExchangeRate | AdminLatestExchangeRate;
+
+/** 筛选条件分成「输入型」与「立即生效型」：搜索框防抖，下拉和日期即刻生效 */
+type Filter = {
+  base: string;
+  quote: string;
+  source: string;
+  from: string;
+  to: string;
+};
 
 /**
  * 后台汇率管理。
  *
  * 汇率是全局系统参考数据，这里的每一次改动都会改变所有用户的折算结果，
  * 因此删除需要二次确认，且操作全部进后台审计。
+ *
+ * 页面骨架：头部三个动作 → 统计卡 → 一行工具栏（视图/搜索/筛选/批量）→ 表格。
+ * 同步状态压在头部第二行而不是单独一张卡：它是一句状态，不是内容。
  *
  * 两个视图：「当前汇率」每个币种对一行，回答「现在生效的是多少」；
  * 「同步记录」保留按日期的流水，用于查某天的明细。
@@ -39,27 +54,34 @@ export default function AdminExchangeRatesPage() {
   const { t } = useTranslation('admin');
   const queryClient = useQueryClient();
 
-  const [view, setView] = useState<View>('latest');
+  const [mode, setMode] = useState<RateTableMode>('latest');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGE_SIZE);
-  const [filter, setFilter] = useState({ base: '', quote: '', source: '', from: '', to: '', q: '' });
+  const [pageSize, setPageSize] = useState(20);
+  const [filter, setFilter] = useState<Filter>({ base: '', quote: '', source: '', from: '', to: '' });
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState({
-    baseCurrency: 'USD',
-    quoteCurrency: 'CNY',
-    rate: '',
-    rateDate: new Date().toISOString().slice(0, 10),
-  });
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingRate, setEditingRate] = useState('');
+  // 弹窗打开时预填的币种对：同步失败项的「补录」会把失败的那一对带进来
+  const [createSeed, setCreateSeed] = useState({ baseCurrency: 'USD', quoteCurrency: 'CNY' });
+
+  const [editingRow, setEditingRow] = useState<RateRow | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [historyPair, setHistoryPair] = useState<{ from: string; to: string } | null>(null);
   const [syncDrawerOpen, setSyncDrawerOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [deleteTargets, setDeleteTargets] = useState<RateRow[] | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // 搜索框每击键都换 queryKey 会让整张表被加载态顶掉，等停顿后再发请求
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
   const latestQuery = useQuery({
-    queryKey: ['admin', 'exchange-rates-latest', page, pageSize, filter],
+    queryKey: ['admin', 'exchange-rates-latest', page, pageSize, filter, search],
     queryFn: () =>
       adminApi.latestExchangeRates({
         page,
@@ -67,12 +89,14 @@ export default function AdminExchangeRatesPage() {
         base: filter.base,
         quote: filter.quote,
         source: filter.source,
-        q: filter.q,
+        q: search,
       }),
-    enabled: view === 'latest',
+    enabled: mode === 'latest',
+    // 换页或改筛选时保留上一份结果，避免表格闪成空白
+    placeholderData: (previous) => previous,
   });
 
-  const listQuery = useQuery({
+  const recordsQuery = useQuery({
     queryKey: ['admin', 'exchange-rates', page, pageSize, filter],
     queryFn: () =>
       adminApi.exchangeRates({
@@ -84,7 +108,14 @@ export default function AdminExchangeRatesPage() {
         from: filter.from,
         to: filter.to,
       }),
-    enabled: view === 'records',
+    enabled: mode === 'records',
+    placeholderData: (previous) => previous,
+  });
+
+  // 统计卡独立取数：切到「同步记录」时当前汇率视图不请求，统计仍要保留
+  const statsQuery = useQuery({
+    queryKey: ['admin', 'exchange-rates-stats'],
+    queryFn: () => adminApi.latestExchangeRates({ page: 1, pageSize: 1 }),
   });
 
   const providerQuery = useQuery({
@@ -97,16 +128,55 @@ export default function AdminExchangeRatesPage() {
     queryFn: () => adminApi.rateSyncSettings(),
   });
 
+  const rows: RateRow[] = useMemo(
+    () =>
+      mode === 'latest'
+        ? (latestQuery.data?.data.exchangeRates ?? [])
+        : (recordsQuery.data?.data.exchangeRates ?? []),
+    [mode, latestQuery.data, recordsQuery.data],
+  );
+
+  const stats = statsQuery.data?.data.stats ?? latestQuery.data?.data.stats ?? null;
+  const pagination =
+    mode === 'latest'
+      ? (latestQuery.data?.pagination ?? null)
+      : (recordsQuery.data?.pagination ?? null);
+  const provider = providerQuery.data ?? null;
+  const staleDays = stats?.staleDays ?? 7;
+  const staleFailures = provider?.lastRun?.failures ?? [];
+
+  const activeLoading = mode === 'latest' ? latestQuery.isLoading : recordsQuery.isLoading;
+  const activeError = mode === 'latest' ? latestQuery.isError : recordsQuery.isError;
+  const activeFetching = mode === 'latest' ? latestQuery.isFetching : recordsQuery.isFetching;
+
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates'] });
     void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates-latest'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates-stats'] });
     void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-provider'] });
+    // 手动同步成功会顺带把开关重新打开，不同步刷新这里，抽屉就会拿着旧值把开关写回关闭
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-sync-settings'] });
     void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rate-history'] });
     // 汇率变化影响所有用户的统计，本地缓存必须一起失效
     void queryClient.invalidateQueries({ queryKey: ['exchange-rates'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     void queryClient.invalidateQueries({ queryKey: ['analytics'] });
     void queryClient.invalidateQueries({ queryKey: ['quality'] });
+  }
+
+  function resetSelection() {
+    setSelected(new Set());
+  }
+
+  function updateFilter(patch: Partial<Filter>) {
+    setFilter((prev) => ({ ...prev, ...patch }));
+    setPage(1);
+  }
+
+  function switchMode(next: RateTableMode) {
+    setMode(next);
+    setPage(1);
+    resetSelection();
   }
 
   const save = useMutation({
@@ -116,40 +186,65 @@ export default function AdminExchangeRatesPage() {
       rate: string;
       rateDate: string;
     }) => adminApi.createExchangeRate(body),
-    onSuccess: () => {
-      setDraft({ ...draft, rate: '' });
-      setEditingId(null);
-      setEditingRate('');
+    onSuccess: (result) => {
+      setCreating(false);
       setError(null);
+      setNotice(
+        result.replaced
+          ? t('exchangeRates.notice.created_replaced')
+          : t('exchangeRates.notice.created'),
+      );
+      invalidate();
+    },
+    onError: (err) => {
       setNotice(null);
+      setError(translateError(err, t));
+    },
+  });
+
+  const update = useMutation({
+    mutationFn: (input: { id: string; rate: string; source: 'manual' | 'provider' }) =>
+      adminApi.updateExchangeRate(input.id, { rate: input.rate, source: input.source }),
+    onSuccess: () => {
+      setEditingRow(null);
+      setError(null);
+      setNotice(t('exchangeRates.notice.updated'));
       invalidate();
     },
     onError: (err) => setError(translateError(err, t)),
   });
 
-  const update = useMutation({
-    mutationFn: (input: { id: string; rate: string }) =>
-      adminApi.updateExchangeRate(input.id, input.rate),
-    onSuccess: () => {
-      setEditingId(null);
-      setEditingRate('');
+  const bulk = useMutation({
+    mutationFn: (body: {
+      rateDate: string;
+      rates: Array<{ baseCurrency: string; quoteCurrency: string; rate: string }>;
+    }) => adminApi.bulkCreateExchangeRates(body),
+    onSuccess: (result) => {
+      setBulkOpen(false);
+      resetSelection();
       setError(null);
-      setNotice(null);
+      setNotice(t('exchangeRates.notice.bulk_saved', { count: result.writtenRows }));
       invalidate();
     },
     onError: (err) => setError(translateError(err, t)),
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => adminApi.deleteExchangeRate(id),
-    onSuccess: () => {
-      setDeleteTarget(null);
+    mutationFn: async (targets: RateRow[]) => {
+      for (const target of targets) {
+        await adminApi.deleteExchangeRate(target.id);
+      }
+      return targets.length;
+    },
+    onSuccess: (count) => {
+      setDeleteTargets(null);
+      resetSelection();
       setError(null);
-      setNotice(null);
+      setNotice(t('exchangeRates.notice.deleted', { count }));
       invalidate();
     },
     onError: (err) => {
-      setDeleteTarget(null);
+      setDeleteTargets(null);
       setError(translateError(err, t));
     },
   });
@@ -194,467 +289,279 @@ export default function AdminExchangeRatesPage() {
     },
   });
 
-  const latestRows: AdminLatestExchangeRate[] =
-    latestQuery.data?.data.exchangeRates ?? [];
-  const recordRows: AdminExchangeRate[] = listQuery.data?.data.exchangeRates ?? [];
-  const stats = latestQuery.data?.data.stats ?? null;
-  const pagination =
-    view === 'latest'
-      ? latestQuery.data?.pagination ?? null
-      : listQuery.data?.pagination ?? null;
-  const provider = providerQuery.data ?? null;
-  const syncFailures = provider?.lastRun?.failures ?? [];
-
-  // 切换视图/筛选后页码可能越界，交给 Pagination 之前先收敛一次
-  const activeLoading = view === 'latest' ? latestQuery.isLoading : listQuery.isLoading;
-  const activeError = view === 'latest' ? latestQuery.isError : listQuery.isError;
-
-  function updateFilter(patch: Partial<typeof filter>) {
-    setFilter((prev) => ({ ...prev, ...patch }));
-    setPage(1);
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
-  const viewTab = (value: View, key: string) => (
-    <button
-      key={value}
-      type="button"
-      onClick={() => {
-        setView(value);
-        setPage(1);
-      }}
-      className={`rounded-lg px-3 py-1.5 text-sm ${
-        view === value
-          ? 'bg-[var(--color-accent)] text-white'
-          : 'border border-[var(--color-border-subtle)] hover:bg-black/5 dark:hover:bg-white/5'
-      }`}
-    >
-      {t(key)}
-    </button>
+  function toggleSelectAll(checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(checked ? [] : prev);
+      if (checked) for (const row of rows) next.add(row.id);
+      else for (const row of rows) next.delete(row.id);
+      return next;
+    });
+  }
+
+  const selectedRows = useMemo(
+    () => rows.filter((row) => selected.has(row.id)),
+    [rows, selected],
   );
+
+  const bulkDrafts: BulkDraft[] = useMemo(
+    () =>
+      selectedRows.map((row) => ({
+        baseCurrency: row.baseCurrency,
+        quoteCurrency: row.quoteCurrency,
+        currentRate: mode === 'latest' ? row.rate : null,
+      })),
+    [selectedRows, mode],
+  );
+
+  const canDelete = deleteTargets !== null;
 
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold">{t('exchangeRates.title')}</h1>
           <p className="mt-1 text-sm text-[var(--color-content-muted)]">
             {t('exchangeRates.subtitle')}
           </p>
+          <div className="mt-2">
+            <RateSyncBar settings={syncSettingsQuery.data ?? null} provider={provider} />
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setCreating((prev) => !prev)}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
-        >
-          <Plus className="size-4" aria-hidden />
-          {t('exchangeRates.new')}
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSyncDrawerOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <Settings2 className="size-4" aria-hidden />
+            {t('exchangeRates.sync.open_settings')}
+          </button>
+          <button
+            type="button"
+            onClick={() => syncNow.mutate()}
+            disabled={!provider?.configured || syncNow.isPending}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`size-4 ${syncNow.isPending ? 'animate-spin' : ''}`}
+              aria-hidden
+            />
+            {syncNow.isPending ? t('exchangeRates.sync.syncing') : t('exchangeRates.sync.sync_now')}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCreateSeed({ baseCurrency: 'USD', quoteCurrency: 'CNY' });
+              setCreating(true);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+          >
+            <Plus className="size-4" aria-hidden />
+            {t('exchangeRates.new')}
+          </button>
+        </div>
       </header>
 
       <RateStats stats={stats} provider={provider} />
 
-      <RateSyncBar
-        settings={syncSettingsQuery.data ?? null}
-        provider={provider}
-        syncing={syncNow.isPending}
-        onOpenSettings={() => setSyncDrawerOpen(true)}
-        onSync={() => syncNow.mutate()}
-      />
-
-      {creating && (
-        <div className="card grid gap-2 p-3 sm:grid-cols-6">
-          <label className="text-xs text-[var(--color-content-muted)]">
-            <span className="mb-1 block">{t('exchangeRates.base_currency')}</span>
-            <select
-              className="input"
-              value={draft.baseCurrency}
-              onChange={(event) => setDraft({ ...draft, baseCurrency: event.target.value })}
-            >
-              {CODES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-[var(--color-content-muted)]">
-            <span className="mb-1 block">{t('exchangeRates.quote_currency')}</span>
-            <select
-              className="input"
-              value={draft.quoteCurrency}
-              onChange={(event) => setDraft({ ...draft, quoteCurrency: event.target.value })}
-            >
-              {CODES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-[var(--color-content-muted)]">
-            <span className="mb-1 block">{t('exchangeRates.rate')}</span>
-            <input
-              className="input font-mono"
-              inputMode="decimal"
-              value={draft.rate}
-              onChange={(event) => setDraft({ ...draft, rate: event.target.value })}
-            />
-          </label>
-          <label className="text-xs text-[var(--color-content-muted)]">
-            <span className="mb-1 block">{t('exchangeRates.rate_date')}</span>
-            <input
-              type="date"
-              className="input"
-              value={draft.rateDate}
-              onChange={(event) => setDraft({ ...draft, rateDate: event.target.value })}
-            />
-          </label>
-          <div className="flex items-end gap-2 sm:col-span-2">
-            <button
-              type="button"
-              disabled={!draft.rate.trim() || save.isPending || draft.baseCurrency === draft.quoteCurrency}
-              onClick={() =>
-                save.mutate({
-                  baseCurrency: draft.baseCurrency,
-                  quoteCurrency: draft.quoteCurrency,
-                  rate: draft.rate.trim(),
-                  rateDate: draft.rateDate,
-                })
-              }
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {t('exchangeRates.save')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreating(false)}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
-            >
-              {t('exchangeRates.cancel')}
-            </button>
-          </div>
-        </div>
-      )}
-
       {notice && (
-        <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
-          {notice}
-        </p>
+        <div className="flex items-start justify-between gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            aria-label={t('exchangeRates.dismiss')}
+            className="shrink-0 opacity-70 hover:opacity-100"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
       )}
       {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {viewTab('latest', 'exchangeRates.tab.latest')}
-        {viewTab('records', 'exchangeRates.tab.records')}
-      </div>
+      {/* 工具栏：视图切换 + 搜索筛选 + 刷新，批量条选中后才出现 */}
+      <section className="card space-y-3 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-[var(--color-border-subtle)] p-0.5">
+            {(['latest', 'records'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => switchMode(value)}
+                aria-pressed={mode === value}
+                className={`rounded-md px-3 py-1.5 text-sm ${
+                  mode === value
+                    ? 'bg-[var(--color-accent)] text-white'
+                    : 'hover:bg-black/5 dark:hover:bg-white/5'
+                }`}
+              >
+                {t(`exchangeRates.tab.${value}`)}
+              </button>
+            ))}
+          </div>
 
-      {/* 筛选 */}
-      <div className="card grid gap-2 p-3 sm:grid-cols-5">
-        <select
-          className="input"
-          value={filter.base}
-          onChange={(event) => updateFilter({ base: event.target.value })}
-          aria-label={t('exchangeRates.filter_base')}
-        >
-          <option value="">{t('exchangeRates.filter_base')}</option>
-          {CODES.map((code) => (
-            <option key={code} value={code}>
-              {code}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={filter.quote}
-          onChange={(event) => updateFilter({ quote: event.target.value })}
-          aria-label={t('exchangeRates.filter_quote')}
-        >
-          <option value="">{t('exchangeRates.filter_quote')}</option>
-          {CODES.map((code) => (
-            <option key={code} value={code}>
-              {code}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={filter.source}
-          onChange={(event) => updateFilter({ source: event.target.value })}
-          aria-label={t('exchangeRates.filter_source')}
-        >
-          <option value="">{t('exchangeRates.filter_source')}</option>
-          <option value="manual">{t('exchangeRates.source_manual')}</option>
-          <option value="provider">{t('exchangeRates.source_provider')}</option>
-        </select>
-        {view === 'latest' ? (
-          <input
-            className="input sm:col-span-2"
-            value={filter.q}
-            placeholder={t('exchangeRates.search_placeholder')}
-            onChange={(event) => updateFilter({ q: event.target.value })}
-            aria-label={t('exchangeRates.search_placeholder')}
-          />
-        ) : (
-          <>
+          {mode === 'latest' && (
             <input
-              type="date"
-              className="input"
-              value={filter.from}
-              onChange={(event) => updateFilter({ from: event.target.value })}
-              aria-label={t('exchangeRates.filter_from')}
+              className="input sm:max-w-xs"
+              value={searchInput}
+              placeholder={t('exchangeRates.search_placeholder')}
+              onChange={(event) => {
+                setSearchInput(event.target.value);
+                setPage(1);
+              }}
+              aria-label={t('exchangeRates.search_placeholder')}
             />
-            <input
-              type="date"
-              className="input"
-              value={filter.to}
-              onChange={(event) => updateFilter({ to: event.target.value })}
-              aria-label={t('exchangeRates.filter_to')}
-            />
-          </>
+          )}
+
+          <select
+            className="input sm:w-auto"
+            value={filter.base}
+            onChange={(event) => updateFilter({ base: event.target.value })}
+            aria-label={t('exchangeRates.filter_base')}
+          >
+            <option value="">{t('exchangeRates.filter_base')}</option>
+            {CODES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="input sm:w-auto"
+            value={filter.quote}
+            onChange={(event) => updateFilter({ quote: event.target.value })}
+            aria-label={t('exchangeRates.filter_quote')}
+          >
+            <option value="">{t('exchangeRates.filter_quote')}</option>
+            {CODES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="input sm:w-auto"
+            value={filter.source}
+            onChange={(event) => updateFilter({ source: event.target.value })}
+            aria-label={t('exchangeRates.filter_source')}
+          >
+            <option value="">{t('exchangeRates.filter_source')}</option>
+            <option value="manual">{t('exchangeRates.source_manual')}</option>
+            <option value="provider">{t('exchangeRates.source_provider')}</option>
+          </select>
+
+          {mode === 'records' && (
+            <>
+              <input
+                type="date"
+                className="input sm:w-auto"
+                value={filter.from}
+                onChange={(event) => updateFilter({ from: event.target.value })}
+                aria-label={t('exchangeRates.filter_from')}
+              />
+              <input
+                type="date"
+                className="input sm:w-auto"
+                value={filter.to}
+                onChange={(event) => updateFilter({ to: event.target.value })}
+                aria-label={t('exchangeRates.filter_to')}
+              />
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() =>
+              void (mode === 'latest' ? latestQuery.refetch() : recordsQuery.refetch())
+            }
+            aria-label={t('exchangeRates.refresh')}
+            className="ml-auto flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <RefreshCw className={`size-4 ${activeFetching ? 'animate-spin' : ''}`} aria-hidden />
+            <span className="hidden sm:inline">{t('exchangeRates.refresh')}</span>
+          </button>
+        </div>
+
+        {selectedRows.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/5 px-3 py-2">
+            <span className="text-sm font-medium">
+              {t('exchangeRates.bulk.selected', { count: selectedRows.length })}
+            </span>
+            <button
+              type="button"
+              onClick={() => setBulkOpen(true)}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white"
+            >
+              {t('exchangeRates.bulk.open')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteTargets(selectedRows)}
+              className="rounded-lg border border-[var(--color-negative)]/40 px-3 py-1.5 text-xs text-[var(--color-negative)]"
+            >
+              {t('exchangeRates.bulk.delete')}
+            </button>
+            <button
+              type="button"
+              onClick={resetSelection}
+              className="ml-auto text-xs text-[var(--color-content-muted)] hover:text-[var(--color-content)]"
+            >
+              {t('exchangeRates.bulk.clear')}
+            </button>
+          </div>
         )}
-      </div>
+      </section>
 
       {activeLoading && <LoadingState />}
       {activeError && (
         <ErrorState
-          onRetry={() =>
-            void (view === 'latest' ? latestQuery.refetch() : listQuery.refetch())
+          onRetry={() => void (mode === 'latest' ? latestQuery.refetch() : recordsQuery.refetch())}
+        />
+      )}
+
+      {!activeLoading && !activeError && rows.length === 0 && (
+        <EmptyState
+          title={t('exchangeRates.empty_title')}
+          description={t('exchangeRates.empty_description')}
+          action={
+            <button
+              type="button"
+              onClick={() => {
+                setCreateSeed({ baseCurrency: 'USD', quoteCurrency: 'CNY' });
+                setCreating(true);
+              }}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            >
+              {t('exchangeRates.new')}
+            </button>
           }
         />
       )}
 
-      {/* 当前汇率：每个币种对一行 */}
-      {view === 'latest' && latestQuery.data && latestRows.length === 0 && (
-        <EmptyState
-          title={t('exchangeRates.empty_title')}
-          description={t('exchangeRates.empty_description')}
+      {rows.length > 0 && (
+        <RateTable
+          mode={mode}
+          rows={rows}
+          staleDays={staleDays}
+          selected={selected}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAll={toggleSelectAll}
+          onEdit={setEditingRow}
+          onViewHistory={(row) => setHistoryPair({ from: row.baseCurrency, to: row.quoteCurrency })}
+          onDelete={(row) => setDeleteTargets([row])}
         />
-      )}
-
-      {view === 'latest' && latestRows.length > 0 && (
-        <div className="card overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="border-b border-[var(--color-border-subtle)] text-left text-xs text-[var(--color-content-muted)]">
-              <tr>
-                <th className="px-3 py-2">{t('exchangeRates.pair')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.rate')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.rate_date')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.source')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.updated_at')}</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-subtle)]">
-              {latestRows.map((row) => {
-                const editing = editingId === row.id;
-                return (
-                  <tr key={row.id} className="hover:bg-black/5 dark:hover:bg-white/5">
-                    <td className="whitespace-nowrap px-3 py-2">
-                      1 {row.baseCurrency} → {row.quoteCurrency}
-                    </td>
-                    <td className="px-3 py-2">
-                      {editing ? (
-                        <input
-                          autoFocus
-                          className="input w-36 py-1 font-mono"
-                          inputMode="decimal"
-                          value={editingRate}
-                          onChange={(event) => setEditingRate(event.target.value)}
-                          aria-label={t('exchangeRates.rate')}
-                        />
-                      ) : (
-                        <span className="font-mono tabular-nums">{formatRate(row.rate)}</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-[var(--color-content-muted)]">
-                      {formatDate(row.rateDate)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs">
-                      {row.source === 'provider'
-                        ? t('exchangeRates.source_provider')
-                        : t('exchangeRates.source_manual')}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs text-[var(--color-content-muted)]">
-                      {formatDateTime(row.updatedAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-xs">
-                      {editing ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={!editingRate.trim() || update.isPending}
-                            onClick={() => update.mutate({ id: row.id, rate: editingRate.trim() })}
-                            className="text-[var(--color-accent)] disabled:opacity-50"
-                          >
-                            {t('exchangeRates.save')}
-                          </button>
-                          <button
-                            type="button"
-                            className="ml-2"
-                            onClick={() => {
-                              setEditingId(null);
-                              setEditingRate('');
-                            }}
-                          >
-                            {t('exchangeRates.cancel')}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="hover:text-[var(--color-accent)]"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setEditingRate(trimTrailingZeros(row.rate));
-                            }}
-                          >
-                            {t('exchangeRates.edit')}
-                          </button>
-                          <button
-                            type="button"
-                            className="ml-2 hover:text-[var(--color-accent)]"
-                            aria-label={t('exchangeRates.history.open')}
-                            onClick={() =>
-                              setHistoryPair({ from: row.baseCurrency, to: row.quoteCurrency })
-                            }
-                          >
-                            <LineChart className="inline size-3.5" aria-hidden />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={t('exchangeRates.delete')}
-                            className="ml-2 text-[var(--color-negative)]"
-                            onClick={() =>
-                              setDeleteTarget({
-                                id: row.id,
-                                label: `${row.baseCurrency}→${row.quoteCurrency} (${row.rateDate})`,
-                              })
-                            }
-                          >
-                            <Trash2 className="inline size-3.5" aria-hidden />
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* 同步记录：按日期的流水 */}
-      {view === 'records' && listQuery.data && recordRows.length === 0 && (
-        <EmptyState
-          title={t('exchangeRates.empty_title')}
-          description={t('exchangeRates.empty_description')}
-        />
-      )}
-
-      {view === 'records' && recordRows.length > 0 && (
-        <div className="card overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="border-b border-[var(--color-border-subtle)] text-left text-xs text-[var(--color-content-muted)]">
-              <tr>
-                <th className="px-3 py-2">{t('exchangeRates.pair')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.rate')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.rate_date')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.source')}</th>
-                <th className="px-3 py-2">{t('exchangeRates.updated_at')}</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border-subtle)]">
-              {recordRows.map((row) => {
-                const editing = editingId === row.id;
-                return (
-                  <tr key={row.id} className="hover:bg-black/5 dark:hover:bg-white/5">
-                    <td className="whitespace-nowrap px-3 py-2">
-                      1 {row.baseCurrency} → {row.quoteCurrency}
-                    </td>
-                    <td className="px-3 py-2">
-                      {editing ? (
-                        <input
-                          autoFocus
-                          className="input w-36 py-1 font-mono"
-                          inputMode="decimal"
-                          value={editingRate}
-                          onChange={(event) => setEditingRate(event.target.value)}
-                          aria-label={t('exchangeRates.rate')}
-                        />
-                      ) : (
-                        <span className="font-mono tabular-nums">{formatRate(row.rate)}</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-[var(--color-content-muted)]">
-                      {formatDate(row.rateDate)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs">
-                      {row.source === 'provider'
-                        ? t('exchangeRates.source_provider')
-                        : t('exchangeRates.source_manual')}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-xs text-[var(--color-content-muted)]">
-                      {formatDateTime(row.updatedAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-xs">
-                      {editing ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={!editingRate.trim() || update.isPending}
-                            onClick={() => update.mutate({ id: row.id, rate: editingRate.trim() })}
-                            className="text-[var(--color-accent)] disabled:opacity-50"
-                          >
-                            {t('exchangeRates.save')}
-                          </button>
-                          <button
-                            type="button"
-                            className="ml-2"
-                            onClick={() => {
-                              setEditingId(null);
-                              setEditingRate('');
-                            }}
-                          >
-                            {t('exchangeRates.cancel')}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="hover:text-[var(--color-accent)]"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setEditingRate(trimTrailingZeros(row.rate));
-                            }}
-                          >
-                            {t('exchangeRates.edit')}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={t('exchangeRates.delete')}
-                            className="ml-2 text-[var(--color-negative)]"
-                            onClick={() =>
-                              setDeleteTarget({
-                                id: row.id,
-                                label: `${row.baseCurrency}→${row.quoteCurrency} (${row.rateDate})`,
-                              })
-                            }
-                          >
-                            <Trash2 className="inline size-3.5" aria-hidden />
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
       )}
 
       {pagination && pagination.total > 0 && (
@@ -672,46 +579,41 @@ export default function AdminExchangeRatesPage() {
         />
       )}
 
-      <section className="card space-y-3 p-3">
-        <div>
-          <h2 className="text-sm font-medium">
-            {t('exchangeRates.sync_title')}
-            {syncFailures.length > 0 && (
-              <span className="ml-2 rounded-full bg-[var(--color-negative)] px-2 py-0.5 text-xs text-white">
-                {syncFailures.length}
-              </span>
-            )}
-          </h2>
-          <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-            {t('exchangeRates.sync_hint')}
-          </p>
+      {/* 同步失败项：给管理员一条直接补录的路径，而不是只报错 */}
+      <section className="card space-y-2 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-sm font-medium">{t('exchangeRates.sync_title')}</h2>
+          {staleFailures.length > 0 && (
+            <span className="rounded-full bg-[var(--color-negative)] px-2 py-0.5 text-xs text-white">
+              {staleFailures.length}
+            </span>
+          )}
         </div>
+        <p className="text-xs text-[var(--color-content-muted)]">{t('exchangeRates.sync_hint')}</p>
 
-        {providerQuery.isLoading && <LoadingState />}
-
-        {provider && syncFailures.length === 0 && (
+        {provider && staleFailures.length === 0 && (
           <p className="text-sm text-[var(--color-content-muted)]">{t('exchangeRates.sync_empty')}</p>
         )}
 
-        {syncFailures.length > 0 && (
+        {staleFailures.length > 0 && (
           <ul className="divide-y divide-[var(--color-border-subtle)]">
-            {syncFailures.map((failure) => {
+            {staleFailures.map((failure) => {
               const [from, to] = failure.pair.split('->');
               return (
                 <li key={failure.pair} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                  <span className="font-mono">1 {from} → {to}</span>
+                  <span className="font-mono">
+                    1 {from} → {to}
+                  </span>
                   <span className="text-xs text-[var(--color-content-muted)]">{failure.code}</span>
                   <span className="min-w-0 flex-1" />
                   <button
                     type="button"
                     onClick={() => {
-                      setCreating(true);
-                      setDraft({
+                      setCreateSeed({
                         baseCurrency: from ?? 'USD',
                         quoteCurrency: to ?? 'CNY',
-                        rate: '',
-                        rateDate: new Date().toISOString().slice(0, 10),
                       });
+                      setCreating(true);
                     }}
                     className="rounded border border-[var(--color-border-subtle)] px-2 py-1 text-xs hover:bg-black/5 dark:hover:bg-white/5"
                   >
@@ -724,7 +626,30 @@ export default function AdminExchangeRatesPage() {
         )}
       </section>
 
+      <RateCreateDialog
+        open={creating}
+        seed={createSeed}
+        saving={save.isPending}
+        onClose={() => setCreating(false)}
+        onSubmit={(input) => save.mutate(input)}
+      />
+
       <RateHistoryDialog pair={historyPair} onClose={() => setHistoryPair(null)} />
+
+      <RateEditDrawer
+        row={editingRow}
+        saving={update.isPending}
+        onClose={() => setEditingRow(null)}
+        onSave={(input) => update.mutate(input)}
+      />
+
+      <RateBulkDrawer
+        open={bulkOpen}
+        drafts={bulkDrafts}
+        saving={bulk.isPending}
+        onClose={() => setBulkOpen(false)}
+        onSubmit={(input) => bulk.mutate(input)}
+      />
 
       <RateSyncDrawer
         open={syncDrawerOpen}
@@ -735,20 +660,31 @@ export default function AdminExchangeRatesPage() {
         onSave={(next) => saveSyncSettings.mutate(next)}
       />
 
-      {deleteTarget && (
+      {canDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="card w-full max-w-sm space-y-4 p-4">
             <div>
-              <p className="text-sm font-semibold">{t('exchangeRates.delete')}</p>
+              <p className="text-sm font-semibold">
+                {deleteTargets.length > 1
+                  ? t('exchangeRates.bulk.delete_title', { count: deleteTargets.length })
+                  : t('exchangeRates.delete')}
+              </p>
               <p className="mt-1 text-sm text-[var(--color-content-muted)]">
                 {t('exchangeRates.delete_confirm')}
               </p>
-              <p className="mt-2 font-mono text-xs">{deleteTarget.label}</p>
+              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto font-mono text-xs">
+                {deleteTargets.slice(0, 10).map((target) => (
+                  <li key={target.id}>
+                    1 {target.baseCurrency} → {target.quoteCurrency} ({target.rateDate.slice(0, 10)})
+                  </li>
+                ))}
+                {deleteTargets.length > 10 && <li>… +{deleteTargets.length - 10}</li>}
+              </ul>
             </div>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => setDeleteTargets(null)}
                 className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm"
               >
                 {t('exchangeRates.cancel')}
@@ -756,7 +692,7 @@ export default function AdminExchangeRatesPage() {
               <button
                 type="button"
                 disabled={remove.isPending}
-                onClick={() => remove.mutate(deleteTarget.id)}
+                onClick={() => remove.mutate(deleteTargets)}
                 className="rounded-lg bg-[var(--color-negative)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
               >
                 {t('exchangeRates.delete')}

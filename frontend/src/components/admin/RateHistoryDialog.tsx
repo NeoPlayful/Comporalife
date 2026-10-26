@@ -7,11 +7,12 @@ import { formatRate } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import ReactECharts from 'echarts-for-react';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const RANGES = [7, 30, 90] as const;
 type Range = (typeof RANGES)[number];
+const DETAIL_PAGE_SIZE = 10;
 
 /**
  * 单个币种对的汇率走势。
@@ -29,6 +30,7 @@ export default function RateHistoryDialog({
 }) {
   const { t } = useTranslation('admin');
   const [range, setRange] = useState<Range>(90);
+  const [detailPage, setDetailPage] = useState(1);
 
   const query = useQuery({
     queryKey: ['admin', 'exchange-rate-history', pair?.from, pair?.to, range],
@@ -36,10 +38,34 @@ export default function RateHistoryDialog({
     enabled: pair !== null,
   });
 
+  // 换区间后回到第一页，否则可能停在已经不存在的页码上
+  useEffect(() => {
+    setDetailPage(1);
+  }, [pair?.from, pair?.to, range]);
+
+  useEffect(() => {
+    if (!pair) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [pair, onClose]);
+
   if (!pair) return null;
 
   const points: AdminRateHistoryPoint[] = query.data?.points ?? [];
-  const inverted = query.data?.inverted ?? false;
+  // 空数据时不提示「图为反向倒数」：没有图可看，提示只会让人以为加载坏了
+  const inverted = (query.data?.inverted ?? false) && points.length > 0;
+
+  // 明细新的在上面：看走势时最关心最近几次改动
+  const ordered = [...points].reverse();
+  const detailTotalPages = Math.max(1, Math.ceil(ordered.length / DETAIL_PAGE_SIZE));
+  const safeDetailPage = Math.min(detailPage, detailTotalPages);
+  const detailRows = ordered.slice(
+    (safeDetailPage - 1) * DETAIL_PAGE_SIZE,
+    safeDetailPage * DETAIL_PAGE_SIZE,
+  );
 
   const option = {
     grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
@@ -159,8 +185,7 @@ export default function RateHistoryDialog({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border-subtle)]">
-                  {/* 新的在上面：看走势时最关心最近几次改动 */}
-                  {[...points].reverse().map((point) => (
+                  {detailRows.map((point) => (
                     <tr key={point.rateDate}>
                       <td className="px-2 py-1.5 font-mono text-xs text-[var(--color-content-muted)]">
                         {point.rateDate}
@@ -177,6 +202,33 @@ export default function RateHistoryDialog({
                   ))}
                 </tbody>
               </table>
+
+              {ordered.length > DETAIL_PAGE_SIZE && (
+                <div className="flex items-center justify-between border-t border-[var(--color-border-subtle)] px-2 py-2 text-xs text-[var(--color-content-muted)]">
+                  <span>{t('exchangeRates.history.detail_total', { total: ordered.length })}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setDetailPage(safeDetailPage - 1)}
+                      disabled={safeDetailPage <= 1}
+                      className="rounded-md px-2 py-1 hover:bg-black/5 disabled:opacity-40 dark:hover:bg-white/5"
+                    >
+                      {t('exchangeRates.history.prev')}
+                    </button>
+                    <span>
+                      {safeDetailPage} / {detailTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDetailPage(safeDetailPage + 1)}
+                      disabled={safeDetailPage >= detailTotalPages}
+                      className="rounded-md px-2 py-1 hover:bg-black/5 disabled:opacity-40 dark:hover:bg-white/5"
+                    >
+                      {t('exchangeRates.history.next')}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

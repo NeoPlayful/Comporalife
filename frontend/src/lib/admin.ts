@@ -49,6 +49,9 @@ export interface AdminExchangeRateStats {
   manual: number;
   provider: number;
   baseCurrencies: number;
+  /** 超过 staleDays 天没有更新的币种对数：覆盖数要配上它才有意义 */
+  stale: number;
+  staleDays: number;
 }
 
 export interface AdminRateHistoryPoint {
@@ -253,7 +256,21 @@ export const adminApi = {
     quoteCurrency: string;
     rate: string;
     rateDate: string;
-  }) => api.post<{ exchangeRate: AdminExchangeRate }>('/api/admin/exchange-rates', body),
+  }) =>
+    api.post<{ exchangeRate: AdminExchangeRate; replaced: boolean }>(
+      '/api/admin/exchange-rates',
+      body,
+    ),
+  /** 批量录入同一生效日期的多组汇率：单事务写入，任一失败整批回滚 */
+  bulkCreateExchangeRates: (body: {
+    rateDate: string;
+    rates: Array<{ baseCurrency: string; quoteCurrency: string; rate: string }>;
+  }) =>
+    api.post<{
+      exchangeRates: AdminExchangeRate[];
+      writtenRows: number;
+      rateDate: string;
+    }>('/api/admin/exchange-rates/bulk', body),
   /** 当前汇率：每个币种对最新一条，附带全局覆盖统计 */
   latestExchangeRates: (filters: {
     page?: number;
@@ -301,8 +318,9 @@ export const adminApi = {
       startedAt: string;
       finishedAt: string;
     }>('/api/market-data/refresh'),
-  updateExchangeRate: (id: string, rate: string) =>
-    api.patch<{ exchangeRate: AdminExchangeRate }>(`/api/admin/exchange-rates/${id}`, { rate }),
+  /** source 省略时按既有规则转人工；显式给 provider 表示把这一行交还自动同步 */
+  updateExchangeRate: (id: string, input: { rate: string; source?: 'manual' | 'provider' }) =>
+    api.patch<{ exchangeRate: AdminExchangeRate }>(`/api/admin/exchange-rates/${id}`, input),
   deleteExchangeRate: (id: string) => api.delete<{ deleted: boolean }>(`/api/admin/exchange-rates/${id}`),
   rateProviderStatus: () => api.get<RateProviderStatus>('/api/market-data/providers'),
 };
