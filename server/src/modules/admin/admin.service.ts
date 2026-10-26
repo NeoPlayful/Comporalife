@@ -30,17 +30,14 @@ export interface AdminUserListItem {
   coolingOffElapsed: boolean;
 }
 
-/** 邮箱与昵称默认脱敏：管理后台的常见操作不需要看到完整值 */
+/** 审计里的操作者只给脱敏邮箱：定位到人即可，不需要明文 */
 export function maskEmail(email: string): string {
   const [name, domain] = email.split('@');
   if (!name || !domain) return '***';
   return `${name.slice(0, 1)}***@${domain}`;
 }
 
-export function maskNickname(nickname: string): string {
-  return nickname.length <= 1 ? '*' : `${nickname.slice(0, 1)}***`;
-}
-
+/** 登录 IP 只保留网段：排障不需要精确到主机 */
 export function maskIp(ip: string | null): string | null {
   if (!ip) return null;
   if (ip.includes('.')) {
@@ -54,30 +51,28 @@ export function maskIp(ip: string | null): string | null {
   return null;
 }
 
-export function toAdminUser(
-  user: {
-    id: string;
-    email: string;
-    nickname: string;
-    role: UserRole;
-    status: string;
-    emailVerifiedAt: Date | null;
-    lastLoginAt: Date | null;
-    lastLoginIp: string | null;
-    createdAt: Date;
-    deletionRequestedAt: Date | null;
-    deletedAt: Date | null;
-  },
-  options: { reveal?: boolean } = {},
-): AdminUserListItem {
+export function toAdminUser(user: {
+  id: string;
+  email: string;
+  nickname: string;
+  role: UserRole;
+  status: string;
+  emailVerifiedAt: Date | null;
+  lastLoginAt: Date | null;
+  lastLoginIp: string | null;
+  createdAt: Date;
+  deletionRequestedAt: Date | null;
+  deletedAt: Date | null;
+}): AdminUserListItem {
   const coolingOffEndsAt = user.deletionRequestedAt
     ? user.deletionRequestedAt.getTime() + DELETION_COOLING_OFF_DAYS * DAY_MS
     : null;
 
   return {
     id: user.id,
-    email: options.reveal ? user.email : maskEmail(user.email),
-    nickname: options.reveal ? user.nickname : maskNickname(user.nickname),
+    // 后台默认展示完整账号：管理员要凭邮箱确认操作对象，脱敏只会放大误操作风险
+    email: user.email,
+    nickname: user.nickname,
     role: user.role,
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
@@ -90,15 +85,39 @@ export function toAdminUser(
   };
 }
 
+export type AdminDeletionFilter = 'pending' | 'ready' | 'deleted';
+
+/**
+ * 注销筛选转成 where 条件。
+ *
+ * 「冷却已满」按申请时间早于截止点计算，与 toAdminUser 的 coolingOffElapsed 保持同一口径，
+ * 否则筛出来的行点进去会显示另一种状态。已注销的账号仍保留申请时间，
+ * 所以 pending / ready 都要排除 deletedAt 非空的行。
+ */
+function deletionWhere(filter: AdminDeletionFilter): Prisma.UserWhereInput {
+  const cutoff = new Date(Date.now() - DELETION_COOLING_OFF_DAYS * DAY_MS);
+
+  if (filter === 'deleted') return { deletedAt: { not: null } };
+
+  const base: Prisma.UserWhereInput = {
+    deletionRequestedAt: { not: null },
+    deletedAt: null,
+  };
+
+  return filter === 'ready'
+    ? { ...base, deletionRequestedAt: { lte: cutoff } }
+    : { ...base, deletionRequestedAt: { gt: cutoff } };
+}
+
 export async function listUsers(
   prisma: PrismaClient,
   params: {
     search?: string;
     role?: UserRole;
     status?: string;
+    deletion?: AdminDeletionFilter;
     page: number;
     pageSize: number;
-    reveal?: boolean;
   },
 ): Promise<{ items: AdminUserListItem[]; total: number }> {
   const where: Prisma.UserWhereInput = {
@@ -108,10 +127,16 @@ export async function listUsers(
       ? {
           OR: [
             { email: { contains: params.search, mode: 'insensitive' } },
-            { id: params.search },
+            { nickname: { contains: params.search, mode: 'insensitive' } },
+            // id 是 uuid 列：把任意字符串直接比较会触发数据库类型错误，
+            // 只有形似 UUID 的搜索词才追加这一条
+            ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.search)
+              ? [{ id: params.search }]
+              : []),
           ],
         }
       : {}),
+    ...(params.deletion ? { ...deletionWhere(params.deletion) } : {}),
   };
 
   const [total, rows] = await Promise.all([
@@ -137,18 +162,14 @@ export async function listUsers(
     }),
   ]);
 
-  return { items: rows.map((row) => toAdminUser(row, { reveal: params.reveal })), total };
+  return { items: rows.map((row) => toAdminUser(row)), total };
 }
 
 /**
  * 账号详情：白名单字段。
  * 任何「顺手加一个余额」的改动都会破坏产品红线，因此这里显式列出每个字段。
  */
-export async function getUserDetail(
-  prisma: PrismaClient,
-  userId: string,
-  options: { reveal?: boolean } = {},
-) {
+export async function getUserDetail(prisma: PrismaClient, userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -173,7 +194,7 @@ export async function getUserDetail(
   });
 
   return {
-    ...toAdminUser(user, options),
+    ...toAdminUser(user),
     sessionCount,
   };
 }

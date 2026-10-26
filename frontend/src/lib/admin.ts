@@ -2,6 +2,9 @@ import { api } from './client';
 
 export type AdminRole = 'super_admin' | 'admin' | 'user';
 
+/** 注销生命周期不在账号状态枚举里，单独作为一个筛选维度 */
+export type AdminDeletionFilter = 'pending' | 'ready' | 'deleted';
+
 export interface AdminUser {
   id: string;
   email: string;
@@ -132,6 +135,8 @@ export interface SystemMetrics {
 export interface AdminSettingsOverview {
   registrationEnabled: boolean;
   emailVerificationEnabled: boolean;
+  /** 后台代建账号：管理员直接设定初始密码，默认关闭，仅超管可切换 */
+  adminUserCreateEnabled: boolean;
   mailConfigured: boolean;
   deletionCoolingOffDays: number;
   auditLogRetentionDays: number;
@@ -162,32 +167,48 @@ export const adminApi = {
     ),
   jobOverview: () => api.get<JobOverview>('/api/admin/dashboard/jobs'),
 
-  users: (params: { page?: number; pageSize?: number; search?: string; role?: AdminRole; status?: string; reveal?: boolean } = {}) => {
+  users: (params: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    role?: AdminRole;
+    status?: string;
+    deletion?: AdminDeletionFilter;
+  } = {}) => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.pageSize) query.set('pageSize', String(params.pageSize));
     if (params.search) query.set('search', params.search);
     if (params.role) query.set('role', params.role);
     if (params.status) query.set('status', params.status);
-    if (params.reveal) query.set('reveal', 'true');
+    if (params.deletion) query.set('deletion', params.deletion);
     return api.getPaged<{ users: AdminUser[] }>(`/api/admin/users?${query}`);
   },
+  /** 后台代建账号：不签发会话，管理员建号后仍保持自己的登录态 */
+  createUser: (body: {
+    email: string;
+    nickname: string;
+    password: string;
+    role?: AdminRole;
+    language?: string;
+  }) => api.post<{ user: AdminUser }>('/api/admin/users', body),
   /** 授予管理员前的候选账号检索（按邮箱或 ID） */
   searchUsers: (query: string) =>
     api.get<{ users: Array<{ id: string; email: string; nickname: string; role: AdminRole; status: string }> }>(
       `/api/admin/users/search?query=${encodeURIComponent(query)}`,
     ),
-  user: (id: string, reveal = false) =>
-    api.get<{ user: AdminUser }>(`/api/admin/users/${id}${reveal ? '?reveal=true' : ''}`),
+  user: (id: string) => api.get<{ user: AdminUser }>(`/api/admin/users/${id}`),
   disableUser: (id: string) => api.post<{ id: string; status: string }>(`/api/admin/users/${id}/disable`, {}),
   enableUser: (id: string) => api.post<{ id: string; status: string }>(`/api/admin/users/${id}/enable`, {}),
   revokeSessions: (id: string) => api.post<{ id: string; revoked: number }>(`/api/admin/users/${id}/revoke-sessions`, {}),
   loginLogs: (id: string, page = 1) =>
-    api.get<{ logs: Array<{ id: string; action: string; ip: string | null; createdAt: string }> }>(
+    api.getPaged<{ logs: Array<{ id: string; action: string; ip: string | null; createdAt: string }> }>(
       `/api/admin/users/${id}/login-logs?page=${page}`,
     ),
-  userAuditLogs: (id: string) =>
-    api.get<{ logs: Array<{ id: string; action: string; createdAt: string }> }>(`/api/admin/users/${id}/audit-logs`),
+  userAuditLogs: (id: string, page = 1) =>
+    api.getPaged<{ logs: Array<{ id: string; action: string; createdAt: string }> }>(
+      `/api/admin/users/${id}/audit-logs?page=${page}`,
+    ),
   reviewDeletion: (id: string, decision: 'approve' | 'reject', note?: string) =>
     api.post<{ id: string; decision: string; status: string; disposition?: string }>(
       `/api/admin/users/${id}/deletion-review`,
@@ -233,6 +254,9 @@ export const adminApi = {
   emailVerification: () => api.get<{ enabled: boolean }>('/api/admin/settings/email-verification'),
   setEmailVerification: (enabled: boolean) =>
     api.patch<{ enabled: boolean }>('/api/admin/settings/email-verification', { enabled }),
+  adminUserCreation: () => api.get<{ enabled: boolean }>('/api/admin/settings/user-creation'),
+  setAdminUserCreation: (enabled: boolean) =>
+    api.patch<{ enabled: boolean }>('/api/admin/settings/user-creation', { enabled }),
 
   exchangeRates: (filters: {
     page?: number;

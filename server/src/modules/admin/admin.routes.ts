@@ -11,8 +11,10 @@ import { AuthService } from '../auth/auth.service.js';
 import { createNotification } from '../notifications/notification.service.js';
 import { requireAuth, type AuthContext } from '../../plugins/auth.js';
 import {
+  isAdminUserCreateEnabled,
   isEmailVerificationEnabled,
   isRegistrationEnabled,
+  setAdminUserCreateEnabled,
   setEmailVerificationEnabled,
   setRegistrationEnabled,
 } from '../settings/system-settings.service.js';
@@ -24,11 +26,11 @@ import {
   adminLoginLogSchema,
   adminRegistrationSchema,
   deletionReviewSchema,
-  adminUserDetailSchema,
+  adminUserCreateSchema,
+  adminUserCreateToggleSchema,
   adminUserIdSchema,
   adminUserListSchema,
   adminUserSearchSchema,
-  normalizeReveal,
 } from './admin.schema.js';
 import {
   assertRoleChangeAllowed,
@@ -107,9 +109,9 @@ export default async function adminRoutes(app: FastifyInstance) {
       ...(query.search ? { search: query.search } : {}),
       ...(query.role ? { role: query.role } : {}),
       ...(query.status ? { status: query.status } : {}),
+      ...(query.deletion ? { deletion: query.deletion } : {}),
       page: page.page,
       pageSize: page.pageSize,
-      reveal: normalizeReveal(query.reveal),
     });
 
     return ok({ users: result.items }, request.id, {
@@ -150,28 +152,49 @@ export default async function adminRoutes(app: FastifyInstance) {
     return ok({ users: rows }, request.id);
   });
 
-  app.get('/admin/users/:id', { preHandler: app.authenticate }, async (request) => {
+  /**
+   * 后台代建账号。
+   *
+   * 与前台注册完全隔离：注册开关关闭时这里仍可用，但本接口受独立开关控制；
+   * 且不签发会话、不写 refresh cookie——管理员建号后自己不能被切换成新账号。
+   * 角色高于 user 属于提权，与 grant 接口同口径，仅超管可用。
+   */
+  app.post('/admin/users', { preHandler: app.authenticate }, async (request, reply) => {
     const actor = requireAdmin(request);
-    const { id } = adminUserIdSchema.parse(request.params);
-    const query = adminUserDetailSchema.parse(request.query);
-    const reveal = normalizeReveal(query.reveal);
 
-    const user = await getUserDetail(app.prisma, id, { reveal });
-
-    // 查看完整账号属于隐私操作：必须留痕，否则谁看过明文无从追溯
-    if (reveal) {
-      await app.prisma.auditLog.create({
-        data: {
-          userId: actor.userId,
-          action: 'admin.user_revealed',
-          targetType: 'user',
-          targetId: id,
-          ip: request.ip,
-        },
-      });
+    if (!(await isAdminUserCreateEnabled(app.prisma))) {
+      throw errors.forbidden('后台代建账号已关闭');
     }
 
-    return ok({ user }, request.id);
+    const body = adminUserCreateSchema.parse(request.body);
+    if (body.role !== 'user') {
+      requireSuperAdmin(request);
+    }
+
+    const service = new AuthService(app.prisma, app.redis);
+    const { user } = await service.register(
+      {
+        email: body.email,
+        password: body.password,
+        nickname: body.nickname,
+        ...(body.language ? { language: body.language } : {}),
+      },
+      {
+        role: body.role,
+        emailVerified: true,
+        audit: { action: 'admin.user_created', actorId: actor.userId },
+      },
+    );
+
+    const detail = await getUserDetail(app.prisma, user.id);
+    return reply.status(201).send(ok({ user: detail }, request.id));
+  });
+
+  app.get('/admin/users/:id', { preHandler: app.authenticate }, async (request) => {
+    requireAdmin(request);
+    const { id } = adminUserIdSchema.parse(request.params);
+
+    return ok({ user: await getUserDetail(app.prisma, id) }, request.id);
   });
 
   app.post('/admin/users/:id/disable', { preHandler: app.authenticate }, async (request) => {
@@ -699,9 +722,10 @@ export default async function adminRoutes(app: FastifyInstance) {
    */
   app.get('/admin/settings', { preHandler: app.authenticate }, async (request) => {
     const actor = requireAdmin(request);
-    const [registration, emailVerification, permissions] = await Promise.all([
+    const [registration, emailVerification, adminUserCreate, permissions] = await Promise.all([
       isRegistrationEnabled(app.prisma),
       isEmailVerificationEnabled(app.prisma),
+      isAdminUserCreateEnabled(app.prisma),
       Promise.resolve(
         actor.role === 'super_admin'
           ? ['dashboard:read', 'users:read', 'users:write', 'admins:read', 'admins:write', 'system:read', 'settings:write']
@@ -713,6 +737,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       {
         registrationEnabled: registration,
         emailVerificationEnabled: emailVerification,
+        adminUserCreateEnabled: adminUserCreate,
         // 只报「有没有配」这个事实，绝不回显主机名、账号或密码
         mailConfigured: isMailConfigured(),
         deletionCoolingOffDays: DELETION_COOLING_OFF_DAYS,
@@ -766,6 +791,31 @@ export default async function adminRoutes(app: FastifyInstance) {
       data: {
         userId: actor.userId,
         action: 'admin.email_verification_toggled',
+        targetType: 'system_setting',
+        metadata: { enabled: body.enabled },
+      },
+    });
+
+    return ok({ enabled: body.enabled }, request.id);
+  });
+
+  // ===== 后台代建账号开关 =====
+  // 后端也做一次超管限制：前端隐藏入口不算权限控制
+  app.get('/admin/settings/user-creation', { preHandler: app.authenticate }, async (request) => {
+    requireSuperAdmin(request);
+    return ok({ enabled: await isAdminUserCreateEnabled(app.prisma) }, request.id);
+  });
+
+  app.patch('/admin/settings/user-creation', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireSuperAdmin(request);
+    const body = adminUserCreateToggleSchema.parse(request.body);
+
+    await setAdminUserCreateEnabled(app.prisma, body.enabled, actor.userId);
+
+    await app.prisma.auditLog.create({
+      data: {
+        userId: actor.userId,
+        action: 'admin.user_creation_toggled',
         targetType: 'system_setting',
         metadata: { enabled: body.enabled },
       },

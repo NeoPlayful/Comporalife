@@ -1,215 +1,112 @@
+import UserCreateDialog, { type UserCreateInput } from '@/components/admin/UserCreateDialog';
+import UserDetailDrawer, { type UserAction } from '@/components/admin/UserDetailDrawer';
+import UserStats from '@/components/admin/UserStats';
+import UserTable from '@/components/admin/UserTable';
+import { deletionFilterOf } from '@/components/admin/UserBadges';
+import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
-import { adminApi, type AdminRole, type AdminUser } from '@/lib/admin';
+import { adminApi, type AdminDeletionFilter, type AdminRole, type AdminUser } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
-import { formatDateTime } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Plus, RefreshCw, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 
-const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
+const DEFAULT_PAGE_SIZE = 20;
 
-type UserAction =
-  | 'disable'
-  | 'enable'
-  | 'revoke'
-  | 'deletion'
-  | 'reject-deletion'
-  | 'reset-mail';
-
-/** 详情面板：账号操作与两类记录集中在这里，列表行只负责定位 */
-function UserDetail({
-  user,
-  onAction,
-  pending,
-}: {
-  user: AdminUser;
-  onAction: (action: UserAction) => void;
-  pending: boolean;
-}) {
-  const { t } = useTranslation('admin');
-  const [tab, setTab] = useState<'logins' | 'audit'>('logins');
-
-  const loginLogs = useQuery({
-    queryKey: ['admin', 'login-logs', user.id],
-    queryFn: () => adminApi.loginLogs(user.id),
-  });
-
-  const auditLogs = useQuery({
-    queryKey: ['admin', 'user-audit-logs', user.id],
-    queryFn: () => adminApi.userAuditLogs(user.id),
-  });
-
-  const deleted = Boolean(user.deletedAt);
-
-  return (
-    <div className="mt-3 space-y-3 border-t border-[var(--color-border-subtle)] pt-3">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {deleted ? (
-          <span className="rounded-lg bg-red-500/10 px-2 py-1 text-xs text-red-600 dark:text-red-400">
-            {t('users.deleted_badge')}
-          </span>
-        ) : user.status === 'active' ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              if (window.confirm(t('users.disable_confirm'))) onAction('disable');
-            }}
-            className="rounded-lg border border-red-500/40 px-2 py-1 text-xs text-red-600 disabled:opacity-50 dark:text-red-400"
-          >
-            {t('users.disable')}
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onAction('enable')}
-            className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs disabled:opacity-50"
-          >
-            {t('users.enable')}
-          </button>
-        )}
-
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            if (window.confirm(t('users.revoke_confirm'))) onAction('revoke');
-          }}
-          className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs disabled:opacity-50"
-        >
-          {t('users.revoke_sessions')}
-        </button>
-
-        {!deleted && (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              if (window.confirm(t('users.reset_mail_confirm', { email: user.email }))) onAction('reset-mail');
-            }}
-            className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs disabled:opacity-50"
-          >
-            {t('users.reset_mail')}
-          </button>
-        )}
-
-        {user.deletionRequestedAt && !deleted && (
-          <>
-            <button
-              type="button"
-              disabled={pending || !user.coolingOffElapsed}
-              title={user.coolingOffElapsed ? undefined : t('users.cooling_off_pending')}
-              onClick={() => {
-                if (window.confirm(t('users.approve_deletion_confirm', { email: user.email }))) onAction('deletion');
-              }}
-              className="rounded-lg border border-red-500/40 px-2 py-1 text-xs text-red-600 disabled:opacity-40 dark:text-red-400"
-            >
-              {t('users.approve_deletion')}
-            </button>
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => {
-                if (window.confirm(t('users.reject_deletion_confirm', { email: user.email }))) {
-                  onAction('reject-deletion');
-                }
-              }}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs disabled:opacity-50"
-            >
-              {t('users.reject_deletion')}
-            </button>
-          </>
-        )}
-      </div>
-
-      {user.deletionRequestedAt && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          {deleted
-            ? t('users.deletion_done', { time: formatDateTime(user.deletedAt) })
-            : user.coolingOffElapsed
-              ? t('users.deletion_ready')
-              : t('users.deletion_cooling', { time: formatDateTime(user.deletionRequestedAt) })}
-        </p>
-      )}
-
-      <div>
-        <div className="flex gap-1 text-xs">
-          <button
-            type="button"
-            onClick={() => setTab('logins')}
-            className={`rounded-lg px-2 py-1 ${tab === 'logins' ? 'bg-black/5 dark:bg-white/10' : 'text-[var(--color-content-muted)]'}`}
-          >
-            {t('users.login_logs')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('audit')}
-            className={`rounded-lg px-2 py-1 ${tab === 'audit' ? 'bg-black/5 dark:bg-white/10' : 'text-[var(--color-content-muted)]'}`}
-          >
-            {t('users.audit_logs')}
-          </button>
-        </div>
-
-        <ul className="mt-2 space-y-1 rounded-lg bg-black/5 p-2 text-xs dark:bg-white/5">
-          {tab === 'logins' && (
-            <>
-              {loginLogs.isLoading && <li className="text-[var(--color-content-muted)]">{t('common:actions.loading')}</li>}
-              {loginLogs.isError && <li className="text-[var(--color-negative)]">{t('users.load_failed')}</li>}
-              {loginLogs.data?.logs.length === 0 && <li>{t('users.empty')}</li>}
-              {loginLogs.data?.logs.map((log) => (
-                <li key={log.id}>
-                  {t(`auditActions.${log.action}`, { defaultValue: log.action })} · {formatDateTime(log.createdAt)} ·{' '}
-                  {log.ip ?? '—'}
-                </li>
-              ))}
-            </>
-          )}
-
-          {tab === 'audit' && (
-            <>
-              {auditLogs.isLoading && <li className="text-[var(--color-content-muted)]">{t('common:actions.loading')}</li>}
-              {auditLogs.isError && <li className="text-[var(--color-negative)]">{t('users.load_failed')}</li>}
-              {auditLogs.data?.logs.length === 0 && <li>{t('users.empty')}</li>}
-              {auditLogs.data?.logs.map((log) => (
-                <li key={log.id}>
-                  {t(`auditActions.${log.action}`, { defaultValue: log.action })} · {formatDateTime(log.createdAt)}
-                </li>
-              ))}
-            </>
-          )}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
+/**
+ * 后台用户管理。
+ *
+ * 列表回答「有哪些账号、哪些需要我动手」：角色、状态、注销生命期都用徽章直接呈现，
+ * 不再要求展开才能看出有待审批的注销申请。
+ *
+ * 筛选与页码写进 URL：管理员常在同一批条件下反复进出详情，
+ * 刷新或后退就丢筛选是很实际的损耗。
+ */
 export default function AdminUsersPage() {
   const { t } = useTranslation('admin');
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState<AdminRole | ''>('');
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
-  const [reveal, setReveal] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+
+  const search = params.get('search') ?? '';
+  const role = (params.get('role') ?? '') as AdminRole | '';
+  const status = params.get('status') ?? '';
+  const deletion = (params.get('deletion') ?? '') as AdminDeletionFilter | '';
+  const page = Math.max(1, Number(params.get('page') ?? 1) || 1);
+  const pageSize = Number(params.get('pageSize') ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE;
+
+  const [searchInput, setSearchInput] = useState(search);
+  const [openUserId, setOpenUserId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [confirm, setConfirm] = useState<{ action: UserAction; user: AdminUser } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const users = useQuery({
-    queryKey: ['admin', 'users', search, role, status, page, reveal],
+  function patchParams(patch: Record<string, string | null>, resetPage = true) {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null || value === '') next.delete(key);
+      else next.set(key, value);
+    }
+    // 条件一变就回第一页，否则会停在一个空页上
+    if (resetPage) next.delete('page');
+    setParams(next, { replace: true });
+  }
+
+  // 搜索框每击键都换 queryKey 会让整张表闪成加载态，等停顿后再落到 URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== search) patchParams({ search: searchInput || null });
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // patchParams 每次渲染都是新函数，这里只跟随输入值
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  const usersQuery = useQuery({
+    queryKey: ['admin', 'users', search, role, status, deletion, page, pageSize],
     queryFn: () =>
       adminApi.users({
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         ...(search ? { search } : {}),
         ...(role ? { role } : {}),
         ...(status ? { status } : {}),
-        reveal,
+        ...(deletion ? { deletion } : {}),
       }),
+    // 换页或改筛选时保留上一份结果，避免表格闪成空白
+    placeholderData: (previous) => previous,
   });
+
+  const statsQuery = useQuery({
+    queryKey: ['admin', 'dashboard-overview'],
+    queryFn: () => adminApi.overview(),
+  });
+
+  const settingsQuery = useQuery({
+    queryKey: ['admin', 'settings'],
+    queryFn: () => adminApi.settingsOverview(),
+  });
+
+  const openUser = usersQuery.data?.data.users.find((item) => item.id === openUserId) ?? null;
+
+  const detailQuery = useQuery({
+    queryKey: ['admin', 'user', openUserId],
+    queryFn: () => adminApi.user(openUserId!),
+    enabled: Boolean(openUserId),
+    placeholderData: (previous) => previous,
+  });
+
+  const list = usersQuery.data?.data.users ?? [];
+  const pagination = usersQuery.data?.pagination ?? null;
+  const canManageAdmins = settingsQuery.data?.capabilities.canManageAdmins ?? false;
+  const createEnabled = settingsQuery.data?.adminUserCreateEnabled ?? false;
 
   const act = useMutation<unknown, Error, { id: string; action: UserAction }>({
     mutationFn: (input) => {
@@ -222,124 +119,314 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       setError(null);
+      setConfirm(null);
+      void queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+    onError: (err) => {
+      setConfirm(null);
+      setError(err instanceof ApiError ? translateError(err, t) : String(err));
+    },
+  });
+
+  const create = useMutation({
+    mutationFn: (input: UserCreateInput) =>
+      adminApi.createUser({
+        email: input.email,
+        nickname: input.nickname,
+        password: input.password,
+        role: input.role,
+        language: input.language,
+      }),
+    onSuccess: (result) => {
+      setCreating(false);
+      setError(null);
+      setNotice(t('users.create_success', { email: result.user.email }));
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
     onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
-  const list = users.data?.data.users ?? [];
-  const pagination = users.data?.pagination ?? null;
+  const activeFilters = useMemo(() => {
+    const chips: { key: string; label: string; onClear: () => void }[] = [];
+    if (search) chips.push({ key: 'search', label: search, onClear: () => setSearchInput('') });
+    if (role) {
+      chips.push({
+        key: 'role',
+        label: t(`roles.${role}`),
+        onClear: () => patchParams({ role: null }),
+      });
+    }
+    if (status) {
+      chips.push({
+        key: 'status',
+        label: t(`statuses.${status}`, { defaultValue: status }),
+        onClear: () => patchParams({ status: null }),
+      });
+    }
+    if (deletion) {
+      chips.push({
+        key: 'deletion',
+        label: t(`users.deletion_${deletion}`),
+        onClear: () => patchParams({ deletion: null }),
+      });
+    }
+    return chips;
+    // patchParams 依赖当前 params，随渲染重建即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, role, status, deletion, t]);
+
+  /** 需要二次确认的动作；启用是纯恢复操作，直接执行 */
+  function requestAction(action: UserAction, user: AdminUser) {
+    if (action === 'enable') {
+      act.mutate({ id: user.id, action });
+      return;
+    }
+    setConfirm({ action, user });
+  }
+
+  const confirmCopy = confirm
+    ? {
+        disable: { title: t('users.disable'), body: t('users.disable_confirm'), danger: true },
+        revoke: { title: t('users.revoke_sessions'), body: t('users.revoke_confirm'), danger: false },
+        'reset-mail': {
+          title: t('users.reset_mail'),
+          body: t('users.reset_mail_confirm', { email: confirm.user.email }),
+          danger: false,
+        },
+        deletion: {
+          title: t('users.approve_deletion'),
+          body: t('users.approve_deletion_confirm', { email: confirm.user.email }),
+          danger: true,
+        },
+        'reject-deletion': {
+          title: t('users.reject_deletion'),
+          body: t('users.reject_deletion_confirm', { email: confirm.user.email }),
+          danger: false,
+        },
+      }[confirm.action as Exclude<UserAction, 'enable'>]
+    : null;
+
+  const hasFilters = Boolean(search || role || status || deletion);
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-semibold">{t('users.title')}</h1>
-        <p className="mt-1 text-sm text-[var(--color-content-muted)]">{t('subtitle')}</p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold">{t('users.title')}</h1>
+          <p className="mt-1 text-sm text-[var(--color-content-muted)]">{t('subtitle')}</p>
+          <p className="mt-1 text-xs text-[var(--color-content-muted)]">
+            {t('users.notice_no_financial')}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void usersQuery.refetch()}
+            aria-label={t('users.refresh')}
+            className="flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <RefreshCw className={`size-4 ${usersQuery.isFetching ? 'animate-spin' : ''}`} aria-hidden />
+            <span className="hidden sm:inline">{t('users.refresh')}</span>
+          </button>
+          <button
+            type="button"
+            disabled={!createEnabled}
+            title={createEnabled ? t('users.new_hint') : t('users.create_disabled')}
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="size-4" aria-hidden />
+            {t('users.new')}
+          </button>
+        </div>
       </header>
 
-      <p className="rounded-lg bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
-        {t('users.notice_no_financial')}
-      </p>
+      <UserStats overview={statsQuery.data ?? null} />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          className="input w-full max-w-xs"
-          placeholder={t('users.search')}
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className="input"
-          value={role}
-          onChange={(event) => {
-            setRole(event.target.value as AdminRole | '');
-            setPage(1);
-          }}
-        >
-          <option value="">{t('users.all_roles')}</option>
-          <option value="super_admin">{t('roles.super_admin')}</option>
-          <option value="admin">{t('roles.admin')}</option>
-          <option value="user">{t('roles.user')}</option>
-        </select>
-        <select
-          className="input"
-          value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">{t('users.all_statuses')}</option>
-          <option value="active">{t('statuses.active')}</option>
-          <option value="disabled">{t('statuses.disabled')}</option>
-        </select>
-        <label className="flex items-center gap-1.5 text-xs">
-          <input type="checkbox" checked={reveal} onChange={(event) => setReveal(event.target.checked)} />
-          {t('users.reveal')}
-        </label>
-      </div>
-
+      {notice && (
+        <div className="flex items-start justify-between gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+          <span>{notice}</span>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            aria-label={t('common:actions.close')}
+            className="shrink-0 opacity-70 hover:opacity-100"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        </div>
+      )}
       {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
-      {users.isLoading && <LoadingState />}
-      {users.isError && <ErrorState onRetry={() => void users.refetch()} />}
+      {/* 工具栏：搜索与三组筛选，隐私开关单独靠右 */}
+      <section className="card space-y-3 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className="input sm:max-w-xs"
+            placeholder={t('users.search_placeholder')}
+            aria-label={t('users.search_placeholder')}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+          />
 
-      {users.data && list.length === 0 && (
-        <p className="text-sm text-[var(--color-content-muted)]">{t('users.empty')}</p>
+          <select
+            className="input sm:w-auto"
+            aria-label={t('users.col_role')}
+            value={role}
+            onChange={(event) => patchParams({ role: event.target.value || null })}
+          >
+            <option value="">{t('users.all_roles')}</option>
+            <option value="user">{t('roles.user')}</option>
+            <option value="admin">{t('roles.admin')}</option>
+            <option value="super_admin">{t('roles.super_admin')}</option>
+          </select>
+
+          <select
+            className="input sm:w-auto"
+            aria-label={t('users.col_status')}
+            value={status}
+            onChange={(event) => patchParams({ status: event.target.value || null })}
+          >
+            <option value="">{t('users.all_statuses')}</option>
+            <option value="active">{t('statuses.active')}</option>
+            <option value="disabled">{t('statuses.disabled')}</option>
+            <option value="pending_verification">{t('statuses.pending_verification')}</option>
+          </select>
+
+          <select
+            className="input sm:w-auto"
+            aria-label={t('users.filter_deletion')}
+            value={deletion}
+            onChange={(event) => patchParams({ deletion: event.target.value || null })}
+          >
+            <option value="">{t('users.all_deletions')}</option>
+            <option value="pending">{t('users.deletion_pending')}</option>
+            <option value="ready">{t('users.deletion_ready')}</option>
+            <option value="deleted">{t('users.deletion_deleted')}</option>
+          </select>
+        </div>
+
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-[var(--color-content-muted)]">{t('users.active_filters')}</span>
+            {activeFilters.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.onClear}
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border-subtle)] px-2 py-0.5 text-xs hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                {chip.label}
+                <X className="size-3" aria-hidden />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setSearchInput('');
+                setParams(new URLSearchParams(), { replace: true });
+              }}
+              className="text-xs text-[var(--color-content-muted)] underline-offset-2 hover:underline"
+            >
+              {t('users.clear_filters')}
+            </button>
+          </div>
+        )}
+      </section>
+
+      {usersQuery.isLoading && <LoadingState />}
+      {usersQuery.isError && <ErrorState onRetry={() => void usersQuery.refetch()} />}
+
+      {usersQuery.data && list.length === 0 && (
+        <EmptyState
+          title={t('users.empty_title')}
+          description={hasFilters ? t('users.empty_description') : t('users.empty')}
+          action={
+            !hasFilters && createEnabled ? (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+              >
+                {t('users.new')}
+              </button>
+            ) : undefined
+          }
+        />
       )}
 
-      {list.length > 0 && (
-        <ul className="space-y-2">
-          {list.map((user) => (
-            <li key={user.id} className="card p-3 text-sm">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {user.email} · {t(`roles.${user.role}`)} · {t(`statuses.${user.status}`)}
-                  </p>
-                  <p className="text-xs text-[var(--color-content-muted)]">
-                    {t('users.joined', { time: formatDateTime(user.createdAt) })} ·{' '}
-                    {user.lastLoginAt
-                      ? t('users.last_login', { time: formatDateTime(user.lastLoginAt) })
-                      : t('users.never_logged_in')}
-                    {user.lastLoginIp && ` · ${user.lastLoginIp}`}
-                  </p>
-                </div>
+      {list.length > 0 && <UserTable users={list} onOpen={(user) => setOpenUserId(user.id)} />}
 
-                <button
-                  type="button"
-                  onClick={() => setExpanded(expanded === user.id ? null : user.id)}
-                  className="rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs"
-                >
-                  {expanded === user.id ? t('users.collapse') : t('users.expand')}
-                </button>
-              </div>
-
-              {expanded === user.id && (
-                <UserDetail
-                  user={user}
-                  pending={act.isPending}
-                  onAction={(action) => act.mutate({ id: user.id, action })}
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {pagination && (
+      {pagination && pagination.total > 0 && (
         <Pagination
           page={pagination.page}
           pageSize={pagination.pageSize}
           total={pagination.total}
           totalPages={pagination.totalPages}
-          onPageChange={setPage}
+          onPageChange={(next) => patchParams({ page: String(next) }, false)}
+          onPageSizeChange={(size) => patchParams({ pageSize: String(size), page: null }, false)}
           totalLabel="pagination.total_accounts"
         />
       )}
+
+      <UserDetailDrawer
+        user={openUser}
+        detail={detailQuery.data?.user ?? null}
+        pending={detailQuery.isFetching && !detailQuery.data}
+        actionPending={act.isPending}
+        onClose={() => setOpenUserId(null)}
+        onAction={requestAction}
+      />
+
+      <UserCreateDialog
+        open={creating}
+        canAssignRole={canManageAdmins}
+        saving={create.isPending}
+        onClose={() => setCreating(false)}
+        onSubmit={(input) => create.mutate(input)}
+      />
+
+      <Modal
+        open={confirm !== null}
+        size="sm"
+        title={confirmCopy?.title ?? ''}
+        description={confirmCopy?.body}
+        busy={act.isPending}
+        onClose={() => setConfirm(null)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setConfirm(null)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('common:actions.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={act.isPending}
+              onClick={() => confirm && act.mutate({ id: confirm.user.id, action: confirm.action })}
+              className={`rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+                confirmCopy?.danger ? 'bg-[var(--color-negative)]' : 'bg-[var(--color-accent)]'
+              }`}
+            >
+              {confirmCopy?.title ?? t('common:actions.confirm')}
+            </button>
+          </>
+        }
+      >
+        {confirm && (
+          <p className="text-sm text-[var(--color-content-muted)]">
+            {confirm.user.nickname} · {confirm.user.email}
+            {deletionFilterOf(confirm.user) === 'ready' && (
+              <span className="ml-1 text-amber-600 dark:text-amber-400">
+                {t('users.detail_cooling_done')}
+              </span>
+            )}
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

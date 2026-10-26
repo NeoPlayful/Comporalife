@@ -2,6 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import {
   DEFAULT_RATE_SYNC_FREQUENCY,
   isRateSyncFrequency,
+  SETTING_ADMIN_USER_CREATE_ENABLED,
   SETTING_EMAIL_VERIFICATION_ENABLED,
   SETTING_RATE_SYNC_FREQUENCY,
   SETTING_REGISTRATION_ENABLED,
@@ -57,6 +58,34 @@ export async function setEmailVerificationEnabled(
   await prisma.systemSetting.upsert({
     where: { key: SETTING_EMAIL_VERIFICATION_ENABLED },
     create: { key: SETTING_EMAIL_VERIFICATION_ENABLED, value: enabled, updatedBy },
+    update: { value: enabled, updatedBy },
+  });
+}
+
+/**
+ * 后台代建账号。
+ *
+ * 与注册开关相反，这里默认关闭：管理员手握用户初始密码是额外风险面，
+ * 自部署场景下多数实例用不上，开启必须是明确操作而不是默认行为。
+ */
+export async function isAdminUserCreateEnabled(prisma: PrismaClient): Promise<boolean> {
+  const row = await prisma.systemSetting.findUnique({
+    where: { key: SETTING_ADMIN_USER_CREATE_ENABLED },
+    select: { value: true },
+  });
+
+  if (!row) return false;
+  return row.value === true || row.value === 'true';
+}
+
+export async function setAdminUserCreateEnabled(
+  prisma: PrismaClient,
+  enabled: boolean,
+  updatedBy: string,
+): Promise<void> {
+  await prisma.systemSetting.upsert({
+    where: { key: SETTING_ADMIN_USER_CREATE_ENABLED },
+    create: { key: SETTING_ADMIN_USER_CREATE_ENABLED, value: enabled, updatedBy },
     update: { value: enabled, updatedBy },
   });
 }

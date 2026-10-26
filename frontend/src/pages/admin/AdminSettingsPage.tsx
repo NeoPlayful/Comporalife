@@ -23,11 +23,14 @@ export default function AdminSettingsPage() {
 
   const overview = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => adminApi.settingsOverview() });
 
+  type SettingField = 'registration' | 'emailVerification' | 'adminUserCreate';
+
   const save = useMutation({
-    mutationFn: (input: { registration?: boolean; emailVerification?: boolean }) =>
-      input.registration !== undefined
-        ? adminApi.setRegistration(input.registration)
-        : adminApi.setEmailVerification(Boolean(input.emailVerification)),
+    mutationFn: (input: { field: SettingField; next: boolean }) => {
+      if (input.field === 'registration') return adminApi.setRegistration(input.next);
+      if (input.field === 'emailVerification') return adminApi.setEmailVerification(input.next);
+      return adminApi.setAdminUserCreation(input.next);
+    },
     onSuccess: () => {
       setError(null);
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
@@ -35,17 +38,15 @@ export default function AdminSettingsPage() {
     onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
-  // 两个开关共用一次 mutation，只有正在提交的那一行才显示忙碌
-  const savingKey = save.isPending
-    ? save.variables?.registration !== undefined
-      ? 'registration'
-      : 'emailVerification'
-    : null;
+  // 多个开关共用一次 mutation，只有正在提交的那一行才显示忙碌
+  const savingKey: SettingField | null = save.isPending ? (save.variables?.field ?? null) : null;
 
   if (overview.isLoading) return <LoadingState />;
 
   const data = overview.data;
   const canWrite = data?.capabilities.canWriteSettings ?? false;
+  // 代建开关的写权限是超管专属，比「能改设置」更窄
+  const canManageAdmins = data?.capabilities.canManageAdmins ?? false;
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -75,7 +76,7 @@ export default function AdminSettingsPage() {
           offLabel={t('settings.off')}
           onCheckedChange={(next) => {
             if (!next && !window.confirm(t('settings.registration_off_confirm'))) return;
-            save.mutate({ registration: next });
+            save.mutate({ field: 'registration', next });
           }}
           className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
         />
@@ -91,7 +92,26 @@ export default function AdminSettingsPage() {
           onCheckedChange={(next) => {
             // 没有 SMTP 时开启等于承诺一件做不到的事
             if (next && !data?.mailConfigured && !window.confirm(t('settings.no_mail_confirm'))) return;
-            save.mutate({ emailVerification: next });
+            save.mutate({ field: 'emailVerification', next });
+          }}
+          className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
+        />
+        <SwitchRow
+          title={t('settings.admin_user_create')}
+          hint={
+            canManageAdmins
+              ? t('settings.admin_user_create_hint')
+              : t('settings.admin_user_create_super_only')
+          }
+          checked={data?.adminUserCreateEnabled ?? false}
+          disabled={!canManageAdmins}
+          disabledHint={!canManageAdmins ? t('settings.admin_user_create_super_only') : undefined}
+          pending={savingKey === 'adminUserCreate'}
+          onLabel={t('settings.on')}
+          offLabel={t('settings.off')}
+          onCheckedChange={(next) => {
+            if (next && !window.confirm(t('settings.admin_user_create_on_confirm'))) return;
+            save.mutate({ field: 'adminUserCreate', next });
           }}
           className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
         />

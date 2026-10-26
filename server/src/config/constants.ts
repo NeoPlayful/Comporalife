@@ -414,6 +414,12 @@ export const SETTING_REGISTRATION_ENABLED = 'registration.enabled';
 /** 邮箱验证开关：默认关闭，自部署单用户场景下强制验证只会抬高门槛 */
 export const SETTING_EMAIL_VERIFICATION_ENABLED = 'auth.email_verification_enabled';
 
+/**
+ * 后台代建账号开关：默认关闭。
+ * 管理员直接设定用户初始密码、且不强制改密，属于高风险能力，必须显式开启。
+ */
+export const SETTING_ADMIN_USER_CREATE_ENABLED = 'admin.user_create_enabled';
+
 /** 汇率自动同步开关在 system_settings 中的键 */
 export const SETTING_RATE_SYNC_ENABLED = 'rate_sync_enabled';
 
