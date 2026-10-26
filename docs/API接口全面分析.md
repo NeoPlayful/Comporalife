@@ -450,12 +450,14 @@
 | GET | `/api/market-data/providers` | 汇率源配置状态与最近运行（管理员） |
 | POST | `/api/market-data/refresh` | 手动触发汇率同步（管理员） |
 | GET | `/api/market-data/status` | 按币种对的汇率同步状态 |
-| GET | `/api/admin/exchange-rates` | 后台汇率列表与筛选 |
+| GET | `/api/admin/exchange-rates` | 后台汇率流水列表与筛选（按日期的明细） |
+| GET | `/api/admin/exchange-rates/latest` | 当前汇率：每个币种对只取最新一条，附全局覆盖统计 |
+| GET | `/api/admin/exchange-rates/history` | 单个币种对的汇率走势（按 `days` 取窗口） |
 | POST | `/api/admin/exchange-rates` | 后台新增或覆盖同日同键 |
 | PATCH | `/api/admin/exchange-rates/:id` | 后台修改汇率 |
 | DELETE | `/api/admin/exchange-rates/:id` | 后台删除汇率 |
-| GET | `/api/admin/rate-sync/settings` | 自动同步开关 |
-| PATCH | `/api/admin/rate-sync/settings` | 开启或关闭自动同步 |
+| GET | `/api/admin/rate-sync/settings` | 自动同步开关与频率（含可选频率列表） |
+| PATCH | `/api/admin/rate-sync/settings` | 修改开关与/或频率，两个字段均可省略 |
 
 > **汇率数据与自选列表是两个概念**：汇率值是全局系统参考数据，由后台统一维护；
 > 每个用户的「自选汇率列表」只是展示偏好，不参与任何折算。
@@ -470,6 +472,32 @@
 > `/admin/rate-pair-requests`）已删除。自动同步的需求由全站实际持有的币种推导，
 > 申请并没有增加可抓取范围，却引入了一张表和一套审核流程。管理员改为在后台
 > 汇率管理页直接查看最近一次同步的失败币种对并补录。
+>
+> **后台两个视图**：`/admin/exchange-rates` 是按日期的流水，回答「某天是多少」；
+> `/admin/exchange-rates/latest` 先按币种对聚合出最大 `rateDate` 再取对应行，
+> 回答「现在生效的是多少」。后者的 `stats` 在筛选之前计算，反映全局覆盖情况，
+> 不受当前筛选或分页影响。币种对数量受支持币种数平方约束（十余个币种，最多
+> 一百多对），因此先整体载入再筛选分页是安全的。
+>
+> **趋势图不需要新表**：`exchange_rates` 本身就是「每对每天一条」的时序数据。
+> `/admin/exchange-rates/history` 的方向口径与折算一致：优先取正向，没有正向
+> 记录时用反向的倒数并以 `inverted` 标出，避免两个方向的数值混成一条线。
+>
+> **自动同步开关与频率**：`rate_sync_enabled` 缺省为关闭，需管理员显式开启；
+> `rate_sync_frequency` 取 `hourly` / `daily` / `weekly`，缺省为 `daily`。两者都在
+> `system_settings` 里，可在后台「同步设置」抽屉中在线修改，改完调度器立即按新
+> 间隔重排，不需要重启进程。连续 3 次失败会自动关闭，后台页给出该原因提示。
+>
+> **为什么频率不放环境变量**：改环境变量必须重启服务，而管理员换个同步频率不该
+> 导致服务中断。原来的 `RATE_SYNC_INTERVAL_MS` 已移除；调度间隔统一由
+> `RATE_SYNC_FREQUENCY_MS` 由三个字面量换算。
+>
+> **`nextRunAt` 的真实来源**：由调度器在排下一次定时器时记录，`null` 表示当前
+> 没有安排（未启用、未配置汇率源、或调度器未运行）。不要用「当前时间 + 间隔」
+> 现算——那种估值与实际定时器无关，会误导管理员。
+>
+> **汇率源地址与密钥只来自环境变量**，接口仅返回 `configured` 与 `keyConfigured`
+> 两个布尔。抽屉里因此没有数据源、API Key、自定义 URL 这些表单项。
 
 
 ## 21、数据导出、备份与恢复 (Data Management) — 已实现

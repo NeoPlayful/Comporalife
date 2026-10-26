@@ -54,7 +54,7 @@ const envSchema = z.object({
   RATE_PROVIDER_DATE_PATH: z.string().optional(),
   RATE_PROVIDER_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   RATE_SYNC_STARTUP_DELAY_MS: z.coerce.number().int().nonnegative().default(60_000),
-  RATE_SYNC_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
+  // 同步间隔不再来自环境变量：改间隔不该要求重启，频率由后台系统设置管理
   RATE_SYNC_LOCK_MS: z.coerce.number().int().positive().default(300_000),
   RATE_SYNC_RUN_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   RATE_MAX_DEVIATION_PCT: z.coerce.number().positive().default(20),

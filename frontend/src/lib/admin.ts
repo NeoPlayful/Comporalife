@@ -31,9 +31,44 @@ export interface AdminExchangeRate {
   updatedAt: string;
 }
 
+/** 每个币种对的当前生效汇率：只保留最新一条，而不是按日期的流水 */
+export interface AdminLatestExchangeRate {
+  id: string;
+  baseCurrency: string;
+  quoteCurrency: string;
+  rate: string;
+  rateDate: string;
+  source: 'manual' | 'provider';
+  updatedAt: string;
+  /** 距离最新汇率的自然日差，用于提示「汇率滞后」 */
+  daysLag: number;
+}
+
+export interface AdminExchangeRateStats {
+  pairs: number;
+  manual: number;
+  provider: number;
+  baseCurrencies: number;
+}
+
+export interface AdminRateHistoryPoint {
+  rate: string;
+  rateDate: string;
+  source: 'manual' | 'provider';
+}
+
 export interface RateSyncFailure {
   pair: string;
   code: string;
+}
+
+/** 同步频率：存在系统设置里，可在后台在线修改 */
+export type RateSyncFrequency = 'hourly' | 'daily' | 'weekly';
+
+export interface RateSyncSettings {
+  enabled: boolean;
+  frequency: RateSyncFrequency;
+  frequencies: RateSyncFrequency[];
 }
 
 export interface RateProviderStatus {
@@ -42,6 +77,9 @@ export interface RateProviderStatus {
   anchorCurrency: string;
   keyConfigured: boolean;
   enabled: boolean;
+  frequency: RateSyncFrequency;
+  /** 由调度器给出；调度器未运行时为 null，不要在前端自行推算 */
+  nextRunAt: string | null;
   lastRun: {
     startedAt: string;
     finishedAt: string | null;
@@ -216,6 +254,53 @@ export const adminApi = {
     rate: string;
     rateDate: string;
   }) => api.post<{ exchangeRate: AdminExchangeRate }>('/api/admin/exchange-rates', body),
+  /** 当前汇率：每个币种对最新一条，附带全局覆盖统计 */
+  latestExchangeRates: (filters: {
+    page?: number;
+    pageSize?: number;
+    base?: string;
+    quote?: string;
+    source?: string;
+    q?: string;
+  } = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== '') query.set(key, String(value));
+    }
+    return api.getPaged<{
+      exchangeRates: AdminLatestExchangeRate[];
+      stats: AdminExchangeRateStats;
+    }>(`/api/admin/exchange-rates/latest?${query}`);
+  },
+  exchangeRateHistory: (params: { from: string; to: string; days?: number }) => {
+    const query = new URLSearchParams({ from: params.from, to: params.to });
+    if (params.days) query.set('days', String(params.days));
+    return api.get<{
+      from: string;
+      to: string;
+      days: number;
+      inverted: boolean;
+      points: AdminRateHistoryPoint[];
+    }>(`/api/admin/exchange-rates/history?${query}`);
+  },
+  rateSyncSettings: () => api.get<RateSyncSettings>('/api/admin/rate-sync/settings'),
+  updateRateSyncSettings: (input: { enabled?: boolean; frequency?: RateSyncFrequency }) =>
+    api.patch<RateSyncSettings>('/api/admin/rate-sync/settings', input),
+  /** 手动触发一次同步：同步执行，返回本次摘要 */
+  refreshRates: () =>
+    api.post<{
+      provider: string;
+      anchorCurrency: string;
+      status: 'succeeded' | 'partial' | 'failed' | 'skipped';
+      fetchedPairs: number;
+      writtenRows: number;
+      skippedManual: number;
+      failures: RateSyncFailure[];
+      errorCode: string | null;
+      errorMessage: string | null;
+      startedAt: string;
+      finishedAt: string;
+    }>('/api/market-data/refresh'),
   updateExchangeRate: (id: string, rate: string) =>
     api.patch<{ exchangeRate: AdminExchangeRate }>(`/api/admin/exchange-rates/${id}`, { rate }),
   deleteExchangeRate: (id: string) => api.delete<{ deleted: boolean }>(`/api/admin/exchange-rates/${id}`),

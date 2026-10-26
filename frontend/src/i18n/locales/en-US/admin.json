@@ -217,19 +217,81 @@
     "filter_source": "Filter source",
     "filter_from": "From",
     "filter_to": "To",
+    "search_placeholder": "Search currency code",
+    "tab": {
+      "latest": "Current rates",
+      "records": "Sync records"
+    },
+    "stats": {
+      "pairs": "Pairs covered",
+      "pairs_desc": "Pairs that have at least one rate",
+      "base_currencies": "Base currencies",
+      "base_currencies_desc": "Bases these rates are expressed in",
+      "source": "Source split",
+      "source_desc": "Auto-synced versus manually entered",
+      "source_value": "{{provider}} auto · {{manual}} manual",
+      "last_sync": "Last sync",
+      "last_sync_desc": "{{count}} rows written",
+      "last_sync_never": "No sync has run yet"
+    },
+    "sync": {
+      "enabled_summary": "Auto-sync on · {{frequency}}",
+      "disabled_summary": "Auto-sync off",
+      "last_sync_at": "Last sync {{time}}",
+      "next_sync_at": "Next {{time}}",
+      "never_synced": "No sync has run yet",
+      "not_configured_short": "No provider configured",
+      "open_settings": "Sync settings",
+      "sync_now": "Sync now",
+      "syncing": "Syncing…",
+      "busy": "A sync is already running. Check back shortly for the result.",
+      "frequency": {
+        "hourly": "Hourly",
+        "daily": "Daily",
+        "weekly": "Weekly"
+      }
+    },
+    "syncDrawer": {
+      "title": "Sync settings",
+      "subtitle": "Fetch rates from the external provider on the interval you choose.",
+      "close": "Close",
+      "scope_hint": "Auto-sync never overwrites a rate already entered manually for the same day: manual entries always win.",
+      "not_configured": "No external provider is configured, so these settings are unavailable. Configure it in the deployment environment, then restart.",
+      "enable": "Enable auto-sync",
+      "enable_hint": "Fetch on the interval below without manual action",
+      "frequency": "Update frequency",
+      "frequency_hint": {
+        "hourly": "Once an hour — suits watching short-term moves.",
+        "daily": "Once a day — enough for personal bookkeeping, and the default.",
+        "weekly": "Once a week — for long-term trends only."
+      },
+      "last_sync": "Last sync",
+      "next_sync": "Next sync",
+      "never": "Never",
+      "not_scheduled": "Not scheduled",
+      "auto_disabled": "Turned off automatically after repeated failures. Check the provider, then turn it back on.",
+      "last_result": "Last sync wrote {{written}} rows and skipped {{skipped}} manually confirmed rows.",
+      "running": "Syncing…",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Sync settings saved"
+    },
+    "history": {
+      "open": "View trend",
+      "title": "Rate trend",
+      "close": "Close",
+      "range_days": "{{count}} days",
+      "inverted_hint": "No direct records exist for this direction, so the chart shows the inverse rate.",
+      "loading": "Loading…",
+      "load_failed": "Failed to load rate history",
+      "empty_title": "No history yet",
+      "empty_description": "This pair has no records in the selected range.",
+      "date": "Date"
+    },
     "sync_title": "Pairs not covered by auto-sync",
     "sync_hint": "Pairs that failed the last sync or were rejected by validation. Fill them in manually to avoid users seeing \"No data\".",
     "sync_empty": "The last sync had no failures.",
-    "sync_provider_state": "Sync status: {{state}}",
-    "sync_not_configured": "No external provider configured, so rates must be maintained manually.",
-    "sync_fill": "Fill in",
-    "sync_status": {
-      "running": "Running",
-      "succeeded": "Succeeded",
-      "partial": "Partial",
-      "failed": "Failed",
-      "skipped": "Skipped",
-      "never": "Never run"
-    }
+    "sync_fill": "Fill in"
   }
 }

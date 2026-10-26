@@ -13,6 +13,8 @@ import {
   setRateSyncEnabled,
   shouldAutoDisable,
 } from './rate-sync.service.js';
+import { getRateSyncSchedule } from './rate-sync.scheduler.js';
+import { getRateSyncFrequency } from '../settings/system-settings.service.js';
 import { RATE_STALE_DAYS } from '../../config/constants.js';
 
 function requireAdmin(request: FastifyRequest): AuthContext {
@@ -30,8 +32,9 @@ export default async function marketDataRoutes(app: FastifyInstance) {
   app.get('/market-data/providers', { preHandler: app.authenticate }, async (request) => {
     requireAdmin(request);
 
-    const [enabled, lastRun] = await Promise.all([
+    const [enabled, frequency, lastRun] = await Promise.all([
       isRateSyncEnabled(app.prisma),
+      getRateSyncFrequency(app.prisma),
       app.prisma.rateSyncRun.findFirst({
         orderBy: { startedAt: 'desc' },
         select: {
@@ -61,6 +64,9 @@ export default async function marketDataRoutes(app: FastifyInstance) {
         // 只返回布尔：密钥的值永远不出现在任何响应里
         keyConfigured: Boolean(env.RATE_PROVIDER_KEY),
         enabled,
+        frequency,
+        // 由调度器给出：环境变量现算的估值与实际定时器无关，会误导管理员
+        nextRunAt: getRateSyncSchedule().nextRunAt,
         lastRun,
         disabledReason,
       },
@@ -144,7 +150,8 @@ export default async function marketDataRoutes(app: FastifyInstance) {
       {
         baseCurrency,
         pairs,
-        nextRunAt: new Date(Date.now() + env.RATE_SYNC_INTERVAL_MS).toISOString(),
+        // 与 providers 用同一个来源：调度器没跑起来时就是 null，不编造时间
+        nextRunAt: getRateSyncSchedule().nextRunAt,
       },
       request.id,
     );
