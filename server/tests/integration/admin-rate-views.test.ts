@@ -63,6 +63,8 @@ afterAll(async () => {
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
   await clearExchangeRates(app, [A, B, C]);
+  // 审计日志不随用户级联删除，上一轮运行留下的行会让「只写一条审计」的断言失效
+  await app.prisma.auditLog.deleteMany({ where: { targetType: 'exchange_rate' } });
 
   const admin = await createUser(app, DOMAIN, 'admin');
   adminToken = await promoteToAdmin(app, admin.userId);
@@ -157,6 +159,305 @@ describe('当前汇率视图', () => {
       method: 'GET',
       url: '/api/admin/exchange-rates/latest',
       headers: auth(userToken),
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('搜索', () => {
+  it('按币种中文名与英文名都能命中', async () => {
+    await createRate(A, B, '150', '2026-01-01');
+
+    // A = HKD（港币 / Hong Kong Dollar），B = CAD（加元 / Canadian Dollar）
+    for (const query of ['港币', 'hong kong']) {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/admin/exchange-rates/latest?q=${encodeURIComponent(query)}`,
+        headers: auth(adminToken),
+      });
+      expect(res.statusCode).toBe(200);
+      const rows = res.json().data.exchangeRates as Array<{ baseCurrency: string }>;
+      expect(rows.some((row) => row.baseCurrency === A)).toBe(true);
+    }
+  });
+
+  it('搜不到的词返回空列表，统计不受影响', async () => {
+    await createRate(A, B, '150', '2026-01-01');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/exchange-rates/latest?q=zzzznotacurrency',
+      headers: auth(adminToken),
+    });
+
+    const body = res.json().data;
+    expect(body.exchangeRates).toHaveLength(0);
+    expect(body.stats.pairs).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('滞后统计', () => {
+  it('统计里给出滞后对数与阈值', async () => {
+    // 一条今天的、一条很旧的：只有后者算滞后
+    await createRate(A, B, '150', new Date().toISOString().slice(0, 10));
+    await createRate(A, C, '890', '2020-01-01');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/exchange-rates/latest',
+      headers: auth(adminToken),
+    });
+
+    const stats = res.json().data.stats as { stale: number; staleDays: number };
+    expect(stats.staleDays).toBeGreaterThan(0);
+    // 只断言本套件写入的这对旧数据一定被计入，不假设库里总数
+    expect(stats.stale).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('显式来源', () => {
+  it('不传 source 时人工改动仍转人工', async () => {
+    const id = await createRate(A, B, '150', '2026-01-01');
+    // 先伪造成自动同步写入的行
+    await app.prisma.exchangeRate.update({ where: { id }, data: { source: 'provider' } });
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/exchange-rates/${id}`,
+      headers: auth(adminToken),
+      payload: { rate: '151' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.exchangeRate.source).toBe('manual');
+  });
+
+  it('显式传 provider 可以把一行交还自动同步', async () => {
+    const id = await createRate(A, B, '150', '2026-01-01');
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/exchange-rates/${id}`,
+      headers: auth(adminToken),
+      payload: { rate: '150', source: 'provider' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.exchangeRate.source).toBe('provider');
+
+    const row = await app.prisma.exchangeRate.findUnique({ where: { id } });
+    expect(row?.source).toBe('provider');
+  });
+
+  it('拒绝无法识别的来源', async () => {
+    const id = await createRate(A, B, '150', '2026-01-01');
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/exchange-rates/${id}`,
+      headers: auth(adminToken),
+      payload: { rate: '150', source: 'automatic' },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('普通用户不能改来源', async () => {
+    const id = await createRate(A, B, '150', '2026-01-01');
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/exchange-rates/${id}`,
+      headers: auth(userToken),
+      payload: { rate: '150', source: 'provider' },
+    });
+
+    expect(res.statusCode).toBe(403);
+  });
+});
+
+describe('新增与覆盖', () => {
+  it('同一币种对同一天再次新增时标记 replaced', async () => {
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
+      payload: { baseCurrency: A, quoteCurrency: B, rate: '150', rateDate: '2026-01-01' },
+    });
+    expect(first.json().data.replaced).toBe(false);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
+      payload: { baseCurrency: A, quoteCurrency: B, rate: '151', rateDate: '2026-01-01' },
+    });
+    expect(second.statusCode).toBe(201);
+    expect(second.json().data.replaced).toBe(true);
+    expect(second.json().data.exchangeRate.rate).toBe('151.0000000000');
+  });
+});
+
+describe('批量录入', () => {
+  it('一次写入多组并返回行数', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: '2026-02-01',
+        rates: [
+          { baseCurrency: A, quoteCurrency: B, rate: '150' },
+          { baseCurrency: A, quoteCurrency: C, rate: '890' },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().data.writtenRows).toBe(2);
+    expect(res.json().data.rateDate).toBe('2026-02-01');
+
+    const count = await app.prisma.exchangeRate.count({
+      where: {
+        baseCurrency: A,
+        quoteCurrency: { in: [B, C] },
+        rateDate: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    });
+    expect(count).toBe(2);
+  });
+
+  it('批量写入的来源是人工', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: '2026-02-01',
+        rates: [{ baseCurrency: A, quoteCurrency: B, rate: '150' }],
+      },
+    });
+
+    const row = await app.prisma.exchangeRate.findFirst({
+      where: { baseCurrency: A, quoteCurrency: B },
+    });
+    expect(row?.source).toBe('manual');
+  });
+
+  it('任一条非法则整批不写入', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: '2026-03-01',
+        rates: [
+          { baseCurrency: A, quoteCurrency: B, rate: '150' },
+          { baseCurrency: A, quoteCurrency: C, rate: '0' },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+    const count = await app.prisma.exchangeRate.count({
+      where: {
+        baseCurrency: A,
+        quoteCurrency: { in: [B, C] },
+        rateDate: new Date('2026-03-01T00:00:00.000Z'),
+      },
+    });
+    expect(count).toBe(0);
+  });
+
+  it('拒绝同一批里的重复币种对', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: '2026-04-01',
+        rates: [
+          { baseCurrency: A, quoteCurrency: B, rate: '150' },
+          { baseCurrency: A, quoteCurrency: B, rate: '151' },
+        ],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('拒绝同币种对自身', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: '2026-04-01',
+        rates: [{ baseCurrency: A, quoteCurrency: A, rate: '1' }],
+      },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('拒绝空批次与未来日期', async () => {
+    const empty = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: { rateDate: '2026-04-01', rates: [] },
+    });
+    expect(empty.statusCode).toBe(400);
+
+    const future = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+        rates: [{ baseCurrency: A, quoteCurrency: B, rate: '150' }],
+      },
+    });
+    expect(future.statusCode).toBe(400);
+  });
+
+  it('批量录入写一条审计且不含数值', async () => {
+    await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(adminToken),
+      payload: {
+        rateDate: '2026-05-01',
+        rates: [
+          { baseCurrency: A, quoteCurrency: B, rate: '150.123456' },
+          { baseCurrency: A, quoteCurrency: C, rate: '890.654321' },
+        ],
+      },
+    });
+
+    const logs = await app.prisma.auditLog.findMany({
+      where: {
+        action: 'admin.currency_rate.bulk_updated',
+        metadata: { path: ['rateDate'], equals: '2026-05-01' },
+      },
+    });
+    expect(logs).toHaveLength(1);
+    const text = JSON.stringify(logs[0]?.metadata);
+    expect(text).not.toContain('150.123456');
+    expect(text).not.toContain('890.654321');
+    expect(text).toContain(`${A}->${B}`);
+  });
+
+  it('普通用户不能批量录入', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates/bulk',
+      headers: auth(userToken),
+      payload: {
+        rateDate: '2026-02-01',
+        rates: [{ baseCurrency: A, quoteCurrency: B, rate: '150' }],
+      },
     });
 
     expect(res.statusCode).toBe(403);

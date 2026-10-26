@@ -232,7 +232,10 @@
       "source_value": "自动 {{provider}} · 人工 {{manual}}",
       "last_sync": "最近同步",
       "last_sync_desc": "本次写入 {{count}} 行",
-      "last_sync_never": "尚未运行过同步"
+      "last_sync_never": "尚未运行过同步",
+      "stale": "滞后币种对",
+      "stale_desc": "超过 {{days}} 天没有更新",
+      "stale_desc_unknown": "超过阈值没有更新的币种对"
     },
     "sync": {
       "enabled_summary": "自动同步已开启 · {{frequency}}",
@@ -287,11 +290,69 @@
       "load_failed": "汇率历史加载失败",
       "empty_title": "暂无历史数据",
       "empty_description": "该币种对在所选区间内没有记录。",
-      "date": "日期"
+      "date": "日期",
+      "detail_total": "共 {{total}} 条",
+      "prev": "上一页",
+      "next": "下一页"
     },
     "sync_title": "自动同步未覆盖的币种对",
     "sync_hint": "最近一次同步失败或被校验拦下的币种对。可直接补录，避免用户看到「暂无数据」。",
     "sync_empty": "最近一次同步没有失败项。",
-    "sync_fill": "补录"
+    "sync_fill": "补录",
+    "actions": "操作",
+    "dismiss": "关闭提示",
+    "refresh": "刷新",
+    "create_hint": "同一币种对同一天已有记录时会覆盖原值，来源会改为人工录入。",
+    "lag": {
+      "column": "滞后",
+      "today": "今天",
+      "days": "{{days}} 天前",
+      "stale": "超过 {{days}} 天未更新"
+    },
+    "bulk": {
+      "select_all": "全选本页",
+      "selected": "已选 {{count}} 项",
+      "open": "批量录入",
+      "delete": "批量删除",
+      "clear": "取消选择",
+      "title": "批量录入汇率",
+      "subtitle": "为选中的 {{count}} 个币种对统一填写生效日期与汇率。",
+      "close": "关闭",
+      "current": "当前 {{rate}}",
+      "placeholder": "留空跳过",
+      "empty": "没有选中的币种对。",
+      "filled": "已填写 {{filled}} / {{total}}",
+      "submit": "提交",
+      "saving": "提交中…",
+      "delete_title": "删除 {{count}} 条汇率"
+    },
+    "editDrawer": {
+      "title": "编辑汇率",
+      "close": "关闭",
+      "decimals": "{{decimals}} 位小数",
+      "rate_label": "汇率（1 {{base}} = ? {{quote}}）",
+      "current_value": "当前值 {{rate}}",
+      "source_label": "来源",
+      "source_provider_hint": "标记为自动同步后，下次同步会覆盖这一行的值。",
+      "source_manual_hint": "人工录入是权威值，自动同步不会覆盖同一天的记录。",
+      "rate_invalid": "汇率必须是大于 0 的数值。",
+      "saving": "保存中…"
+    },
+    "notice": {
+      "created": "汇率已新增",
+      "created_replaced": "该币种对当天已有记录，已覆盖为人工录入",
+      "updated": "汇率已更新",
+      "bulk_saved": "已批量写入 {{count}} 条汇率",
+      "deleted": "已删除 {{count}} 条汇率"
+    },
+    "create": {
+      "title": "新增汇率",
+      "subtitle": "录入一条系统参考汇率，写入后所有用户的折算都会使用它。",
+      "close": "关闭",
+      "same_currency": "基准币种与计价币种不能相同。",
+      "rate_label": "汇率（1 {{base}} = ? {{quote}}）",
+      "overwrite_hint": "同一币种对同一天已有记录时会直接覆盖原值，并把来源标记为人工录入。",
+      "saving": "保存中…"
+    }
   }
 }

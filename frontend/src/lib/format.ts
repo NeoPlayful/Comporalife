@@ -1,4 +1,5 @@
 import i18n from '@/i18n';
+import { CURRENCY_NAMES } from '@/utils/constants';
 
 export type DateFormatPattern = 'YYYY-MM-DD' | 'DD/MM/YYYY' | 'MM/DD/YYYY';
 
@@ -13,6 +14,13 @@ function pad(value: number): string {
 function parseDate(value: string | number | Date): Date | null {
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** 币种显示名：按当前语言取中文或英文名，未知币种退回代码 */
+export function currencyName(code: string): string {
+  const name = CURRENCY_NAMES[code];
+  if (!name) return code;
+  return currentLocale().startsWith('zh') ? name.zh : name.en;
 }
 
 /** 数字按当前语言格式化千分位，保留调用方指定的小数位 */

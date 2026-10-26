@@ -1,7 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import Decimal from 'decimal.js';
 import { z } from 'zod';
-import { RATE_SYNC_FREQUENCIES, SUPPORTED_CURRENCIES } from '../../config/constants.js';
+import {
+  CURRENCY_NAMES,
+  RATE_STALE_DAYS,
+  RATE_SYNC_FREQUENCIES,
+  SUPPORTED_CURRENCIES,
+} from '../../config/constants.js';
 import { buildPagination, ok, parsePageParams } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
 import { rateToString, toDecimal } from '../../lib/money.js';
@@ -195,21 +200,26 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
       manual: rows.filter((row) => row.source === 'manual').length,
       provider: rows.filter((row) => row.source === 'provider').length,
       baseCurrencies: new Set(rows.map((row) => row.baseCurrency)).size,
+      // 覆盖数没有分母看不出好坏，「其中多少已经滞后」才是管理员要看的那个数
+      stale: rows.filter((row) => row.daysLag > RATE_STALE_DAYS).length,
+      staleDays: RATE_STALE_DAYS,
     };
 
     // 「来源」是筛选条件之一，但统计要先于筛选，因此顺序不能倒过来
     const keyword = query.q?.toUpperCase();
+    const matchesKeyword = (code: string) => {
+      if (!keyword) return true;
+      if (code.includes(keyword)) return true;
+      const name = CURRENCY_NAMES[code];
+      return Boolean(name && (name.zh.includes(query.q!.trim()) || name.en.toUpperCase().includes(keyword)));
+    };
+
     const filtered = rows.filter((row) => {
       if (query.base && row.baseCurrency !== query.base) return false;
       if (query.quote && row.quoteCurrency !== query.quote) return false;
       if (query.source && row.source !== query.source) return false;
-      if (
-        keyword &&
-        !row.baseCurrency.includes(keyword) &&
-        !row.quoteCurrency.includes(keyword)
-      ) {
-        return false;
-      }
+      // 只填了起点或终点时，另一端走关键字匹配，避免「只看以 X 开头的对」无从下手
+      if (!matchesKeyword(row.baseCurrency) && !matchesKeyword(row.quoteCurrency)) return false;
       return true;
     });
 
@@ -351,25 +361,153 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
     });
 
     return reply.status(201).send(
-      ok({ exchangeRate: { ...saved, rate: rateToString(saved.rate.toString()) } }, request.id),
+      ok(
+        {
+          exchangeRate: { ...saved, rate: rateToString(saved.rate.toString()) },
+          // 同一币种对同一天已存在时这里走的是覆盖，界面要能区分「新增」与「改掉别人写的值」
+          replaced: Boolean(existing),
+        },
+        request.id,
+      ),
+    );
+  });
+
+  /**
+   * 修改单条汇率。
+   *
+   * source 可省略：省略时沿用「人工改动即转人工」的既有规则，避免管理员只改数值
+   * 却让这一行继续被自动同步覆盖。显式给出 provider 则是把这一行交还给自动同步，
+   * 否则没有任何入口能撤销一次误触的人工覆盖，只能删行重录。
+   */
+  /**
+   * 批量录入同一生效日期的多组汇率。
+   *
+   * 管理员通常一次拿到一整张当天的牌价，逐条 POST 既慢又会留下多条审计；
+   * 这里在单个事务里写完整批，只记一条审计。任何一条校验不过就整批回滚，
+   * 避免「一半写进去一半没写」需要人工对账。
+   */
+  app.post('/admin/exchange-rates/bulk', { preHandler: app.authenticate }, async (request, reply) => {
+    const actor = requireAdmin(request);
+    const body = z
+      .object({
+        rateDate: z.coerce
+          .date()
+          .refine((value) => value.getTime() <= Date.now() + 86_400_000, '生效日期不能晚于今天'),
+        rates: z
+          .array(
+            z
+              .object({
+                baseCurrency: currencySchema,
+                quoteCurrency: currencySchema,
+                rate: rateValueSchema,
+              })
+              .refine((value) => value.baseCurrency !== value.quoteCurrency, {
+                message: '基准币种与计价币种不能相同',
+              }),
+          )
+          .min(1, '至少需要一组汇率')
+          .max(SUPPORTED_CURRENCIES.length * SUPPORTED_CURRENCIES.length, '一次提交的币种对过多'),
+      })
+      .parse(request.body);
+
+    // 同一请求里重复的币种对会让 upsert 相互覆盖，结果取决于顺序，直接拒绝
+    const seen = new Set<string>();
+    for (const item of body.rates) {
+      const key = `${item.baseCurrency}->${item.quoteCurrency}`;
+      if (seen.has(key)) throw errors.validation(`重复的币种对：${key}`);
+      seen.add(key);
+    }
+
+    const rateDate = new Date(
+      Date.UTC(body.rateDate.getUTCFullYear(), body.rateDate.getUTCMonth(), body.rateDate.getUTCDate()),
+    );
+
+    const saved = await app.prisma.$transaction(async (tx) => {
+      const records = [];
+      for (const item of body.rates) {
+        records.push(
+          await tx.exchangeRate.upsert({
+            where: {
+              baseCurrency_quoteCurrency_rateDate: {
+                baseCurrency: item.baseCurrency,
+                quoteCurrency: item.quoteCurrency,
+                rateDate,
+              },
+            },
+            create: {
+              baseCurrency: item.baseCurrency,
+              quoteCurrency: item.quoteCurrency,
+              rate: item.rate,
+              rateDate,
+              source: 'manual',
+            },
+            update: { rate: item.rate, source: 'manual' },
+            select: {
+              id: true,
+              baseCurrency: true,
+              quoteCurrency: true,
+              rate: true,
+              rateDate: true,
+              source: true,
+              updatedAt: true,
+            },
+          }),
+        );
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'admin.currency_rate.bulk_updated',
+          targetType: 'exchange_rate',
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          // 只记币种对与日期，数值不进审计
+          metadata: {
+            rateDate: rateDate.toISOString().slice(0, 10),
+            pairs: body.rates.map((item) => `${item.baseCurrency}->${item.quoteCurrency}`),
+            count: body.rates.length,
+          },
+        },
+      });
+
+      return records;
+    });
+
+    return reply.status(201).send(
+      ok(
+        {
+          exchangeRates: saved.map((row) => ({ ...row, rate: rateToString(row.rate.toString()) })),
+          writtenRows: saved.length,
+          rateDate: rateDate.toISOString().slice(0, 10),
+        },
+        request.id,
+      ),
     );
   });
 
   app.patch('/admin/exchange-rates/:id', { preHandler: app.authenticate }, async (request) => {
     const actor = requireAdmin(request);
     const { id } = idSchema.parse(request.params);
-    const body = z.object({ rate: rateValueSchema }).parse(request.body);
+    const body = z
+      .object({
+        rate: rateValueSchema,
+        source: z.enum(['manual', 'provider']).optional(),
+      })
+      .parse(request.body);
 
     const existing = await app.prisma.exchangeRate.findUnique({
       where: { id },
-      select: { id: true, baseCurrency: true, quoteCurrency: true, rateDate: true },
+      select: { id: true, baseCurrency: true, quoteCurrency: true, rateDate: true, source: true },
     });
     if (!existing) throw errors.notFound('汇率记录不存在');
+
+    const source = body.source ?? 'manual';
 
     const saved = await app.prisma.$transaction(async (tx) => {
       const record = await tx.exchangeRate.update({
         where: { id },
-        data: { rate: body.rate, source: 'manual' },
+        data: { rate: body.rate, source },
         select: {
           id: true,
           baseCurrency: true,
@@ -393,7 +531,8 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
             baseCurrency: existing.baseCurrency,
             quoteCurrency: existing.quoteCurrency,
             rateDate: existing.rateDate.toISOString().slice(0, 10),
-            changedFields: ['rate'],
+            changedFields: existing.source === source ? ['rate'] : ['rate', 'source'],
+            ...(existing.source === source ? {} : { source }),
           },
         },
       });

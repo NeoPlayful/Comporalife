@@ -7,8 +7,11 @@ import { useTranslation } from 'react-i18next';
 /**
  * 汇率概览卡片。
  *
- * 前两张来自「当前汇率」接口的统计字段（筛选前计算，反映全局覆盖），
- * 后两张来自供应商状态接口，因此不额外增加请求。
+ * 前三张来自「当前汇率」接口的统计字段（筛选前计算，反映全局覆盖），
+ * 最后一张来自供应商状态接口，因此不额外增加请求。
+ *
+ * 「滞后」单独占一张：只报覆盖数看不出好坏，管理员真正要判断的是
+ * 「这些覆盖率里面有多少已经过期」。
  */
 export default function RateStats({
   stats,
@@ -31,12 +34,15 @@ export default function RateStats({
       })
     : '—';
 
+  const stale = stats?.stale ?? 0;
+
   const cards: {
     label: string;
     desc: string;
     value: ReactNode;
     icon: ReactNode;
     iconClass: string;
+    alert?: boolean;
   }[] = [
     {
       label: t('exchangeRates.stats.pairs'),
@@ -46,11 +52,14 @@ export default function RateStats({
       iconClass: 'bg-indigo-500/10 text-indigo-500',
     },
     {
-      label: t('exchangeRates.stats.base_currencies'),
-      desc: t('exchangeRates.stats.base_currencies_desc'),
-      value: stats ? String(stats.baseCurrencies) : '—',
-      icon: <Database className="size-4" aria-hidden />,
-      iconClass: 'bg-emerald-500/10 text-emerald-600',
+      label: t('exchangeRates.stats.stale'),
+      desc: stats
+        ? t('exchangeRates.stats.stale_desc', { days: stats.staleDays })
+        : t('exchangeRates.stats.stale_desc_unknown'),
+      value: stats ? String(stale) : '—',
+      icon: <Clock className="size-4" aria-hidden />,
+      iconClass: 'bg-violet-500/10 text-violet-500',
+      alert: stale > 0,
     },
     {
       label: t('exchangeRates.stats.source'),
@@ -65,8 +74,8 @@ export default function RateStats({
         ? t('exchangeRates.stats.last_sync_desc', { count: lastRun.writtenRows })
         : t('exchangeRates.stats.last_sync_never'),
       value: lastSyncValue,
-      icon: <Clock className="size-4" aria-hidden />,
-      iconClass: 'bg-violet-500/10 text-violet-500',
+      icon: <Database className="size-4" aria-hidden />,
+      iconClass: 'bg-emerald-500/10 text-emerald-600',
     },
   ];
 
@@ -81,7 +90,13 @@ export default function RateStats({
           </span>
           <div className="min-w-0">
             <p className="text-xs text-[var(--color-content-muted)]">{card.label}</p>
-            <p className="truncate text-base font-semibold tabular-nums">{card.value}</p>
+            <p
+              className={`truncate text-base font-semibold tabular-nums ${
+                card.alert ? 'text-amber-600 dark:text-amber-400' : ''
+              }`}
+            >
+              {card.value}
+            </p>
             <p className="truncate text-xs text-[var(--color-content-muted)]">{card.desc}</p>
           </div>
         </div>

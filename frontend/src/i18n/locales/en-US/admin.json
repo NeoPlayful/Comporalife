@@ -232,7 +232,10 @@
       "source_value": "{{provider}} auto · {{manual}} manual",
       "last_sync": "Last sync",
       "last_sync_desc": "{{count}} rows written",
-      "last_sync_never": "No sync has run yet"
+      "last_sync_never": "No sync has run yet",
+      "stale": "Stale pairs",
+      "stale_desc": "Not updated for more than {{days}} days",
+      "stale_desc_unknown": "Pairs past the staleness threshold"
     },
     "sync": {
       "enabled_summary": "Auto-sync on · {{frequency}}",
@@ -287,11 +290,69 @@
       "load_failed": "Failed to load rate history",
       "empty_title": "No history yet",
       "empty_description": "This pair has no records in the selected range.",
-      "date": "Date"
+      "date": "Date",
+      "detail_total": "{{total}} points",
+      "prev": "Prev",
+      "next": "Next"
     },
     "sync_title": "Pairs not covered by auto-sync",
     "sync_hint": "Pairs that failed the last sync or were rejected by validation. Fill them in manually to avoid users seeing \"No data\".",
     "sync_empty": "The last sync had no failures.",
-    "sync_fill": "Fill in"
+    "sync_fill": "Fill in",
+    "actions": "Actions",
+    "dismiss": "Dismiss",
+    "refresh": "Refresh",
+    "create_hint": "If a rate already exists for the same pair on that date, it is overwritten and marked manual.",
+    "lag": {
+      "column": "Staleness",
+      "today": "Today",
+      "days": "{{days}}d ago",
+      "stale": "Not updated for more than {{days}} days"
+    },
+    "bulk": {
+      "select_all": "Select page",
+      "selected": "{{count}} selected",
+      "open": "Bulk entry",
+      "delete": "Delete selected",
+      "clear": "Clear",
+      "title": "Bulk rate entry",
+      "subtitle": "Fill one effective date and rate for the {{count}} selected pairs.",
+      "close": "Close",
+      "current": "Current {{rate}}",
+      "placeholder": "Leave blank to skip",
+      "empty": "No pairs selected.",
+      "filled": "{{filled}} of {{total}} filled",
+      "submit": "Submit",
+      "saving": "Submitting…",
+      "delete_title": "Delete {{count}} rates"
+    },
+    "editDrawer": {
+      "title": "Edit rate",
+      "close": "Close",
+      "decimals": "{{decimals}} decimals",
+      "rate_label": "Rate (1 {{base}} = ? {{quote}})",
+      "current_value": "Current {{rate}}",
+      "source_label": "Source",
+      "source_provider_hint": "Marked as auto-synced, the next sync may overwrite this value.",
+      "source_manual_hint": "Manual entries are authoritative; auto-sync never overwrites the same day.",
+      "rate_invalid": "Rate must be a number greater than 0.",
+      "saving": "Saving…"
+    },
+    "notice": {
+      "created": "Rate created",
+      "created_replaced": "A rate already existed for that day; overwritten as manual",
+      "updated": "Rate updated",
+      "bulk_saved": "Wrote {{count}} rates",
+      "deleted": "Deleted {{count}} rates"
+    },
+    "create": {
+      "title": "New rate",
+      "subtitle": "Add a system reference rate that every user conversion will use.",
+      "close": "Close",
+      "same_currency": "Base and quote currency must differ.",
+      "rate_label": "Rate (1 {{base}} = ? {{quote}})",
+      "overwrite_hint": "If a rate already exists for the same pair and date, it is overwritten and marked manual.",
+      "saving": "Saving…"
+    }
   }
 }
