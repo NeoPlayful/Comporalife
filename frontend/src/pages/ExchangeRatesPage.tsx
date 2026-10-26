@@ -1,6 +1,7 @@
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import { exchangeRatesApi, type WatchlistEntry } from '@/lib/dashboard';
 import { translateError } from '@/lib/error-message';
 import { formatDate, formatRate } from '@/lib/format';
@@ -110,19 +111,39 @@ export default function ExchangeRatesPage() {
         </div>
       </header>
 
-      {picking && (
-        <section className="card space-y-3 p-3">
-          <div>
-            <p className="text-sm font-medium">{t('exchange_rates.page.add_title')}</p>
-            <p className="mt-1 text-xs text-[var(--color-content-muted)]">
-              {t('exchange_rates.page.add_hint')}
-            </p>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto_auto]">
+      <Modal
+        open={picking}
+        title={t('exchange_rates.page.add_title')}
+        description={t('exchange_rates.page.add_hint')}
+        dirty={draft.from !== 'USD' || draft.to !== 'CNY'}
+        busy={busy}
+        onClose={() => setPicking(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setPicking(false)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('exchange_rates.page.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={busy || draftSameCurrency || !draftAddable}
+              onClick={() => add.mutate({ from: draft.from, to: draft.to })}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {t('exchange_rates.page.confirm_add')}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-2">
             <label className="text-xs text-[var(--color-content-muted)]">
               <span className="mb-1 block">{t('exchange_rates.base_currency')}</span>
               <select
+                data-autofocus
                 className="input"
                 value={draft.from}
                 onChange={(event) => setDraft({ ...draft, from: event.target.value })}
@@ -148,29 +169,12 @@ export default function ExchangeRatesPage() {
                 ))}
               </select>
             </label>
-            <div className="flex items-end">
-              <button
-                type="button"
-                disabled={busy || draftSameCurrency || !draftAddable}
-                onClick={() => add.mutate({ from: draft.from, to: draft.to })}
-                className="w-full rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50 sm:w-auto"
-              >
-                {t('exchange_rates.page.confirm_add')}
-              </button>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => setPicking(false)}
-                className="w-full rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm sm:w-auto"
-              >
-                {t('exchange_rates.page.cancel')}
-              </button>
-            </div>
           </div>
 
           <p className="text-xs">
-            {draftSameCurrency ? (
+            {error ? (
+              <span className="text-[var(--color-negative)]">{error}</span>
+            ) : draftSameCurrency ? (
               <span className="text-[var(--color-negative)]">
                 {t('exchange_rates.page.same_currency')}
               </span>
@@ -222,8 +226,8 @@ export default function ExchangeRatesPage() {
               </div>
             )}
           </div>
-        </section>
-      )}
+        </div>
+      </Modal>
 
       {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 

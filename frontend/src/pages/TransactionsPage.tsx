@@ -12,6 +12,7 @@ import {
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import TransactionForm from '@/components/finance/TransactionForm';
 import EmptyState from '@/components/ui/EmptyState';
+import Modal from '@/components/ui/Modal';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Pagination from '@/components/ui/Pagination';
@@ -375,27 +376,57 @@ function TransactionDetail({
   const { transactionType } = useEnumLabels();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-label={t('common:actions.close')}
-      />
-      <div className="card relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-b-none p-5 sm:rounded-xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-medium">{transaction.description}</h2>
-            <p className="mt-0.5 text-xs text-[var(--color-content-muted)]">
-              {formatDate(transaction.occurredAt)} · {transactionType(transaction.type)}
-              {transaction.status === 'voided' && t('transactions:detail.voided_suffix')}
-            </p>
-          </div>
+    <Modal
+      open
+      title={transaction.description}
+      description={
+        <>
+          {formatDate(transaction.occurredAt)} · {transactionType(transaction.type)}
+          {transaction.status === 'voided' && t('transactions:detail.voided_suffix')}
+        </>
+      }
+      variant="sheet"
+      size="lg"
+      busy={voiding}
+      onClose={onClose}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+          >
+            {t('common:actions.close')}
+          </button>
+          {transaction.status === 'posted' &&
+            (confirmVoid ? (
+              <button
+                type="button"
+                onClick={onVoid}
+                disabled={voiding}
+                className="rounded-lg bg-[var(--color-negative)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {voiding ? t('transactions:detail.voiding') : t('transactions:detail.confirm_void')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmVoid(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--color-negative)] px-3 py-2 text-sm text-[var(--color-negative)]"
+              >
+                <RotateCcw className="size-4" />
+                {t('transactions:detail.void')}
+              </button>
+            ))}
+        </>
+      }
+    >
+        <div className="mb-4">
           <MoneyDisplay
             amount={transaction.amount}
             currency={transaction.currency}
             colorize
-            className="text-base font-semibold"
+            className="text-xl font-semibold"
           />
         </div>
 
@@ -435,43 +466,12 @@ function TransactionDetail({
           </p>
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
-          >
-            {t('common:actions.close')}
-          </button>
-          {transaction.status === 'posted' &&
-            (confirmVoid ? (
-              <button
-                type="button"
-                onClick={onVoid}
-                disabled={voiding}
-                className="rounded-lg bg-[var(--color-negative)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-              >
-                {voiding ? t('transactions:detail.voiding') : t('transactions:detail.confirm_void')}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmVoid(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-[var(--color-negative)] px-4 py-2 text-sm text-[var(--color-negative)]"
-              >
-                <RotateCcw className="size-4" />
-                {t('transactions:detail.void')}
-              </button>
-            ))}
-        </div>
-
         {confirmVoid && (
-          <p className="mt-2 text-xs text-[var(--color-content-muted)]">
+          <p className="mt-4 text-xs text-[var(--color-content-muted)]">
             {t('transactions:detail.void_hint')}
           </p>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 

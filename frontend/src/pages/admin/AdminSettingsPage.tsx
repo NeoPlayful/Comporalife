@@ -1,48 +1,11 @@
 import LoadingState from '@/components/ui/LoadingState';
+import SwitchRow from '@/components/ui/SwitchRow';
 import { adminApi } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-/** 单个开关卡片：改动即生效，因此高风险项需要二次确认 */
-function ToggleCard({
-  title,
-  hint,
-  enabled,
-  canWrite,
-  pending,
-  onToggle,
-}: {
-  title: string;
-  hint: string;
-  enabled: boolean;
-  canWrite: boolean;
-  pending: boolean;
-  onToggle: (next: boolean) => void;
-}) {
-  const { t } = useTranslation('admin');
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border-subtle)] py-3 last:border-0">
-      <div>
-        <p className="text-sm font-medium">{title}</p>
-        <p className="mt-0.5 text-xs text-[var(--color-content-muted)]">{hint}</p>
-      </div>
-      <button
-        type="button"
-        onClick={() => onToggle(!enabled)}
-        disabled={!canWrite || pending}
-        className={`rounded-lg px-3 py-1.5 text-xs text-white disabled:opacity-50 ${
-          enabled ? 'bg-emerald-600' : 'bg-red-600'
-        }`}
-      >
-        {enabled ? t('settings.on') : t('settings.off')}
-      </button>
-    </div>
-  );
-}
 
 function ReadOnlyRow({ label, value }: { label: string; value: string }) {
   return (
@@ -72,6 +35,13 @@ export default function AdminSettingsPage() {
     onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
+  // 两个开关共用一次 mutation，只有正在提交的那一行才显示忙碌
+  const savingKey = save.isPending
+    ? save.variables?.registration !== undefined
+      ? 'registration'
+      : 'emailVerification'
+    : null;
+
   if (overview.isLoading) return <LoadingState />;
 
   const data = overview.data;
@@ -94,28 +64,36 @@ export default function AdminSettingsPage() {
 
       <section className="card px-4 py-2">
         <h2 className="py-2 text-sm font-semibold">{t('settings.access')}</h2>
-        <ToggleCard
+        <SwitchRow
           title={t('settings.registration')}
           hint={t('settings.registration_hint')}
-          enabled={data?.registrationEnabled ?? false}
-          canWrite={canWrite}
-          pending={save.isPending}
-          onToggle={(next) => {
+          checked={data?.registrationEnabled ?? false}
+          disabled={!canWrite}
+          disabledHint={!canWrite ? t('settings.read_only_short') : undefined}
+          pending={savingKey === 'registration'}
+          onLabel={t('settings.on')}
+          offLabel={t('settings.off')}
+          onCheckedChange={(next) => {
             if (!next && !window.confirm(t('settings.registration_off_confirm'))) return;
             save.mutate({ registration: next });
           }}
+          className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
         />
-        <ToggleCard
+        <SwitchRow
           title={t('settings.email_verification')}
           hint={t('settings.email_verification_hint')}
-          enabled={data?.emailVerificationEnabled ?? false}
-          canWrite={canWrite}
-          pending={save.isPending}
-          onToggle={(next) => {
+          checked={data?.emailVerificationEnabled ?? false}
+          disabled={!canWrite}
+          disabledHint={!canWrite ? t('settings.read_only_short') : undefined}
+          pending={savingKey === 'emailVerification'}
+          onLabel={t('settings.on')}
+          offLabel={t('settings.off')}
+          onCheckedChange={(next) => {
             // 没有 SMTP 时开启等于承诺一件做不到的事
             if (next && !data?.mailConfigured && !window.confirm(t('settings.no_mail_confirm'))) return;
             save.mutate({ emailVerification: next });
           }}
+          className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
         />
       </section>
 

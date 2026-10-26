@@ -278,6 +278,10 @@ export default function MonteCarloPage() {
             ))}
           </select>
 
+          {/*
+            「新建方案」刻意不弹窗：它切换的是本页的参数编辑模式，参数面板同时是
+            保存后驱动图表重算的工作区，遮住它就等于遮住用户正在操作的对象。
+          */}
           <button
             type="button"
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"

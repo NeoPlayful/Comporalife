@@ -18,6 +18,7 @@
     "other": "其他"
   },
   "form": {
+    "title": "登记负债",
     "name": "负债名称",
     "kind": "类别",
     "currency": "币种",

@@ -1,3 +1,4 @@
+import Modal from '@/components/ui/Modal';
 import { accountsApi, type Account } from '@/lib/accounts';
 import { categoriesApi, type FlatCategory } from '@/lib/categories';
 import { translateError } from '@/lib/error-message';
@@ -101,19 +102,41 @@ export default function TransactionForm({
     (type !== 'adjustment' || categoryId) &&
     (type !== 'transfer' || (toAccountId && toAccountId !== accountId && !currencyMismatch));
 
+  // 交易表单字段多，只有记录过内容才值得在关闭时拦一下
+  const dirty =
+    amount !== '' || description !== '' || merchant !== '' || note !== '' || categoryId !== '';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-label={t('common:actions.close')}
-      />
-
-      <div className="card relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-b-none p-5 sm:rounded-xl">
-        <h2 className="mb-4 text-base font-medium">{t('transactions:form.title')}</h2>
-
+    <Modal
+      open
+      title={t('transactions:form.title')}
+      variant="sheet"
+      size="lg"
+      dirty={dirty}
+      busy={saveMutation.isPending}
+      onClose={onClose}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+          >
+            {t('transactions:form.cancel')}
+          </button>
+          <button
+            type="submit"
+            form="transaction-create-form"
+            disabled={!canSubmit || saveMutation.isPending}
+            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {saveMutation.isPending ? t('transactions:form.saving') : t('transactions:form.save')}
+          </button>
+        </>
+      }
+    >
         <form
+          id="transaction-create-form"
           onSubmit={(e) => {
             e.preventDefault();
             if (canSubmit) saveMutation.mutate();
@@ -268,26 +291,8 @@ export default function TransactionForm({
               {error}
             </p>
           )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
-            >
-              {t('transactions:form.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={!canSubmit || saveMutation.isPending}
-              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              {saveMutation.isPending ? t('transactions:form.saving') : t('transactions:form.save')}
-            </button>
-          </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

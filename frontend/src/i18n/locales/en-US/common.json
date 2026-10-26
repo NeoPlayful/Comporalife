@@ -40,6 +40,9 @@
   "footer": {
     "version": "Version v{{version}}"
   },
+  "modal": {
+    "discard_confirm": "You have unsaved changes. Close anyway?"
+  },
   "network_error": "Network error, please try again",
   "list_separator": ", ",
   "pagination": {

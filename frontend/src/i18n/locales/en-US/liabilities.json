@@ -18,6 +18,7 @@
     "other": "Other"
   },
   "form": {
+    "title": "Add liability",
     "name": "Liability name",
     "kind": "Category",
     "currency": "Currency",

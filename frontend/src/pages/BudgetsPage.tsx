@@ -3,6 +3,7 @@ import BudgetItemEditor, { type DraftItem } from '@/components/budgets/BudgetIte
 import BudgetProgressBar from '@/components/budgets/BudgetProgressBar';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import { budgetsApi, type BudgetProgressResponse, type BudgetPeriodType } from '@/lib/budgets';
 import { categoriesApi, type CategoryNode } from '@/lib/categories';
 import { translateError } from '@/lib/error-message';
@@ -172,6 +173,20 @@ export default function BudgetsPage() {
     setCreating(true);
   }
 
+  function closeForm() {
+    setEditing(false);
+    setCreating(false);
+    setError(null);
+  }
+
+  // 编辑态从已有数据起步，打开即「有内容」，只有新建时才把填过的字段当作脏数据
+  const hasFormInput =
+    !editing &&
+    (form.totalAmount !== '' ||
+      form.note !== '' ||
+      form.rollover ||
+      form.items.some((item) => item.categoryId !== '' || item.amount !== ''));
+
   const currency = data?.basis.baseCurrency ?? 'CNY';
   const label = periodLabel(period);
   const alerts = alertsQuery.data?.alerts ?? [];
@@ -274,82 +289,6 @@ export default function BudgetsPage() {
             }
           />
         </div>
-      ) : creating || editing ? (
-        <section className="card space-y-4">
-          <h2 className="text-base font-medium">{editing ? t('form.edit') : t('form.create')}</h2>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span className="text-[var(--color-content-muted)]">{t('form.total_amount')}</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.totalAmount}
-                onChange={(event) => setForm({ ...form, totalAmount: event.target.value })}
-                className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5 tabular-nums"
-              />
-              <span className="block text-xs text-[var(--color-content-muted)]">
-                {t('form.total_amount_hint')}
-              </span>
-            </label>
-
-            <label className="space-y-1 text-sm">
-              <span className="text-[var(--color-content-muted)]">{t('form.note')}</span>
-              <input
-                value={form.note}
-                onChange={(event) => setForm({ ...form, note: event.target.value })}
-                className="w-full rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1.5"
-              />
-            </label>
-          </div>
-
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.rollover}
-              disabled={period.periodType === 'yearly'}
-              onChange={(event) => setForm({ ...form, rollover: event.target.checked })}
-              className="mt-0.5"
-            />
-            <span>
-              {t('form.rollover')}
-              <span className="block text-xs text-[var(--color-content-muted)]">
-                {period.periodType === 'yearly'
-                  ? t('form.rollover_yearly_disabled')
-                  : t('form.rollover_hint')}
-              </span>
-            </span>
-          </label>
-
-          <BudgetItemEditor
-            items={form.items}
-            categories={expenseCategories}
-            onChange={(items) => setForm({ ...form, items })}
-          />
-
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={createMutation.isPending || updateMutation.isPending}
-              onClick={() => (editing ? updateMutation.mutate() : createMutation.mutate())}
-              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              {createMutation.isPending || updateMutation.isPending ? t('form.saving') : t('form.save')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(false);
-                setCreating(false);
-                setError(null);
-              }}
-              className="rounded-lg px-4 py-2 text-sm text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              {t('form.cancel')}
-            </button>
-          </div>
-        </section>
       ) : !data ? (
         <div className="card">
           <EmptyState title={t('empty_title')} description={t('empty_description')} action={
@@ -500,6 +439,92 @@ export default function BudgetsPage() {
           </section>
         </>
       )}
+
+      <Modal
+        open={creating || editing}
+        title={editing ? t('form.edit') : t('form.create')}
+        description={editing ? undefined : periodLabel(period)}
+        size="xl"
+        dirty={editing ? false : hasFormInput}
+        busy={createMutation.isPending || updateMutation.isPending}
+        onClose={closeForm}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={closeForm}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('form.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={createMutation.isPending || updateMutation.isPending}
+              onClick={() => (editing ? updateMutation.mutate() : createMutation.mutate())}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {createMutation.isPending || updateMutation.isPending
+                ? t('form.saving')
+                : t('form.save')}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <span className="text-[var(--color-content-muted)]">{t('form.total_amount')}</span>
+              <input
+                data-autofocus
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.totalAmount}
+                onChange={(event) => setForm({ ...form, totalAmount: event.target.value })}
+                className="input tabular-nums"
+              />
+              <span className="block text-xs text-[var(--color-content-muted)]">
+                {t('form.total_amount_hint')}
+              </span>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <span className="text-[var(--color-content-muted)]">{t('form.note')}</span>
+              <input
+                value={form.note}
+                onChange={(event) => setForm({ ...form, note: event.target.value })}
+                className="input"
+              />
+            </label>
+          </div>
+
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.rollover}
+              disabled={period.periodType === 'yearly'}
+              onChange={(event) => setForm({ ...form, rollover: event.target.checked })}
+              className="mt-0.5"
+            />
+            <span>
+              {t('form.rollover')}
+              <span className="block text-xs text-[var(--color-content-muted)]">
+                {period.periodType === 'yearly'
+                  ? t('form.rollover_yearly_disabled')
+                  : t('form.rollover_hint')}
+              </span>
+            </span>
+          </label>
+
+          <BudgetItemEditor
+            items={form.items}
+            categories={expenseCategories}
+            onChange={(items) => setForm({ ...form, items })}
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

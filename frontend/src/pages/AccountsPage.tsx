@@ -10,6 +10,7 @@ import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, Plus, RotateCcw } from 'lucide-react';
@@ -263,24 +264,50 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
     onError: (err) => setError(translateError(err, t)),
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-label={t('common:actions.close')}
-      />
-      <div className="card relative w-full max-w-md p-5">
-        <h2 className="mb-4 text-base font-medium">{t('accounts:dialog.title')}</h2>
+  const dirty =
+    form.name.trim() !== '' ||
+    form.institution !== '' ||
+    form.openingBalance !== '0' ||
+    form.currency !== 'CNY' ||
+    form.type !== 'bank';
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-          className="space-y-3"
-        >
+  return (
+    <Modal
+      open
+      title={t('accounts:dialog.title')}
+      dirty={dirty}
+      busy={createMutation.isPending}
+      onClose={onClose}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+          >
+            {t('common:actions.cancel')}
+          </button>
+          <button
+            type="submit"
+            form="account-create-form"
+            disabled={createMutation.isPending}
+            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {createMutation.isPending
+              ? t('accounts:dialog.creating')
+              : t('accounts:dialog.create')}
+          </button>
+        </>
+      }
+    >
+      <form
+        id="account-create-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          createMutation.mutate();
+        }}
+        className="space-y-3"
+      >
           <Field label={t('accounts:dialog.name')}>
             <input
               required
@@ -361,28 +388,8 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
               {error}
             </p>
           )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm"
-            >
-              {t('common:actions.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={createMutation.isPending}
-              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              {createMutation.isPending
-                ? t('accounts:dialog.creating')
-                : t('accounts:dialog.create')}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
 

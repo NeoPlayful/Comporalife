@@ -22,6 +22,7 @@
     "market": "Market reference"
   },
   "form": {
+    "title": "Add asset",
     "name": "Asset name",
     "kind": "Category",
     "currency": "Currency",

@@ -1,6 +1,7 @@
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
+import Modal from '@/components/ui/Modal';
 import FinancialIndependencePanel from '@/components/goals/FinancialIndependencePanel';
 import GoalForm from '@/components/goals/GoalForm';
 import GoalHistoryChart from '@/components/goals/GoalHistoryChart';
@@ -33,6 +34,7 @@ export default function GoalsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [formDirty, setFormDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rate, setRate] = useState<string | undefined>(undefined);
 
@@ -46,27 +48,28 @@ export default function GoalsPage() {
 
   // 进入页面时自动挂到第一个目标，避免右侧永远空白
   useEffect(() => {
-    if (selectedId || creating || !listQuery.data) return;
+    if (selectedId || !listQuery.data) return;
     const first = listQuery.data.goals[0];
     if (first) setSelectedId(first.id);
-  }, [creating, listQuery.data, selectedId]);
+  }, [listQuery.data, selectedId]);
 
+  // 新建走弹窗，底下详情保持可见：关掉弹窗后回到原位置比白屏更可预期
   const detailQuery = useQuery({
     queryKey: ['goals', 'detail', selectedId],
     queryFn: () => goalsApi.detail(selectedId!),
-    enabled: Boolean(selectedId) && !creating,
+    enabled: Boolean(selectedId),
   });
 
   const historyQuery = useQuery({
     queryKey: ['goals', 'history', selectedId],
     queryFn: () => goalsApi.history(selectedId!),
-    enabled: Boolean(selectedId) && !creating,
+    enabled: Boolean(selectedId),
   });
 
   const projectionQuery = useQuery({
     queryKey: ['goals', 'projection', selectedId],
     queryFn: () => goalsApi.projection(selectedId!, { includeProbabilistic: true }),
-    enabled: Boolean(selectedId) && !creating,
+    enabled: Boolean(selectedId),
     retry: false,
   });
 
@@ -209,7 +212,7 @@ export default function GoalsPage() {
                 onClick={() => {
                   setCreating(true);
                   setEditing(false);
-                  setSelectedId(null);
+                  setFormDirty(false);
                   setError(null);
                 }}
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
@@ -223,7 +226,7 @@ export default function GoalsPage() {
                 <ErrorState message={translateError(listQuery.error, t)} onRetry={() => void listQuery.refetch()} />
               )}
 
-              {listQuery.data?.goals.length === 0 && !creating && (
+              {listQuery.data?.goals.length === 0 && (
                 <EmptyState title={t('empty.title')} description={t('empty.description')} />
               )}
 
@@ -246,24 +249,9 @@ export default function GoalsPage() {
             </aside>
 
             <section className="space-y-4">
-              {creating && (
-                <div>
-                  <h2 className="mb-2 text-sm font-semibold">{t('actions.create')}</h2>
-                  <GoalForm
-                    onSubmit={(body) => createMutation.mutate(body)}
-                    onCancel={() => {
-                      setCreating(false);
-                      setError(null);
-                    }}
-                    submitting={createMutation.isPending}
-                    error={error}
-                  />
-                </div>
-              )}
+              {!detail && <EmptyState title={t('detail.empty')} />}
 
-              {!creating && !detail && <EmptyState title={t('detail.empty')} />}
-
-              {!creating && detail && (
+              {detail && (
                 <>
                   <div className="card space-y-4 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -323,6 +311,7 @@ export default function GoalsPage() {
                           type="button"
                           onClick={() => {
                             setEditing((value) => !value);
+                            setFormDirty(false);
                             setError(null);
                           }}
                           className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs"
@@ -353,18 +342,6 @@ export default function GoalsPage() {
                       </div>
                     </div>
 
-                    {editing && (
-                      <GoalForm
-                        initial={{ ...detail.goal, targetAmount: detail.progress.originalTargetAmount }}
-                        onSubmit={(body) => updateMutation.mutate(body)}
-                        onCancel={() => {
-                          setEditing(false);
-                          setError(null);
-                        }}
-                        submitting={updateMutation.isPending}
-                        error={error}
-                      />
-                    )}
                   </div>
 
                   <div className="card p-4">
@@ -399,6 +376,124 @@ export default function GoalsPage() {
           </div>
         </>
       )}
+
+      <Modal
+        open={creating}
+        title={t('actions.create')}
+        size="xl"
+        dirty={formDirty}
+        busy={createMutation.isPending}
+        onClose={() => {
+          setCreating(false);
+          setFormDirty(false);
+          setError(null);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setCreating(false);
+                setFormDirty(false);
+                setError(null);
+              }}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('common:actions.cancel', { ns: 'common' })}
+            </button>
+            <button
+              type="submit"
+              form="goal-create-form"
+              disabled={createMutation.isPending}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {createMutation.isPending
+                ? t('common:state.saving', { ns: 'common' })
+                : t('form.submit')}
+            </button>
+          </>
+        }
+      >
+        {error && (
+          <p role="alert" className="mb-3 text-sm text-[var(--color-negative)]">
+            {error}
+          </p>
+        )}
+        <GoalForm
+          formId="goal-create-form"
+          embedded
+          onSubmit={(body) => createMutation.mutate(body)}
+          onCancel={() => {
+            setCreating(false);
+            setFormDirty(false);
+            setError(null);
+          }}
+          submitting={createMutation.isPending}
+          error={error}
+          onDirtyChange={setFormDirty}
+        />
+      </Modal>
+
+      <Modal
+        open={editing && Boolean(detail)}
+        title={t('actions.edit')}
+        description={detail?.goal.name}
+        size="xl"
+        dirty={formDirty}
+        busy={updateMutation.isPending}
+        onClose={() => {
+          setEditing(false);
+          setFormDirty(false);
+          setError(null);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(false);
+                setFormDirty(false);
+                setError(null);
+              }}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('common:actions.cancel', { ns: 'common' })}
+            </button>
+            <button
+              type="submit"
+              form="goal-edit-form"
+              disabled={updateMutation.isPending}
+              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {updateMutation.isPending
+                ? t('common:state.saving', { ns: 'common' })
+                : t('form.submit')}
+            </button>
+          </>
+        }
+      >
+        {error && (
+          <p role="alert" className="mb-3 text-sm text-[var(--color-negative)]">
+            {error}
+          </p>
+        )}
+        {detail && (
+          <GoalForm
+            formId="goal-edit-form"
+            embedded
+            initial={{ ...detail.goal, targetAmount: detail.progress.originalTargetAmount }}
+            onSubmit={(body) => updateMutation.mutate(body)}
+            onCancel={() => {
+              setEditing(false);
+              setFormDirty(false);
+              setError(null);
+            }}
+            submitting={updateMutation.isPending}
+            error={error}
+            onDirtyChange={setFormDirty}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

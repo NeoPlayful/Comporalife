@@ -118,6 +118,7 @@ export default function CompoundPage() {
             {t('compound:disclaimer')}
           </p>
         </div>
+        {/* 存方案只有一个名称输入，保持行内快加，不为此弹窗 */}
         <button
           type="button"
           onClick={() => setSaveOpen((open) => !open)}

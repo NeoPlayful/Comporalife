@@ -164,6 +164,7 @@
     "title": "System settings",
     "subtitle": "Deployment-level switches and runtime parameters. Secrets come from environment variables only.",
     "read_only": "Your role can view settings but not change them.",
+    "read_only_short": "Your role cannot change settings",
     "access": "Access control",
     "runtime": "Runtime parameters",
     "on": "On",
