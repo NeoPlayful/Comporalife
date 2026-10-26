@@ -37,6 +37,15 @@ export default function RateSyncBar({
         </span>
       </span>
 
+      {configured && (
+        <span className="text-[var(--color-content-muted)]">
+          {t('exchangeRates.sync.provider_summary', {
+            provider: t(`exchangeRates.syncDrawer.providers.${provider?.provider ?? 'exchangerate-api'}`),
+            anchor: provider?.anchorCurrency ?? '—',
+          })}
+        </span>
+      )}
+
       <span className="text-[var(--color-content-muted)]">
         {lastRun?.finishedAt
           ? t('exchangeRates.sync.last_sync_at', { time: formatDateTime(lastRun.finishedAt) })

@@ -3,7 +3,18 @@ import type { PrismaClient } from '@prisma/client';
 import { SETTING_RATE_SYNC_ENABLED } from '../../config/constants.js';
 import { env } from '../../config/env.js';
 import { toDecimal } from '../../lib/money.js';
-import { createGenericJsonProvider, todayKey, RateProviderError, type RateProvider } from './rate-provider.js';
+import {
+  createGenericJsonProvider,
+  createPresetProvider,
+  todayKey,
+  RateProviderError,
+  type RateProvider,
+} from './rate-provider.js';
+import {
+  getRateProviderConfig,
+  isProviderUsable,
+  isRateProviderAvailable,
+} from './rate-provider-config.service.js';
 import { convertToBasePairs, pairKey, validateQuotes, type RateRejectCode } from './rate-validation.js';
 import type { Redis } from 'ioredis';
 
@@ -28,22 +39,43 @@ export interface SyncSummary {
 
 const LOCK_KEY = 'rate:sync:lock';
 
-/** 供应商是否已配置：只暴露布尔，绝不返回 URL 或密钥 */
-export function isRateProviderConfigured(): boolean {
-  return Boolean(env.RATE_PROVIDER_URL);
+/**
+ * 供应商是否已配置：只暴露布尔，绝不返回地址或密钥。
+ *
+ * 配置可能来自数据库（后台可改）或环境变量（回退兼容），因此必须异步读。
+ */
+export async function isRateProviderConfigured(prisma: PrismaClient): Promise<boolean> {
+  return isRateProviderAvailable(prisma);
 }
 
-export function buildProvider(): RateProvider {
-  if (!env.RATE_PROVIDER_URL) {
+export async function buildProvider(prisma: PrismaClient): Promise<RateProvider> {
+  const resolved = await getRateProviderConfig(prisma);
+  if (!resolved || !isProviderUsable(resolved.config)) {
     throw new RateProviderError('PROVIDER_ERROR', '未配置外部汇率源');
   }
-  return createGenericJsonProvider({
-    urlTemplate: env.RATE_PROVIDER_URL,
-    anchorCurrency: env.RATE_PROVIDER_ANCHOR,
-    apiKey: env.RATE_PROVIDER_KEY,
-    keyParam: env.RATE_PROVIDER_KEY_PARAM,
-    ratesPath: env.RATE_PROVIDER_RATES_PATH,
-    datePath: env.RATE_PROVIDER_DATE_PATH,
+
+  const { config, source } = resolved;
+  if (source === 'environment') {
+    // 回退路径保持原样：老部署的 RATE_PROVIDER_URL 是带 {date}/{quotes}/{key}
+    // 占位符的模板，按预设的「自定义端点」构造会丢掉这些占位符与 keyParam，
+    // 静默把一个能用的配置变成请求失败。
+    return createGenericJsonProvider({
+      urlTemplate: env.RATE_PROVIDER_URL!,
+      anchorCurrency: config.anchorCurrency,
+      apiKey: config.apiKey,
+      keyParam: env.RATE_PROVIDER_KEY_PARAM,
+      ratesPath: config.ratesPath,
+      datePath: config.datePath,
+      timeoutMs: env.RATE_PROVIDER_TIMEOUT_MS,
+    });
+  }
+
+  return createPresetProvider(config.provider, {
+    anchorCurrency: config.anchorCurrency,
+    apiKey: config.apiKey,
+    customUrl: config.customUrl,
+    ratesPath: config.ratesPath,
+    datePath: config.datePath,
     timeoutMs: env.RATE_PROVIDER_TIMEOUT_MS,
   });
 }
@@ -136,12 +168,15 @@ export async function runRateSync(
   const asOf = todayKey(startedAt);
 
   let provider: RateProvider;
+  let errorAnchor = 'USD';
   try {
-    provider = options.provider ?? buildProvider();
+    const resolved = options.provider ? null : await getRateProviderConfig(prisma);
+    if (resolved) errorAnchor = resolved.config.anchorCurrency;
+    provider = options.provider ?? (await buildProvider(prisma));
   } catch (err) {
     return {
       provider: 'unknown',
-      anchorCurrency: env.RATE_PROVIDER_ANCHOR,
+      anchorCurrency: errorAnchor,
       status: 'failed',
       fetchedPairs: 0,
       writtenRows: 0,
@@ -169,7 +204,9 @@ export async function runRateSync(
   const { targets, baseCurrencies } = options.demand ?? (await collectRateDemand(prisma));
 
   // 没有任何外币实体时不需要外部调用，也不该产生一次「失败」
-  const baseSet = new Set(baseCurrencies.length > 0 ? baseCurrencies : [env.RATE_PROVIDER_ANCHOR]);
+  const baseSet = new Set(
+    baseCurrencies.length > 0 ? baseCurrencies : [provider.anchorCurrency],
+  );
   const quotesToFetch = targets.filter((target) =>
     [...baseSet].some((base) => base !== target),
   );

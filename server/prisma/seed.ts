@@ -1,10 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import argon2 from 'argon2';
 import { CATEGORY_TEMPLATE } from '../src/modules/categories/category-template.js';
+import { seedRateSettings } from './seed-rate-settings.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const applied = await seedRateSettings(prisma);
+  if (applied.length > 0) {
+    console.log(`已写入默认汇率配置：${applied.join(', ')}`);
+  }
+
   const email = process.env.ADMIN_EMAIL ?? 'admin@comporalife.com';
   const password = process.env.ADMIN_PASSWORD ?? 'admin123';
   const nickname = '超级管理员';

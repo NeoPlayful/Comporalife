@@ -77,11 +77,42 @@ export interface RateSyncSettings {
   frequencies: RateSyncFrequency[];
 }
 
+/** 数据源预设：地址与响应解析固定在服务端，页面只填密钥与（自定义源）地址 */
+export type RateProviderId = 'exchangerate-api' | 'openexchangerates' | 'custom';
+
+/** 数据源配置回显：密钥只有末四位，没有明文也没有密文 */
+export interface RateProviderConfigView {
+  provider: RateProviderId;
+  anchorCurrency: string;
+  keyConfigured: boolean;
+  keyHint: string;
+  customUrl: string;
+  ratesPath: string;
+  datePath: string;
+  /** database = 后台可改；environment = 仍在读部署环境变量 */
+  source: 'database' | 'environment';
+}
+
+export interface RateProviderUpdateInput {
+  provider: RateProviderId;
+  anchorCurrency: string;
+  /** 省略 = 保持现有密钥；空串 = 清除；非空 = 覆盖 */
+  apiKey?: string;
+  customUrl?: string;
+  ratesPath?: string;
+  datePath?: string;
+}
+
 export interface RateProviderStatus {
   configured: boolean;
   provider: string;
   anchorCurrency: string;
   keyConfigured: boolean;
+  /** 已配置密钥的末四位；未配置时为空串 */
+  keyHint: string;
+  /** 数据源来自数据库还是部署环境（回退） */
+  configSource: 'database' | 'environment';
+  customUrlConfigured: boolean;
   enabled: boolean;
   frequency: RateSyncFrequency;
   /** 由调度器给出；调度器未运行时为 null，不要在前端自行推算 */
@@ -327,6 +358,9 @@ export const adminApi = {
   rateSyncSettings: () => api.get<RateSyncSettings>('/api/admin/rate-sync/settings'),
   updateRateSyncSettings: (input: { enabled?: boolean; frequency?: RateSyncFrequency }) =>
     api.patch<RateSyncSettings>('/api/admin/rate-sync/settings', input),
+  rateProvider: () => api.get<RateProviderConfigView>('/api/admin/rate-sync/provider'),
+  updateRateProvider: (input: RateProviderUpdateInput) =>
+    api.patch<RateProviderConfigView>('/api/admin/rate-sync/provider', input),
   /** 手动触发一次同步：同步执行，返回本次摘要 */
   refreshRates: () =>
     api.post<{

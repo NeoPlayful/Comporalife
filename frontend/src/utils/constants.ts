@@ -1,3 +1,11 @@
+/**
+ * 币种元数据。
+ *
+ * 这份表必须与 server/src/config/constants.ts 完全一致：
+ * 界面按名称搜索时服务端也按名称匹配，精度与符号则直接决定展示与输入校验。
+ * 两侧一旦漂移，就会出现「搜得到却不显示」「少显示一位小数」这类难查的问题，
+ * 因此 scripts/check-currency-parity.cjs 会逐项比对，测试里也会兜底。
+ */
 export const CURRENCY_DECIMALS: Record<string, number> = {
   CNY: 2,
   USD: 2,
@@ -11,12 +19,29 @@ export const CURRENCY_DECIMALS: Record<string, number> = {
   KRW: 0,
   CHF: 2,
   TWD: 2,
+  NZD: 2,
+  SEK: 2,
+  NOK: 2,
+  DKK: 2,
+  INR: 2,
+  THB: 2,
+  MYR: 2,
+  PHP: 2,
+  IDR: 0,
+  VND: 0,
+  BRL: 2,
+  MXN: 2,
+  ZAR: 2,
+  TRY: 2,
+  AED: 2,
+  SAR: 2,
+  PLN: 2,
+  CZK: 2,
+  HUF: 0,
+  ILS: 2,
 };
 
-/**
- * 币种显示名。与后端 constants 里的同名字段保持一致：界面按名称搜索时，
- * 服务端也按名称匹配，两侧词表不同就会出现「搜得到却不显示」。
- */
+/** 与后端同名字段保持一致：界面按名称搜索时，服务端也按名称匹配 */
 export const CURRENCY_NAMES: Record<string, { zh: string; en: string }> = {
   CNY: { zh: '人民币', en: 'Chinese Yuan' },
   USD: { zh: '美元', en: 'US Dollar' },
@@ -30,6 +55,26 @@ export const CURRENCY_NAMES: Record<string, { zh: string; en: string }> = {
   KRW: { zh: '韩元', en: 'South Korean Won' },
   CHF: { zh: '瑞士法郎', en: 'Swiss Franc' },
   TWD: { zh: '新台币', en: 'New Taiwan Dollar' },
+  NZD: { zh: '新西兰元', en: 'New Zealand Dollar' },
+  SEK: { zh: '瑞典克朗', en: 'Swedish Krona' },
+  NOK: { zh: '挪威克朗', en: 'Norwegian Krone' },
+  DKK: { zh: '丹麦克朗', en: 'Danish Krone' },
+  INR: { zh: '印度卢比', en: 'Indian Rupee' },
+  THB: { zh: '泰铢', en: 'Thai Baht' },
+  MYR: { zh: '马来西亚林吉特', en: 'Malaysian Ringgit' },
+  PHP: { zh: '菲律宾比索', en: 'Philippine Peso' },
+  IDR: { zh: '印尼盾', en: 'Indonesian Rupiah' },
+  VND: { zh: '越南盾', en: 'Vietnamese Dong' },
+  BRL: { zh: '巴西雷亚尔', en: 'Brazilian Real' },
+  MXN: { zh: '墨西哥比索', en: 'Mexican Peso' },
+  ZAR: { zh: '南非兰特', en: 'South African Rand' },
+  TRY: { zh: '土耳其里拉', en: 'Turkish Lira' },
+  AED: { zh: '阿联酋迪拉姆', en: 'UAE Dirham' },
+  SAR: { zh: '沙特里亚尔', en: 'Saudi Riyal' },
+  PLN: { zh: '波兰兹罗提', en: 'Polish Zloty' },
+  CZK: { zh: '捷克克朗', en: 'Czech Koruna' },
+  HUF: { zh: '匈牙利福林', en: 'Hungarian Forint' },
+  ILS: { zh: '以色列新谢克尔', en: 'Israeli New Shekel' },
 };
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -45,4 +90,24 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   KRW: '₩',
   CHF: 'CHF',
   TWD: 'NT$',
+  NZD: 'NZ$',
+  SEK: 'kr',
+  NOK: 'kr',
+  DKK: 'kr',
+  INR: '₹',
+  THB: '฿',
+  MYR: 'RM',
+  PHP: '₱',
+  IDR: 'Rp',
+  VND: '₫',
+  BRL: 'R$',
+  MXN: 'MX$',
+  ZAR: 'R',
+  TRY: '₺',
+  AED: 'د.إ',
+  SAR: '﷼',
+  PLN: 'zł',
+  CZK: 'Kč',
+  HUF: 'Ft',
+  ILS: '₪',
 };

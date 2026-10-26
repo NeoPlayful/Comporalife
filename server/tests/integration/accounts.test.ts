@@ -381,4 +381,42 @@ describe('币种', () => {
     expect(currencies.find((c) => c.code === 'JPY')?.decimals).toBe(0);
     expect(currencies.find((c) => c.code === 'CNY')?.decimals).toBe(2);
   });
+
+  it('每个币种都带代码、精度与符号，且精度不是全部默认 2 位', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/currencies' });
+    const currencies = res.json().data.currencies as Array<{
+      code: string;
+      decimals: number;
+      symbol: string;
+    }>;
+
+    expect(currencies.length).toBe(32);
+    for (const item of currencies) {
+      expect(item.code).toMatch(/^[A-Z]{3}$/);
+      expect(item.symbol.trim()).not.toBe('');
+      expect([0, 2, 3]).toContain(item.decimals);
+    }
+
+    // 0 位币种必须如实反映，缺条目会退化成 2 位并在展示时凭空多出辅币
+    expect(currencies.find((c) => c.code === 'VND')?.decimals).toBe(0);
+    expect(currencies.find((c) => c.code === 'IDR')?.decimals).toBe(0);
+    expect(currencies.find((c) => c.code === 'HUF')?.decimals).toBe(0);
+  });
+
+  it('新增的主流币种可用于建账户', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/accounts',
+      headers: auth(token),
+      payload: {
+        name: 'INR 账户',
+        type: 'bank',
+        currency: 'INR',
+        openingBalance: '1000',
+        openingBalanceDate: '2026-01-01',
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().data.account.currency).toBe('INR');
+  });
 });

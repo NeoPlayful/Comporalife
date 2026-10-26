@@ -1,3 +1,4 @@
+import CurrencySelect from '@/components/finance/CurrencySelect';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
@@ -6,7 +7,6 @@ import Modal from '@/components/ui/Modal';
 import { translateError } from '@/lib/error-message';
 import { formatDate } from '@/lib/format';
 import { liabilitiesApi, type Liability, type LiabilityKind } from '@/lib/liabilities';
-import { CURRENCY_DECIMALS } from '@/utils/constants';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -118,17 +118,11 @@ function LiabilityForm({ onClose }: { onClose: () => void }) {
         </label>
         <label className="text-sm">
           {t('form.currency')}
-          <select
-            className="input mt-1"
+          <CurrencySelect
+            className="mt-1"
             value={form.currency}
-            onChange={(event) => setForm({ ...form, currency: event.target.value })}
-          >
-            {Object.keys(CURRENCY_DECIMALS).map((currency) => (
-              <option key={currency} value={currency}>
-                {currency}
-              </option>
-            ))}
-          </select>
+            onChange={(currency) => setForm({ ...form, currency })}
+          />
         </label>
         <label className="text-sm">
           {t('form.original_amount')}

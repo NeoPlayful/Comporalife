@@ -78,7 +78,7 @@ export function scheduleRateSync(
     if (stopped) return;
 
     const enabled = await isRateSyncEnabled(app.prisma);
-    const configured = isRateProviderConfigured();
+    const configured = await isRateProviderConfigured(app.prisma);
     if (!enabled || !configured) {
       state.nextRunAt = null;
       return;
@@ -94,7 +94,7 @@ export function scheduleRateSync(
 
   async function tick(): Promise<void> {
     if (stopped) return;
-    if (!isRateProviderConfigured()) {
+    if (!(await isRateProviderConfigured(app.prisma))) {
       state.nextRunAt = null;
       return;
     }
