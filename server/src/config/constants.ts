@@ -395,6 +395,35 @@ export const SETTING_REGISTRATION_ENABLED = 'registration.enabled';
 /** 邮箱验证开关：默认关闭，自部署单用户场景下强制验证只会抬高门槛 */
 export const SETTING_EMAIL_VERIFICATION_ENABLED = 'auth.email_verification_enabled';
 
+/** 汇率自动同步开关在 system_settings 中的键 */
+export const SETTING_RATE_SYNC_ENABLED = 'rate_sync_enabled';
+
+/** 汇率同步频率在 system_settings 中的键 */
+export const SETTING_RATE_SYNC_FREQUENCY = 'rate_sync_frequency';
+
+/**
+ * 可选的同步频率。
+ *
+ * 放在库里而不是环境变量，是因为它属于「运维可在线调整」的业务参数：
+ * 改环境变量必须重启进程，而管理员换个频率不该导致服务中断。
+ */
+export const RATE_SYNC_FREQUENCIES = ['hourly', 'daily', 'weekly'] as const;
+
+export type RateSyncFrequency = (typeof RATE_SYNC_FREQUENCIES)[number];
+
+export const RATE_SYNC_FREQUENCY_MS: Record<RateSyncFrequency, number> = {
+  hourly: 60 * 60 * 1000,
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000,
+};
+
+/** 没有配置过频率时按每日一次，与历史默认行为一致 */
+export const DEFAULT_RATE_SYNC_FREQUENCY: RateSyncFrequency = 'daily';
+
+export function isRateSyncFrequency(value: unknown): value is RateSyncFrequency {
+  return typeof value === 'string' && (RATE_SYNC_FREQUENCIES as readonly string[]).includes(value);
+}
+
 /** 邮箱验证令牌有效期：72 小时，给用户跨天打开邮件留足窗口 */
 export const EMAIL_VERIFY_TTL_SECONDS = 72 * 60 * 60;
 

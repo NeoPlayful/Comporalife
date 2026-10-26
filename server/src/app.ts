@@ -55,6 +55,14 @@ declare module 'fastify' {
     jobs: JobExecutor;
     /** 通用任务执行器（导出、备份、恢复、重检）；仅在启用 prisma 时存在 */
     tasks: TaskExecutor;
+    /**
+     * 汇率同步调度句柄。只有真正启动调度的入口（index.ts）会挂上它，
+     * 因此取用时必须判空——测试里的 buildApp 没有调度器。
+     */
+    rateSyncScheduler?: {
+      stop: () => void;
+      reschedule: () => Promise<void>;
+    };
   }
 }
 

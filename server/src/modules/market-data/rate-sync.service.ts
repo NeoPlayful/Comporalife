@@ -1,5 +1,6 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
+import { SETTING_RATE_SYNC_ENABLED } from '../../config/constants.js';
 import { env } from '../../config/env.js';
 import { toDecimal } from '../../lib/money.js';
 import { createGenericJsonProvider, todayKey, RateProviderError, type RateProvider } from './rate-provider.js';
@@ -84,10 +85,11 @@ async function consecutiveFailures(prisma: PrismaClient, limit: number): Promise
   return rows.length >= limit && rows.every((row) => row.status === 'failed');
 }
 
-const SETTING_KEY = 'rate_sync_enabled';
-
 export async function isRateSyncEnabled(prisma: PrismaClient): Promise<boolean> {
-  const row = await prisma.systemSetting.findUnique({ where: { key: SETTING_KEY }, select: { value: true } });
+  const row = await prisma.systemSetting.findUnique({
+    where: { key: SETTING_RATE_SYNC_ENABLED },
+    select: { value: true },
+  });
   if (!row) return false;
   return row.value === true || row.value === 'true';
 }
@@ -98,8 +100,8 @@ export async function setRateSyncEnabled(
   updatedBy: string | null,
 ): Promise<void> {
   await prisma.systemSetting.upsert({
-    where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, value: enabled, updatedBy },
+    where: { key: SETTING_RATE_SYNC_ENABLED },
+    create: { key: SETTING_RATE_SYNC_ENABLED, value: enabled, updatedBy },
     update: { value: enabled, updatedBy },
   });
 }

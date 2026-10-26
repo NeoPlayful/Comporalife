@@ -25,8 +25,13 @@ afterAll(async () => {
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
   // 汇率已全局化：残留行会让「缺少汇率」类断言失效，必须逐例清空。
-  // 只清本文件用到的币种，避免抹掉并行执行的其他套件正在写的汇率。
-  await clearExchangeRates(app, ['USD', 'CNY', 'EUR', 'JPY']);
+  //
+  // 用方向精确匹配而不是双向匹配：rate-sync 等套件也以 CNY 为对手币，
+  // 双向清理（「任一币种出现在任一侧」）会在它们断言前把数据删掉。
+  await clearExchangeRates(app, {
+    froms: ['USD', 'CNY', 'EUR', 'JPY'],
+    tos: ['USD', 'CNY', 'EUR', 'JPY'],
+  });
 
   const user = await createUser(app, DOMAIN);
   token = user.token;
@@ -573,9 +578,19 @@ describe('多币种与汇率', () => {
         'admin.currency_rate.deleted',
       ]),
     );
-    // 审计 metadata 不得出现汇率数值
-    expect(JSON.stringify(mine)).not.toContain('7.1');
-    expect(JSON.stringify(mine)).not.toContain('7.3');
+    // 审计 metadata 不得出现汇率数值。
+    // 只能比对 metadata 本身：列表接口不返回它，而整条日志的 JSON 里含有
+    // UUID 与毫秒时间戳，做子串匹配会被形如 "...37.186Z" 的巧合误判。
+    const stored = await app.prisma.auditLog.findMany({
+      where: { targetId: rateId },
+      select: { metadata: true },
+    });
+    expect(stored).toHaveLength(3);
+    for (const row of stored) {
+      const text = JSON.stringify(row.metadata);
+      expect(text).not.toContain('7.1');
+      expect(text).not.toContain('7.3');
+    }
   });
 
   it('用户不能写汇率', async () => {

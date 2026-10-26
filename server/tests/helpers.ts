@@ -64,19 +64,40 @@ export async function promoteToAdmin(
 }
 
 /**
- * 汇率已全局化，测试之间必须清空，否则上一个用例的汇率会让「缺少汇率」类断言失效。
+ * 清理汇率行。
  *
- * 传入 `codes` 时只清理涉及这些币种的行：并行执行的其他套件可能正在使用其他币种对，
- * 全表删除会把它们正在写入的数据一起抹掉。
+ * 汇率表已全局化，并行执行的套件共用同一张表，因此清理范围必须与「本套件写入什么」
+ * 精确对应：
+ *
+ * - `pairs`：按「基准币在 froms 且计价币在 tos」清理，只删自己造的方向。
+ *   两个套件都以 CNY 为对手币时（例如 GBP→CNY 与 EUR→CNY），双向匹配会互相删除，
+ *   这类套件必须用这个模式。
+ * - `codes`：双向匹配，任一币种出现在任一侧就删除。适合独占若干币种的套件。
+ *
+ * 两者都不传则清空全表——仅用于串行执行的场景，并行下会误删其他套件的数据。
  */
-export async function clearExchangeRates(app: FastifyInstance, codes?: string[]) {
-  if (!codes || codes.length === 0) {
+export async function clearExchangeRates(
+  app: FastifyInstance,
+  scope?: string[] | { froms: string[]; tos: string[] },
+) {
+  if (!scope) {
     await app.prisma.exchangeRate.deleteMany({});
     return;
   }
+
+  if (Array.isArray(scope)) {
+    await app.prisma.exchangeRate.deleteMany({
+      where: {
+        OR: [{ baseCurrency: { in: scope } }, { quoteCurrency: { in: scope } }],
+      },
+    });
+    return;
+  }
+
   await app.prisma.exchangeRate.deleteMany({
     where: {
-      OR: [{ baseCurrency: { in: codes } }, { quoteCurrency: { in: codes } }],
+      baseCurrency: { in: scope.froms },
+      quoteCurrency: { in: scope.tos },
     },
   });
 }

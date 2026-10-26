@@ -68,8 +68,9 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  // 只清本套件使用的币种：全表清理会抹掉并行执行的其他套件正在写入的汇率
-  await clearExchangeRates(app, ['GBP', 'AUD', 'CNY']);
+  // 用方向精确匹配：本套件只写 GBP/AUD → CNY 方向，而 dashboard 也以 CNY 为
+  // 对手币。双向清理会在对方断言前把它的 USD→CNY 行删掉。
+  await clearExchangeRates(app, { froms: ['GBP', 'AUD', 'CNY'], tos: ['GBP', 'AUD', 'CNY'] });
   await app.prisma.rateSyncRun.deleteMany({});
 
   const user = await createUser(app, DOMAIN);

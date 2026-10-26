@@ -14,9 +14,11 @@ async function main() {
   const stopRetention = scheduleDataRetention(app.prisma, (err) => {
     app.log.warn({ err }, '备份与导出保留清理任务失败');
   });
-  const stopRateSync = scheduleRateSync(app, (err) => {
+  const rateSync = scheduleRateSync(app, (err) => {
     app.log.warn({ err }, '汇率同步任务失败');
   });
+  // 同步设置接口在频率或开关变更后立刻重排，不必等旧定时器到期
+  app.decorate('rateSyncScheduler', rateSync);
 
   // 生产环境没有 SMTP 时，密码重置与邮箱验证都不可用；提前告警而不是等用户触发才报错
   if (env.NODE_ENV === 'production' && !isMailConfigured()) {
@@ -25,7 +27,7 @@ async function main() {
   app.addHook('onClose', async () => {
     stopCleanup();
     stopRetention();
-    stopRateSync();
+    rateSync.stop();
   });
 
   const shutdown = async (signal: string) => {

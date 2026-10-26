@@ -6,10 +6,13 @@ import { auth, cleanupUsers, clearExchangeRates, createUser, promoteToAdmin, tes
 const DOMAIN = testDomain('rate-watchlist');
 
 // 与其他汇率测试文件使用互不重叠的币种对，避免并行执行时互相污染全局汇率表。
-// 基准币种也刻意不选 CNY：dashboard 与 rate-sync 两个套件都用 CNY 作为对手币。
-const HELD = 'GBP';
-const OTHER = 'AUD';
-const BASE = 'SGD';
+//
+// 当前占用：dashboard 用 USD/CNY/EUR/JPY，rate-sync 用 GBP/AUD/CNY，
+// admin-rate-views 用 HKD/CAD/KRW。本套件因此只用剩下的 SGD/CHF/TWD——
+// 三个套件都清理 GBP/AUD 时，会在对方断言前把数据删掉。
+const HELD = 'SGD';
+const OTHER = 'CHF';
+const BASE = 'TWD';
 
 let app: FastifyInstance;
 let token: string;
@@ -80,7 +83,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  await clearExchangeRates(app, [HELD, OTHER, 'CHF', BASE]);
+  await clearExchangeRates(app, [HELD, OTHER, BASE]);
 
   const user = await createUser(app, DOMAIN);
   token = user.token;
@@ -265,20 +268,21 @@ describe('候选集合', () => {
   });
 
   it('持有但暂无汇率的币种对移除后仍可重新加入', async () => {
+    // 两个币种都持有，但只为 OTHER 录入汇率：HELD->BASE 因此是「需要但没有数据」
     await createAccount(HELD);
-    await createAccount('CHF');
+    await createAccount(OTHER);
     await createAdminRate(OTHER, BASE, '4.5');
 
-    // 先转为自定义列表：移除没有数据的 CHF
-    await removePair('CHF', BASE);
+    // 先转为自定义列表：移除没有数据的 HELD
+    await removePair(HELD, BASE);
     const candidates = (await watchlist()).json().data.candidates as Array<{
       from: string;
       to: string;
     }>;
     const keys = candidates.map((item) => `${item.from}->${item.to}`);
-    expect(keys).toContain(`CHF->${BASE}`);
+    expect(keys).toContain(`${HELD}->${BASE}`);
 
-    const reAdded = await addPair('CHF', BASE);
+    const reAdded = await addPair(HELD, BASE);
     expect(reAdded.statusCode).toBe(201);
   });
 

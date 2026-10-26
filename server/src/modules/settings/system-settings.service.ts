@@ -1,7 +1,11 @@
 import type { PrismaClient } from '@prisma/client';
 import {
+  DEFAULT_RATE_SYNC_FREQUENCY,
+  isRateSyncFrequency,
   SETTING_EMAIL_VERIFICATION_ENABLED,
+  SETTING_RATE_SYNC_FREQUENCY,
   SETTING_REGISTRATION_ENABLED,
+  type RateSyncFrequency,
 } from '../../config/constants.js';
 
 /**
@@ -54,5 +58,32 @@ export async function setEmailVerificationEnabled(
     where: { key: SETTING_EMAIL_VERIFICATION_ENABLED },
     create: { key: SETTING_EMAIL_VERIFICATION_ENABLED, value: enabled, updatedBy },
     update: { value: enabled, updatedBy },
+  });
+}
+
+/**
+ * 汇率同步频率。
+ *
+ * 库里可能存着被手工改坏的值，因此读到无法识别的取值时回退到每日一次，
+ * 而不是抛错——同步停摆比频率不准严重得多。
+ */
+export async function getRateSyncFrequency(prisma: PrismaClient): Promise<RateSyncFrequency> {
+  const row = await prisma.systemSetting.findUnique({
+    where: { key: SETTING_RATE_SYNC_FREQUENCY },
+    select: { value: true },
+  });
+
+  return isRateSyncFrequency(row?.value) ? row.value : DEFAULT_RATE_SYNC_FREQUENCY;
+}
+
+export async function setRateSyncFrequency(
+  prisma: PrismaClient,
+  frequency: RateSyncFrequency,
+  updatedBy: string,
+): Promise<void> {
+  await prisma.systemSetting.upsert({
+    where: { key: SETTING_RATE_SYNC_FREQUENCY },
+    create: { key: SETTING_RATE_SYNC_FREQUENCY, value: frequency, updatedBy },
+    update: { value: frequency, updatedBy },
   });
 }
