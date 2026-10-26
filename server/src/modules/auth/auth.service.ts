@@ -46,12 +46,27 @@ export class AuthService {
     private readonly redis: Redis,
   ) {}
 
-  async register(input: {
-    email: string;
-    password: string;
-    nickname: string;
-    language?: (typeof SUPPORTED_LANGUAGES)[number];
-  }) {
+  /**
+   * 建号。
+   *
+   * 前台注册与后台代建共用这套流程：预设分类复制、默认设置、审计都必须一致，
+   * 否则同一个系统里会出现「后台建的号缺一套分类」这类隐性差异。
+   * 差异只体现在 options 上：角色、初始密码是否视为已验证、审计动作与操作者。
+   */
+  async register(
+    input: {
+      email: string;
+      password: string;
+      nickname: string;
+      language?: (typeof SUPPORTED_LANGUAGES)[number];
+    },
+    options: {
+      role?: User['role'];
+      /** 管理员代建视为已验证，否则开启邮箱验证后新账号会被卡在登录之外 */
+      emailVerified?: boolean;
+      audit?: { action: string; actorId?: string };
+    } = {},
+  ) {
     const email = input.email.toLowerCase().trim();
     const language = input.language ?? 'zh-CN';
 
@@ -61,6 +76,7 @@ export class AuthService {
     }
 
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id });
+    const verifiedAt = options.emailVerified ? new Date() : null;
 
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
@@ -68,8 +84,9 @@ export class AuthService {
           email,
           passwordHash,
           nickname: input.nickname.trim(),
-          role: 'user',
+          role: options.role ?? 'user',
           status: 'active',
+          emailVerifiedAt: verifiedAt,
           settings: {
             create: {
               baseCurrency: env.DEFAULT_CURRENCY,
@@ -113,7 +130,13 @@ export class AuthService {
       }
 
       await tx.auditLog.create({
-        data: { userId: created.id, action: 'auth.register', targetType: 'user', targetId: created.id },
+        data: {
+          // 后台代建记在操作者名下，自助注册记在新账号名下
+          userId: options.audit?.actorId ?? created.id,
+          action: options.audit?.action ?? 'auth.register',
+          targetType: 'user',
+          targetId: created.id,
+        },
       });
 
       return created;

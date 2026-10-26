@@ -49,12 +49,15 @@ afterAll(async () => {
   } else {
     await app.prisma.systemSetting.deleteMany({ where: { key: 'registration.enabled' } });
   }
+  await app.prisma.systemSetting.deleteMany({ where: { key: 'admin.user_create_enabled' } });
   await cleanupUsers(app, DOMAIN);
   await app.close();
 });
 
 beforeEach(async () => {
   await app.prisma.systemSetting.deleteMany({ where: { key: 'registration.enabled' } });
+  // 代建开关每个用例都从「关闭」开始，个别用例自行打开
+  await app.prisma.systemSetting.deleteMany({ where: { key: 'admin.user_create_enabled' } });
   await cleanupUsers(app, DOMAIN);
 
   const superUser = await createUser(app, DOMAIN, 'super');
@@ -154,19 +157,20 @@ describe('仪表板聚合', () => {
 });
 
 describe('用户管理', () => {
-  it('列表默认脱敏邮箱', async () => {
+  it('列表默认返回完整账号', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/admin/users', headers: auth(adminToken) });
 
     expect(res.statusCode).toBe(200);
     const users = res.json().data.users as Array<{ email: string }>;
     expect(users.length).toBeGreaterThan(0);
-    expect(users.every((item) => item.email.includes('***'))).toBe(true);
+    // 后台靠完整邮箱确认操作对象，脱敏会放大误操作风险
+    expect(users.every((item) => item.email.includes('@') && !item.email.includes('***'))).toBe(true);
   });
 
-  it('reveal=true 时返回完整邮箱并写审计', async () => {
+  it('详情返回完整账号且不再写查看审计', async () => {
     const res = await app.inject({
       method: 'GET',
-      url: `/api/admin/users/${userId}?reveal=true`,
+      url: `/api/admin/users/${userId}`,
       headers: auth(adminToken),
     });
 
@@ -174,20 +178,7 @@ describe('用户管理', () => {
     expect(res.json().data.user.email).toContain('@');
     expect(res.json().data.user.email).not.toContain('***');
 
-    // 查看明文账号属于隐私操作，必须留痕，否则谁看过无从追溯
-    const log = await app.prisma.auditLog.findFirst({
-      where: { userId: adminId, action: 'admin.user_revealed', targetId: userId },
-    });
-    expect(log).not.toBeNull();
-  });
-
-  it('未 reveal 时不写查看审计', async () => {
-    await app.inject({
-      method: 'GET',
-      url: `/api/admin/users/${userId}`,
-      headers: auth(adminToken),
-    });
-
+    // 查看详情已不是隐私特例，不应再产生单独的留痕噪声
     const log = await app.prisma.auditLog.findFirst({
       where: { userId: adminId, action: 'admin.user_revealed' },
     });
@@ -207,6 +198,15 @@ describe('用户管理', () => {
     expect(pagination.total).toBeGreaterThanOrEqual(3);
     expect(pagination.totalPages).toBeGreaterThanOrEqual(2);
     expect((res.json().data.users as unknown[]).length).toBeLessThanOrEqual(2);
+  });
+
+  it('分页参数之外的筛选不影响返回结构', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?page=1&pageSize=5',
+      headers: auth(adminToken),
+    });
+    expect(res.json().meta.pagination.pageSize).toBe(5);
   });
 
   it('详情不含任何财务字段', async () => {
@@ -779,5 +779,262 @@ describe('系统与设置', () => {
     expect(pagination.pageSize).toBe(2);
     expect(pagination.total).toBeGreaterThanOrEqual(3);
     expect((res.json().data.logs as unknown[]).length).toBe(2);
+  });
+});
+
+describe('后台代建账号', () => {
+  /** 打开代建开关；调用方自己保证此时是超管 */
+  async function enableCreate() {
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/admin/settings/user-creation',
+      headers: auth(superToken),
+      payload: { enabled: true },
+    });
+  }
+
+  function createPayload(overrides: Record<string, unknown> = {}) {
+    return {
+      email: `created-${Math.random().toString(36).slice(2, 10)}${DOMAIN}`,
+      nickname: '代建账号',
+      password: 'InitPass123',
+      ...overrides,
+    };
+  }
+
+  it('开关默认关闭，关闭时建号返回 403', async () => {
+    const settings = await app.inject({
+      method: 'GET',
+      url: '/api/admin/settings',
+      headers: auth(superToken),
+    });
+    expect(settings.json().data.adminUserCreateEnabled).toBe(false);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(superToken),
+      payload: createPayload(),
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('只有超管能切换开关', async () => {
+    const denied = await app.inject({
+      method: 'PATCH',
+      url: '/api/admin/settings/user-creation',
+      headers: auth(adminToken),
+      payload: { enabled: true },
+    });
+    expect(denied.statusCode).toBe(403);
+
+    const readDenied = await app.inject({
+      method: 'GET',
+      url: '/api/admin/settings/user-creation',
+      headers: auth(adminToken),
+    });
+    expect(readDenied.statusCode).toBe(403);
+  });
+
+  it('开启后管理员可以建普通用户，邮箱视为已验证', async () => {
+    await enableCreate();
+
+    const payload = createPayload();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload,
+    });
+
+    expect(res.statusCode).toBe(201);
+    const created = res.json().data.user;
+    expect(created.email).toBe(payload.email);
+    expect(created.role).toBe('user');
+    expect(created.emailVerifiedAt).not.toBeNull();
+
+    // 建号不签发会话：管理员不会被切换成新账号
+    expect(res.json().data.accessToken).toBeUndefined();
+
+    // 新账号能用自己的初始密码登录
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: payload.email, password: payload.password },
+    });
+    expect(login.statusCode).toBe(200);
+  });
+
+  it('代建账号会生成预设分类', async () => {
+    await enableCreate();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload: createPayload(),
+    });
+
+    const categories = await app.prisma.category.count({
+      where: { userId: res.json().data.user.id },
+    });
+    expect(categories).toBeGreaterThan(0);
+  });
+
+  it('重复邮箱返回 409', async () => {
+    await enableCreate();
+
+    const payload = createPayload({ email: `dup${DOMAIN}` });
+    const first = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload,
+    });
+    expect(first.statusCode).toBe(201);
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload,
+    });
+    expect(second.statusCode).toBe(409);
+  });
+
+  it('弱密码被拒绝', async () => {
+    await enableCreate();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload: createPayload({ password: '123' }),
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('普通管理员不能代建管理员，超管可以', async () => {
+    await enableCreate();
+
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload: createPayload({ role: 'admin' }),
+    });
+    expect(denied.statusCode).toBe(403);
+
+    const allowed = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(superToken),
+      payload: createPayload({ role: 'admin' }),
+    });
+    expect(allowed.statusCode).toBe(201);
+    expect(allowed.json().data.user.role).toBe('admin');
+  });
+
+  it('建号写审计且不含密码', async () => {
+    await enableCreate();
+
+    const payload = createPayload();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: auth(adminToken),
+      payload,
+    });
+    const createdId = res.json().data.user.id;
+
+    const log = await app.prisma.auditLog.findFirst({
+      where: { action: 'admin.user_created', targetId: createdId },
+    });
+    expect(log).not.toBeNull();
+    expect(log?.userId).toBe(adminId);
+    // 审计不得落密码：连序列化后的整行都不应包含
+    expect(JSON.stringify(log)).not.toContain(payload.password);
+  });
+
+  it('开关切换写审计', async () => {
+    await enableCreate();
+
+    const log = await app.prisma.auditLog.findFirst({
+      where: { action: 'admin.user_creation_toggled' },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(log).not.toBeNull();
+    expect(log?.metadata).toEqual({ enabled: true });
+  });
+});
+
+describe('注销状态筛选', () => {
+  it('deletion 参数分别命中待审批、可批准与已注销', async () => {
+    const coolingDays = 30;
+
+    // 待审批：刚提交申请，冷却期未满
+    await app.prisma.user.update({
+      where: { id: userId },
+      data: { deletionRequestedAt: new Date() },
+    });
+
+    const pending = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?deletion=pending',
+      headers: auth(adminToken),
+    });
+    expect(pending.json().data.users.some((u: { id: string }) => u.id === userId)).toBe(true);
+
+    const readyBefore = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?deletion=ready',
+      headers: auth(adminToken),
+    });
+    expect(readyBefore.json().data.users.some((u: { id: string }) => u.id === userId)).toBe(false);
+
+    // 把申请时间推到冷却期之前，应转到「可批准」
+    await app.prisma.user.update({
+      where: { id: userId },
+      data: { deletionRequestedAt: new Date(Date.now() - (coolingDays + 1) * 86_400_000) },
+    });
+
+    const ready = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?deletion=ready',
+      headers: auth(adminToken),
+    });
+    expect(ready.json().data.users.some((u: { id: string }) => u.id === userId)).toBe(true);
+
+    // 已注销的记录只出现在 deleted 里
+    await app.prisma.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date() },
+    });
+
+    const deleted = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?deletion=deleted',
+      headers: auth(adminToken),
+    });
+    expect(deleted.json().data.users.some((u: { id: string }) => u.id === userId)).toBe(true);
+
+    const readyAfter = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?deletion=ready',
+      headers: auth(adminToken),
+    });
+    expect(readyAfter.json().data.users.some((u: { id: string }) => u.id === userId)).toBe(false);
+  });
+
+  it('搜索可按昵称命中', async () => {
+    await app.prisma.user.update({ where: { id: userId }, data: { nickname: '独一无二的昵称' } });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/admin/users?search=${encodeURIComponent('独一无二')}`,
+      headers: auth(adminToken),
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().data.users.some((u: { id: string }) => u.id === userId)).toBe(true);
   });
 });
