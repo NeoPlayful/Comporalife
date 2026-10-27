@@ -12,6 +12,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { importsApi, type ColumnMapping, type CommitResult } from '@/lib/imports';
 
 const DEFAULT_MAPPING: ColumnMapping = {
@@ -32,8 +33,7 @@ export default function ImportWorkbenchPage() {
   const [step, setStep] = useState(2);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [templateName, setTemplateName] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // 提交后的导入统计是结束页的核心内容，留在页面里；中途各步的结果走 toast
   const [commitResult, setCommitResult] = useState<CommitResult | null>(null);
 
   const detail = useQuery({ queryKey: ['imports', id], queryFn: () => importsApi.detail(id) });
@@ -64,20 +64,18 @@ export default function ImportWorkbenchPage() {
         ...(templateName.trim() ? { templateName: templateName.trim() } : {}),
       }),
     onSuccess: async () => {
-      setError(null);
-      setMessage(t('mapping.saved'));
+      toastSuccess(t('mapping.saved'));
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       await rowsQuery.refetch();
       setStep(3);
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const validate = useMutation({
     mutationFn: () => importsApi.validate(id),
     onSuccess: async (result) => {
-      setError(null);
-      setMessage(
+      toastSuccess(
         t('validate.validated', {
           valid: result.batch.counts.valid,
           invalid: result.batch.counts.invalid,
@@ -90,19 +88,18 @@ export default function ImportWorkbenchPage() {
       const totalDuplicates = result.batch.counts.duplicate + result.batch.counts.suspected;
       setStep(totalDuplicates > 0 ? 4 : 5);
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const decideDuplicates = useMutation({
     mutationFn: (decisions: Array<{ rowId: string; action: 'keep' | 'skip' }>) =>
       importsApi.decideDuplicates(id, decisions),
     onSuccess: async () => {
-      setError(null);
-      setMessage(t('duplicates.saved'));
+      toastSuccess(t('duplicates.saved'));
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       setStep(5);
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const commit = useMutation({
@@ -112,21 +109,19 @@ export default function ImportWorkbenchPage() {
       return importsApi.commit(id, key);
     },
     onSuccess: async (result) => {
-      setError(null);
       setCommitResult(result);
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       await queryClient.invalidateQueries({ queryKey: ['imports'] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const rollback = useMutation({
     mutationFn: () => importsApi.rollback(id),
     onSuccess: async () => {
-      setError(null);
-      setMessage(t('workbench.rollback.done'));
+      toastSuccess(t('workbench.rollback.done'));
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -137,13 +132,13 @@ export default function ImportWorkbenchPage() {
         const reasons = details?.blockedTransactions
           ?.map((item) => item.reason)
           .join(t('common:list_separator'));
-        setError(
+        toastError(
           t('workbench.rollback.blocked', {
             reasons: reasons ?? t('workbench.rollback.blocked_default'),
           }),
         );
       } else {
-        setError(translateError(err, t));
+        toastError(translateError(err, t));
       }
     },
   });
@@ -152,9 +147,9 @@ export default function ImportWorkbenchPage() {
     mutationFn: () => importsApi.cancel(id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['imports', id] });
-      setMessage(t('workbench.cancel.done'));
+      toastSuccess(t('workbench.cancel.done'));
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   if (detail.isPending) return <LoadingState label={t('loading_batches')} />;
@@ -195,12 +190,6 @@ export default function ImportWorkbenchPage() {
 
       <ImportStepper current={step} onSelect={(target) => target >= 2 && setStep(target)} />
 
-      {message && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">{message}</p>}
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
       {batch.failureReason && batch.status === 'failed' && (
         <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-500">{batch.failureReason}</p>
       )}

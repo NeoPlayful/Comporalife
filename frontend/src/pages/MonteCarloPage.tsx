@@ -9,6 +9,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastInfo, toastSuccess } from '@/lib/toast';
 import { formatDateTime } from '@/lib/format';
 import {
   monteCarloApi,
@@ -76,7 +77,6 @@ export default function MonteCarloPage() {
   const [tab, setTab] = useState<Tab>('params');
   const [draft, setDraft] = useState<ScenarioBody | null>(null);
   const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [stressPreset, setStressPreset] = useState<StressPresetKey | ''>('');
 
@@ -154,32 +154,32 @@ export default function MonteCarloPage() {
         : monteCarloApi.update(selectedId, draft);
     },
     onSuccess: (scenario) => {
+      toastSuccess(t('common:feedback.saved'));
       setCreating(false);
-      setError(null);
       setSelectedId(scenario.id);
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => monteCarloApi.remove(id),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       setSelectedId(null);
       setDraft(null);
       setActiveRunId(null);
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const duplicateMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => monteCarloApi.duplicate(id, name),
     onSuccess: (scenario) => {
+      toastSuccess(t('common:feedback.copied'));
       setSelectedId(scenario.id);
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const runMutation = useMutation({
@@ -188,22 +188,21 @@ export default function MonteCarloPage() {
         ...(stressPreset ? { stressPreset } : {}),
       }),
     onSuccess: (run) => {
+      toastSuccess(t('common:feedback.run_started'));
       setActiveRunId(run.id);
       setTab('runs');
-      setError(null);
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo', 'runs', selectedId] });
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const cancelMutation = useMutation({
     mutationFn: () => monteCarloApi.cancelRun(selectedId!, activeRunId!),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.cancelled'));
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo', 'run', selectedId, activeRunId] });
       void queryClient.invalidateQueries({ queryKey: ['monte-carlo', 'runs', selectedId] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const applySuggestion = async (portfolioId: string) => {
@@ -227,9 +226,8 @@ export default function MonteCarloPage() {
         ),
       });
       setTab('assets');
-      setError(null);
     } catch (err) {
-      setError(translateError(err, t));
+      toastError(translateError(err, t));
     }
   };
 
@@ -293,7 +291,6 @@ export default function MonteCarloPage() {
               setDraft(defaultBody());
               setActiveRunId(null);
               setTab('params');
-              setError(null);
             }}
           >
             <Plus className="size-4" aria-hidden />
@@ -301,12 +298,6 @@ export default function MonteCarloPage() {
           </button>
         </div>
       </div>
-
-      {error && (
-        <p className="rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-sm text-rose-300" role="alert">
-          {error}
-        </p>
-      )}
 
       <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="card h-fit p-2">
@@ -325,7 +316,6 @@ export default function MonteCarloPage() {
                       setCreating(false);
                       setActiveRunId(item.latestRun?.id ?? null);
                       setTab('params');
-                      setError(null);
                     }}
                     className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
                       selectedId === item.id
@@ -473,7 +463,7 @@ export default function MonteCarloPage() {
                   onRun={() => {
                     if (!selectedId) return;
                     if (creating) {
-                      setError(t('run.save_first'));
+                      toastInfo(t('run.save_first'));
                       return;
                     }
                     runMutation.mutate();

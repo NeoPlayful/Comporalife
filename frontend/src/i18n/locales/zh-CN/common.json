@@ -47,6 +47,20 @@
     "discard_keep_editing": "继续编辑"
   },
   "network_error": "网络异常，请稍后重试",
+  "feedback": {
+    "created": "创建成功",
+    "saved": "保存成功",
+    "deleted": "删除成功",
+    "archived": "归档成功",
+    "unarchived": "已取消归档",
+    "voided": "已作废",
+    "copied": "复制成功",
+    "submitted": "提交成功",
+    "cancelled": "已取消",
+    "updated": "更新成功",
+    "run_started": "已开始计算",
+    "done": "已恢复默认"
+  },
   "list_separator": "、",
   "pagination": {
     "total": "共 {{total}} 条",

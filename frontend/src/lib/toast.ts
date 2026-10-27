@@ -29,8 +29,4 @@ export function toastInfo(message: string) {
   toast(message, BASE);
 }
 
-export function dismissToasts() {
-  toast.dismiss();
-}
-
 export { Toaster } from 'react-hot-toast';

@@ -53,6 +53,7 @@ export default function NotificationsPage() {
     queryFn: () => notificationsApi.list({ unreadOnly }),
   });
 
+  // 已读状态由列表即时反映，不再额外弹提示——点一下就弹会盖住用户正在读的正文
   const markRead = useMutation({
     mutationFn: (id: string) => notificationsApi.markRead(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),

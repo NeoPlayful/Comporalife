@@ -9,6 +9,7 @@ import GoalHistoryChart from '@/components/goals/GoalHistoryChart';
 import GoalProgressRing from '@/components/goals/GoalProgressRing';
 import GoalProjectionCards from '@/components/goals/GoalProjectionCards';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatDate, formatNumber } from '@/lib/format';
 import {
   financialIndependenceApi,
@@ -90,6 +91,7 @@ export default function GoalsPage() {
   const createMutation = useMutation({
     mutationFn: (body: GoalInput) => goalsApi.create(body),
     onSuccess: (result) => {
+      toastSuccess(t('common:feedback.created'));
       setCreating(false);
       setError(null);
       setSelectedId(result.id);
@@ -101,6 +103,7 @@ export default function GoalsPage() {
   const updateMutation = useMutation({
     mutationFn: (body: GoalInput) => goalsApi.update(selectedId!, body),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       setEditing(false);
       setError(null);
       invalidate();
@@ -110,17 +113,19 @@ export default function GoalsPage() {
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) => goalsApi.update(id, { status: 'archived' }),
-    onSuccess: () => invalidate(),
-    onError: (err) => setError(translateError(err, t)),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.archived'));
+      invalidate();
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => goalsApi.remove(id),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       setSelectedId(null);
       invalidate();
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const currency = summaryQuery.data?.currency ?? detailQuery.data?.goal.currency ?? 'CNY';

@@ -1,5 +1,6 @@
 import { authApi } from '@/lib/auth';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDateTime } from '@/lib/format';
 import LoadingState from '@/components/ui/LoadingState';
 import { useAuthStore } from '@/stores/auth-store';
@@ -14,8 +15,6 @@ export default function ProfilePage() {
   const { t } = useTranslation('settings');
 
   const [nickname, setNickname] = useState(user?.nickname ?? '');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -28,14 +27,10 @@ export default function ProfilePage() {
   const updateProfile = useMutation({
     mutationFn: () => authApi.updateProfile({ nickname }),
     onSuccess: () => {
-      setMessage(t('profile.nickname_updated'));
-      setError(null);
+      toastSuccess(t('profile.nickname_updated'));
       queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
     },
-    onError: (err) => {
-      setMessage(null);
-      setError(translateError(err, t));
-    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const changePassword = useMutation({
@@ -48,37 +43,28 @@ export default function ProfilePage() {
       clear();
       window.location.assign('/login');
     },
-    onError: (err) => {
-      setError(translateError(err, t));
-    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const revokeSession = useMutation({
     mutationFn: (id: string) => authApi.revokeSession(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] }),
+    onSuccess: () => {
+      toastSuccess(t('profile.sessions.revoked'));
+      queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
+    },
   });
 
   const revokeOthers = useMutation({
     mutationFn: () => authApi.revokeOtherSessions(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] }),
+    onSuccess: () => {
+      toastSuccess(t('profile.sessions.revoked_others'));
+      queryClient.invalidateQueries({ queryKey: ['auth', 'sessions'] });
+    },
   });
 
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-semibold">{t('profile.title')}</h1>
-
-      {(message || error) && (
-        <p
-          role="status"
-          className={`rounded-lg px-3 py-2 text-sm ${
-            error
-              ? 'bg-[var(--color-negative)]/10 text-[var(--color-negative)]'
-              : 'bg-[var(--color-positive)]/10 text-[var(--color-positive)]'
-          }`}
-        >
-          {error ?? message}
-        </p>
-      )}
 
       <section className="card space-y-4 p-5">
         <h2 className="text-sm font-medium">{t('profile.basic')}</h2>

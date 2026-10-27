@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { ApiError } from '@/lib/client';
 import { jobsApi, type JobItem } from '@/lib/data-management';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDateTime } from '@/lib/format';
 
 type Filter = 'all' | 'running' | 'failed';
@@ -14,7 +15,6 @@ export default function JobList({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation(['data', 'enums']);
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
-  const [error, setError] = useState<string | null>(null);
 
   const query = useQuery({
     queryKey: ['jobs', filter],
@@ -30,14 +30,20 @@ export default function JobList({ compact = false }: { compact?: boolean }) {
 
   const cancel = useMutation({
     mutationFn: (id: string) => jobsApi.cancel(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs'] }),
-    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.cancelled'));
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   const retry = useMutation({
     mutationFn: (id: string) => jobsApi.retry(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs'] }),
-    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.submitted'));
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   return (
@@ -56,8 +62,6 @@ export default function JobList({ compact = false }: { compact?: boolean }) {
           </button>
         ))}
       </div>
-
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {query.data?.items.length === 0 ? (
         <EmptyState title={t('jobs.empty')} description="" />

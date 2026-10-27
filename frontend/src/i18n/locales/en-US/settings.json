@@ -85,7 +85,9 @@
       "current_badge": "Current",
       "no_ip": "No IP recorded",
       "last_used": "Last used {{time}}",
-      "revoke": "Revoke"
+      "revoke": "Revoke",
+      "revoked": "Device signed out",
+      "revoked_others": "Other devices signed out"
     }
   }
 }
