@@ -1,6 +1,7 @@
 import EmptyState from '@/components/ui/EmptyState';
 import Modal from '@/components/ui/Modal';
 import '@/components/charts/echarts';
+import { useChartTheme } from '@/components/charts/chart-theme';
 import { adminApi, type AdminRateHistoryPoint } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
@@ -29,6 +30,7 @@ export default function RateHistoryDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation('admin');
+  const chartTheme = useChartTheme();
   const [range, setRange] = useState<Range>(90);
   const [detailPage, setDetailPage] = useState(1);
 
@@ -62,25 +64,25 @@ export default function RateHistoryDialog({
     grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       valueFormatter: (value: number) => formatRate(value),
     },
     xAxis: {
       type: 'category',
       data: points.map((point) => point.rateDate.slice(5)),
       boundaryGap: false,
-      axisLine: { lineStyle: { color: 'var(--color-border-subtle)' } },
-      axisLabel: { color: 'var(--color-content-muted)', fontSize: 10 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 10 },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      splitLine: { lineStyle: { color: 'var(--color-border-subtle)', opacity: 0.4 } },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
       axisLabel: {
-        color: 'var(--color-content-muted)',
+        color: chartTheme.axisLabel,
         fontSize: 10,
         formatter: (value: number) => formatRate(value),
       },

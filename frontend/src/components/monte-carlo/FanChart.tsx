@@ -3,6 +3,7 @@ import type { SimulationResult } from '@/lib/monte-carlo';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
+import { useChartTheme } from '../charts/chart-theme';
 import ReactECharts from 'echarts-for-react';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 
 export default function FanChart({ bands, currency, samplePaths = [], compact = false }: Props) {
   const { t } = useTranslation('monte-carlo');
+  const chartTheme = useChartTheme();
 
   if (bands.length === 0) {
     return <EmptyState title={t('result.empty')} />;
@@ -126,16 +128,16 @@ export default function FanChart({ bands, currency, samplePaths = [], compact = 
     legend: {
       top: 0,
       right: 0,
-      textStyle: { color: 'rgba(255,255,255,0.55)', fontSize: 11 },
+      textStyle: { color: chartTheme.legend, fontSize: 11 },
       itemWidth: 12,
       itemHeight: 8,
       data: [t('chart.band_outer'), ...(compact ? [] : [t('chart.band_inner')]), t('chart.median')],
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       formatter: (params: Array<{ dataIndex: number }>) => {
         const index = params[0]?.dataIndex ?? 0;
         const band = bands[index];
@@ -157,17 +159,17 @@ export default function FanChart({ bands, currency, samplePaths = [], compact = 
     xAxis: {
       type: 'category',
       data: years,
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
     },
     yAxis: {
       type: 'value',
       axisLabel: {
-        color: 'rgba(255,255,255,0.45)',
+        color: chartTheme.axisLabel,
         fontSize: 11,
         formatter: (value: number) => formatNumber(value, { notation: 'compact', maximumFractionDigits: 1 }),
       },
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
     },
     series,
   };

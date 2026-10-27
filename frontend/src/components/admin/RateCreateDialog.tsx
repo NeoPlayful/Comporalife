@@ -159,7 +159,7 @@ export default function RateCreateDialog({
           />
           {rate.trim() !== '' && !positive ? (
             <span className="mt-1 block text-xs text-[var(--color-negative)]">
-              {t('exchangeRates.editDrawer.rate_invalid')}
+              {t('exchangeRates.editForm.rate_invalid')}
             </span>
           ) : (
             <span className="mt-1 block text-xs text-[var(--color-content-muted)]">

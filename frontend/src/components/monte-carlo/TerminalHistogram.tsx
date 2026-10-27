@@ -3,6 +3,7 @@ import type { SimulationResult } from '@/lib/monte-carlo';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
+import { useChartTheme } from '../charts/chart-theme';
 import ReactECharts from 'echarts-for-react';
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 
 export default function TerminalHistogram({ histogram, currency }: Props) {
   const { t } = useTranslation('monte-carlo');
+  const chartTheme = useChartTheme();
 
   const total = histogram.bins.reduce((sum, value) => sum + value, 0);
   if (total === 0) {
@@ -32,9 +34,9 @@ export default function TerminalHistogram({ histogram, currency }: Props) {
     grid: { left: 8, right: 16, top: 20, bottom: 8, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       formatter: (params: Array<{ dataIndex: number }>) => {
         const index = params[0]?.dataIndex ?? 0;
         const count = histogram.bins[index] ?? 0;
@@ -52,13 +54,13 @@ export default function TerminalHistogram({ histogram, currency }: Props) {
     xAxis: {
       type: 'category',
       data: labels,
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10, interval: 1 },
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 10, interval: 1 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
     },
     yAxis: {
       type: 'value',
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
     },
     series: [
       {

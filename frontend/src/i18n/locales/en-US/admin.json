@@ -268,13 +268,7 @@
     "filter_base": "Filter base",
     "filter_quote": "Filter quote",
     "filter_source": "Filter source",
-    "filter_from": "From",
-    "filter_to": "To",
     "search_placeholder": "Search currency code",
-    "tab": {
-      "latest": "Current rates",
-      "records": "Sync records"
-    },
     "stats": {
       "pairs": "Pairs covered",
       "pairs_desc": "Pairs that have at least one rate",
@@ -408,16 +402,19 @@
       "saving": "Submitting…",
       "delete_title": "Delete {{count}} rates"
     },
-    "editDrawer": {
+    "editForm": {
       "title": "Edit rate",
+      "subtitle": "Change this rate's value or source; every user conversion updates right away.",
       "close": "Close",
-      "decimals": "{{decimals}} decimals",
+      "decimals": "Quote has {{decimals}} decimals; conversions use the stored precision.",
       "rate_label": "Rate (1 {{base}} = ? {{quote}})",
       "current_value": "Current {{rate}}",
+      "date_locked": "The pair and effective date identify this record; create a new one to change them.",
       "source_label": "Source",
       "source_provider_hint": "Marked as auto-synced, the next sync may overwrite this value.",
       "source_manual_hint": "Manual entries are authoritative; auto-sync never overwrites the same day.",
       "rate_invalid": "Rate must be a number greater than 0.",
+      "updated_at_hint": "Last updated {{time}}. {{decimals}} decimals is the quote's usual precision; conversions use the stored precision.",
       "saving": "Saving…"
     },
     "notice": {

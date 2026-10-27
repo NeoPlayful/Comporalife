@@ -3,6 +3,7 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
+import { useChartTheme } from '../charts/chart-theme';
 import ReactECharts from 'echarts-for-react';
 
 export default function TrendComparisonChart({
@@ -13,6 +14,7 @@ export default function TrendComparisonChart({
   currency: string;
 }) {
   const { t } = useTranslation('analytics');
+  const chartTheme = useChartTheme();
 
   if (points.length === 0) {
     return <EmptyState title={t('trend.empty')} />;
@@ -23,29 +25,29 @@ export default function TrendComparisonChart({
     legend: {
       top: 0,
       right: 0,
-      textStyle: { color: 'rgba(255,255,255,0.55)', fontSize: 11 },
+      textStyle: { color: chartTheme.legend, fontSize: 11 },
       itemWidth: 10,
       itemHeight: 10,
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       valueFormatter: (value: number) => `${formatNumber(value)} ${currency}`,
     },
     xAxis: {
       type: 'category',
       // 无流水的周期追加标记，避免被读成零支出
       data: points.map((point) => (point.isComplete ? point.period : `${point.period} ·`)),
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
     },
     series: [
       {

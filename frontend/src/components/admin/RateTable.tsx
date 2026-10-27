@@ -1,27 +1,19 @@
 import CurrencyPair from '@/components/finance/CurrencyPair';
-import type { AdminExchangeRate, AdminLatestExchangeRate } from '@/lib/admin';
+import type { AdminLatestExchangeRate } from '@/lib/admin';
 import { currencyName, formatDate, formatDateTime, formatRate } from '@/lib/format';
 import { AlertTriangle, LineChart, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-export type RateTableMode = 'latest' | 'records';
-
-/** 两个视图共用的行形状：latest 多一个 daysLag，records 没有 */
-type Row = AdminExchangeRate | AdminLatestExchangeRate;
-
-function lagOf(row: Row): number | null {
-  return 'daysLag' in row ? row.daysLag : null;
-}
+type Row = AdminLatestExchangeRate;
 
 /**
  * 汇率表格与移动端卡片。
  *
- * 「当前汇率」和「同步记录」的数据形状几乎一致，只有滞后天数一列是当前视图
- * 专属，因此合成一个组件按 mode 打开对应列，两个视图的动作入口也保持一致。
+ * 每行是一个币种对的当前生效汇率，滞后天数是判断汇率是否过期的主要依据，
+ * 因此桌面与手机都常显。
  * 小屏改用卡片：汇率对本身很短，横向滚动的表格在手机上读不出上下文。
  */
 export default function RateTable({
-  mode,
   rows,
   staleDays,
   selected,
@@ -31,7 +23,6 @@ export default function RateTable({
   onViewHistory,
   onDelete,
 }: {
-  mode: RateTableMode;
   rows: Row[];
   staleDays: number;
   selected: Set<string>;
@@ -44,7 +35,6 @@ export default function RateTable({
   const { t } = useTranslation('admin');
 
   const allSelected = rows.length > 0 && rows.every((row) => selected.has(row.id));
-  const showLag = mode === 'latest';
 
   const sourceLabel = (source: string) =>
     source === 'provider'
@@ -58,8 +48,8 @@ export default function RateTable({
       {/* 小屏卡片 */}
       <ul className="space-y-2 sm:hidden">
         {rows.map((row) => {
-          const lag = lagOf(row);
-          const stale = lag !== null && lag > staleDays;
+          const lag = row.daysLag;
+          const stale = lag > staleDays;
           return (
             <li key={row.id} className="card space-y-1.5 p-3">
               <div className="flex items-start justify-between gap-2">
@@ -78,20 +68,16 @@ export default function RateTable({
 
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--color-content-muted)]">
                 <span>{formatDate(row.rateDate)}</span>
-                {showLag && lag !== null && (
-                  <span
-                    className={
-                      stale
-                        ? 'flex items-center gap-1 text-amber-600 dark:text-amber-400'
-                        : undefined
-                    }
-                  >
-                    {stale && <AlertTriangle className="size-3" aria-hidden />}
-                    {lag === 0
-                      ? t('exchangeRates.lag.today')
-                      : t('exchangeRates.lag.days', { days: lag })}
-                  </span>
-                )}
+                <span
+                  className={
+                    stale ? 'flex items-center gap-1 text-amber-600 dark:text-amber-400' : undefined
+                  }
+                >
+                  {stale && <AlertTriangle className="size-3" aria-hidden />}
+                  {lag === 0
+                    ? t('exchangeRates.lag.today')
+                    : t('exchangeRates.lag.days', { days: lag })}
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-1 text-xs">
@@ -142,7 +128,7 @@ export default function RateTable({
               <th className="px-3 py-2">{t('exchangeRates.pair')}</th>
               <th className="px-3 py-2 text-right">{t('exchangeRates.rate')}</th>
               <th className="px-3 py-2">{t('exchangeRates.rate_date')}</th>
-              {showLag && <th className="px-3 py-2">{t('exchangeRates.lag.column')}</th>}
+              <th className="px-3 py-2">{t('exchangeRates.lag.column')}</th>
               <th className="px-3 py-2">{t('exchangeRates.source')}</th>
               <th className="px-3 py-2">{t('exchangeRates.updated_at')}</th>
               <th className="px-3 py-2 text-right">{t('exchangeRates.actions')}</th>
@@ -150,8 +136,8 @@ export default function RateTable({
           </thead>
           <tbody className="divide-y divide-[var(--color-border-subtle)]">
             {rows.map((row) => {
-              const lag = lagOf(row);
-              const stale = lag !== null && lag > staleDays;
+              const lag = row.daysLag;
+              const stale = lag > staleDays;
               return (
                 <tr
                   key={row.id}
@@ -184,22 +170,20 @@ export default function RateTable({
                   <td className="whitespace-nowrap px-3 py-2 text-[var(--color-content-muted)]">
                     {formatDate(row.rateDate)}
                   </td>
-                  {showLag && lag !== null && (
-                    <td className="whitespace-nowrap px-3 py-2 text-xs">
-                      <span
-                        className={
-                          stale
-                            ? 'flex items-center gap-1 text-amber-600 dark:text-amber-400'
-                            : 'text-[var(--color-content-muted)]'
-                        }
-                      >
-                        {stale && <AlertTriangle className="size-3" aria-hidden />}
-                        {lag === 0
-                          ? t('exchangeRates.lag.today')
-                          : t('exchangeRates.lag.days', { days: lag })}
-                      </span>
-                    </td>
-                  )}
+                  <td className="whitespace-nowrap px-3 py-2 text-xs">
+                    <span
+                      className={
+                        stale
+                          ? 'flex items-center gap-1 text-amber-600 dark:text-amber-400'
+                          : 'text-[var(--color-content-muted)]'
+                      }
+                    >
+                      {stale && <AlertTriangle className="size-3" aria-hidden />}
+                      {lag === 0
+                        ? t('exchangeRates.lag.today')
+                        : t('exchangeRates.lag.days', { days: lag })}
+                    </span>
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs">{sourceLabel(row.source)}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-[var(--color-content-muted)]">
                     {formatDateTime(row.updatedAt)}

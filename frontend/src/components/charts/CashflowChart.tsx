@@ -4,6 +4,7 @@ import './echarts';
 import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
+import { useChartTheme } from './chart-theme';
 
 export default function CashflowChart({
   points,
@@ -13,6 +14,7 @@ export default function CashflowChart({
   currency: string;
 }) {
   const { t } = useTranslation('dashboard');
+  const chartTheme = useChartTheme();
 
   if (points.length === 0) {
     return (
@@ -28,28 +30,28 @@ export default function CashflowChart({
     legend: {
       top: 0,
       right: 0,
-      textStyle: { color: 'rgba(255,255,255,0.55)', fontSize: 11 },
+      textStyle: { color: chartTheme.legend, fontSize: 11 },
       itemWidth: 10,
       itemHeight: 10,
     },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       valueFormatter: (value: number) => `${formatNumber(value)} ${currency}`,
     },
     xAxis: {
       type: 'category',
       data: points.map((point) => point.period),
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
     },
     series: [
       {
