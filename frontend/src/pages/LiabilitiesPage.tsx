@@ -1,5 +1,6 @@
 import CurrencySelect from '@/components/finance/CurrencySelect';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -176,6 +177,7 @@ function LiabilityForm({ onClose }: { onClose: () => void }) {
 function SnapshotRow({ liability }: { liability: Liability }) {
   const { t } = useTranslation('liabilities');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -202,10 +204,14 @@ function SnapshotRow({ liability }: { liability: Liability }) {
       setForm({ ...form, balance: '' });
       setError(null);
     },
-    onError: (err) => {
+    onError: async (err) => {
       const message = translateError(err, t);
       if (message.includes('LIABILITY_SNAPSHOT_EXISTS') || message.includes('覆盖')) {
-        if (window.confirm(t('snapshot.overwrite_confirm'))) {
+        const ok = await confirm({
+          title: t('snapshot.overwrite_confirm'),
+          message: t('snapshot.overwrite_confirm'),
+        });
+        if (ok) {
           add.mutate(true);
           return;
         }
@@ -299,6 +305,7 @@ function SnapshotRow({ liability }: { liability: Liability }) {
 export default function LiabilitiesPage() {
   const { t } = useTranslation('liabilities');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showArchived, setShowArchived] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -459,10 +466,13 @@ export default function LiabilitiesPage() {
                   <button
                     type="button"
                     className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs"
-                    onClick={() => {
-                      if (window.confirm(t('archive_confirm', { name: liability.name }))) {
-                        archive.mutate(liability.id);
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: t('archive'),
+                        message: t('archive_confirm', { name: liability.name }),
+                        tone: 'danger',
+                      });
+                      if (ok) archive.mutate(liability.id);
                     }}
                   >
                     <Archive className="size-3.5" />

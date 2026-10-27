@@ -4,7 +4,8 @@ import './echarts';
 import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
-import { useChartTheme } from './chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_PRIMARY } from '@/theme/palette';
 
 export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
   const { t } = useTranslation('dashboard');
@@ -46,7 +47,7 @@ export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
         type: 'line',
         smooth: true,
         symbol: 'none',
-        lineStyle: { width: 2, color: '#5b8def' },
+        lineStyle: { width: 2, color: SERIES_PRIMARY },
         areaStyle: {
           color: {
             type: 'linear',

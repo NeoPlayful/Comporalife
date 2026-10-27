@@ -4,7 +4,8 @@ import './echarts';
 import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
-import { useChartTheme } from './chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_NEGATIVE, SERIES_POSITIVE, SERIES_PRIMARY } from '@/theme/palette';
 
 export default function CashflowChart({
   points,
@@ -58,14 +59,14 @@ export default function CashflowChart({
         name: t('charts.cashflow_income'),
         type: 'bar',
         barMaxWidth: 22,
-        itemStyle: { color: '#4ea87c', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: SERIES_POSITIVE, borderRadius: [3, 3, 0, 0] },
         data: points.map((point) => Number(point.income)),
       },
       {
         name: t('charts.cashflow_expense'),
         type: 'bar',
         barMaxWidth: 22,
-        itemStyle: { color: '#c76a5e', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: SERIES_NEGATIVE, borderRadius: [3, 3, 0, 0] },
         data: points.map((point) => Number(point.expense)),
       },
       {
@@ -73,8 +74,8 @@ export default function CashflowChart({
         type: 'line',
         smooth: true,
         symbolSize: 5,
-        lineStyle: { width: 2, color: '#5b8def' },
-        itemStyle: { color: '#5b8def' },
+        lineStyle: { width: 2, color: SERIES_PRIMARY },
+        itemStyle: { color: SERIES_PRIMARY },
         data: points.map((point) => Number(point.net)),
       },
     ],

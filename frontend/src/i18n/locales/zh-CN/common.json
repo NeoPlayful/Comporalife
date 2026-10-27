@@ -41,7 +41,10 @@
     "version": "版本 v{{version}}"
   },
   "modal": {
-    "discard_confirm": "还有未保存的内容，确定关闭？"
+    "discard_title": "放弃未保存的修改？",
+    "discard_confirm": "还有未保存的内容，关闭后这些修改会丢失。",
+    "discard_confirm_action": "放弃并关闭",
+    "discard_keep_editing": "继续编辑"
   },
   "network_error": "网络异常，请稍后重试",
   "list_separator": "、",

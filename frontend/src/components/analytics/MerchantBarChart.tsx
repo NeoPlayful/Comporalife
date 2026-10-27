@@ -3,7 +3,8 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_NEGATIVE } from '@/theme/palette';
 import ReactECharts from 'echarts-for-react';
 
 export default function MerchantBarChart({
@@ -49,7 +50,7 @@ export default function MerchantBarChart({
       {
         type: 'bar',
         barMaxWidth: 16,
-        itemStyle: { color: '#c76a5e', borderRadius: [0, 3, 3, 0] },
+        itemStyle: { color: SERIES_NEGATIVE, borderRadius: [0, 3, 3, 0] },
         data: top.map((item) => Number(item.amount)),
       },
     ],

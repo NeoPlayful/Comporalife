@@ -1,10 +1,11 @@
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import LoadingState from '@/components/ui/LoadingState';
 import SwitchRow from '@/components/ui/SwitchRow';
 import { adminApi } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
+import { toastError } from '@/lib/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 function ReadOnlyRow({ label, value }: { label: string; value: string }) {
@@ -19,7 +20,7 @@ function ReadOnlyRow({ label, value }: { label: string; value: string }) {
 export default function AdminSettingsPage() {
   const { t } = useTranslation('admin');
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const overview = useQuery({ queryKey: ['admin', 'settings'], queryFn: () => adminApi.settingsOverview() });
 
@@ -32,10 +33,9 @@ export default function AdminSettingsPage() {
       return adminApi.setAdminUserCreation(input.next);
     },
     onSuccess: () => {
-      setError(null);
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   // 多个开关共用一次 mutation，只有正在提交的那一行才显示忙碌
@@ -61,8 +61,6 @@ export default function AdminSettingsPage() {
         </p>
       )}
 
-      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
-
       <section className="card px-4 py-2">
         <h2 className="py-2 text-sm font-semibold">{t('settings.access')}</h2>
         <SwitchRow
@@ -74,8 +72,15 @@ export default function AdminSettingsPage() {
           pending={savingKey === 'registration'}
           onLabel={t('settings.on')}
           offLabel={t('settings.off')}
-          onCheckedChange={(next) => {
-            if (!next && !window.confirm(t('settings.registration_off_confirm'))) return;
+          onCheckedChange={async (next) => {
+            if (!next) {
+              const ok = await confirm({
+                title: t('settings.registration'),
+                message: t('settings.registration_off_confirm'),
+                tone: 'danger',
+              });
+              if (!ok) return;
+            }
             save.mutate({ field: 'registration', next });
           }}
           className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
@@ -89,9 +94,15 @@ export default function AdminSettingsPage() {
           pending={savingKey === 'emailVerification'}
           onLabel={t('settings.on')}
           offLabel={t('settings.off')}
-          onCheckedChange={(next) => {
+          onCheckedChange={async (next) => {
             // 没有 SMTP 时开启等于承诺一件做不到的事
-            if (next && !data?.mailConfigured && !window.confirm(t('settings.no_mail_confirm'))) return;
+            if (next && !data?.mailConfigured) {
+              const ok = await confirm({
+                title: t('settings.email_verification'),
+                message: t('settings.no_mail_confirm'),
+              });
+              if (!ok) return;
+            }
             save.mutate({ field: 'emailVerification', next });
           }}
           className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"
@@ -109,8 +120,14 @@ export default function AdminSettingsPage() {
           pending={savingKey === 'adminUserCreate'}
           onLabel={t('settings.on')}
           offLabel={t('settings.off')}
-          onCheckedChange={(next) => {
-            if (next && !window.confirm(t('settings.admin_user_create_on_confirm'))) return;
+          onCheckedChange={async (next) => {
+            if (next) {
+              const ok = await confirm({
+                title: t('settings.admin_user_create'),
+                message: t('settings.admin_user_create_on_confirm'),
+              });
+              if (!ok) return;
+            }
             save.mutate({ field: 'adminUserCreate', next });
           }}
           className="border-b border-[var(--color-border-subtle)] py-3 last:border-0"

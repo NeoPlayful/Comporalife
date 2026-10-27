@@ -11,6 +11,7 @@ import Pagination from '@/components/ui/Pagination';
 import { adminApi, type AdminDeletionFilter, type AdminRole, type AdminUser } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, RefreshCw, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -45,8 +46,6 @@ export default function AdminUsersPage() {
   const [openUserId, setOpenUserId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [confirm, setConfirm] = useState<{ action: UserAction; user: AdminUser } | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   function patchParams(patch: Record<string, string | null>, resetPage = true) {
     const next = new URLSearchParams(params);
@@ -118,13 +117,12 @@ export default function AdminUsersPage() {
       return adminApi.reviewDeletion(input.id, 'approve');
     },
     onSuccess: () => {
-      setError(null);
       setConfirm(null);
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
     onError: (err) => {
       setConfirm(null);
-      setError(err instanceof ApiError ? translateError(err, t) : String(err));
+      toastError(err instanceof ApiError ? translateError(err, t) : String(err));
     },
   });
 
@@ -139,11 +137,10 @@ export default function AdminUsersPage() {
       }),
     onSuccess: (result) => {
       setCreating(false);
-      setError(null);
-      setNotice(t('users.create_success', { email: result.user.email }));
+      toastSuccess(t('users.create_success', { email: result.user.email }));
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   const activeFilters = useMemo(() => {
@@ -243,21 +240,6 @@ export default function AdminUsersPage() {
       </header>
 
       <UserStats overview={statsQuery.data ?? null} />
-
-      {notice && (
-        <div className="flex items-start justify-between gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
-          <span>{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            aria-label={t('common:actions.close')}
-            className="shrink-0 opacity-70 hover:opacity-100"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
-      )}
-      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
       {/* 工具栏：搜索与三组筛选，隐私开关单独靠右 */}
       <section className="card space-y-3 p-3">

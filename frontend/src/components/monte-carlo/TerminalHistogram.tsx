@@ -3,7 +3,8 @@ import type { SimulationResult } from '@/lib/monte-carlo';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_PRIMARY } from '@/theme/palette';
 import ReactECharts from 'echarts-for-react';
 
 interface Props {
@@ -66,7 +67,7 @@ export default function TerminalHistogram({ histogram, currency }: Props) {
       {
         type: 'bar',
         data: histogram.bins,
-        itemStyle: { color: '#5b8def', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: SERIES_PRIMARY, borderRadius: [3, 3, 0, 0] },
         barCategoryGap: '12%',
       },
     ],

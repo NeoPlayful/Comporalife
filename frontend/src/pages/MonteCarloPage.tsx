@@ -4,6 +4,7 @@ import CorrelationEditor from '@/components/monte-carlo/CorrelationEditor';
 import FanChart from '@/components/monte-carlo/FanChart';
 import MetricCards from '@/components/monte-carlo/MetricCards';
 import TerminalHistogram from '@/components/monte-carlo/TerminalHistogram';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -69,6 +70,7 @@ function defaultBody(): ScenarioBody {
 export default function MonteCarloPage() {
   const { t } = useTranslation('monte-carlo');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('params');
@@ -404,8 +406,13 @@ export default function MonteCarloPage() {
                     <button
                       type="button"
                       className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-rose-400 hover:bg-rose-500/10"
-                      onClick={() => {
-                        if (window.confirm(t('list.delete_confirm'))) deleteMutation.mutate(selectedId);
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: t('list.delete'),
+                          message: t('list.delete_confirm'),
+                          tone: 'danger',
+                        });
+                        if (ok) deleteMutation.mutate(selectedId);
                       }}
                     >
                       <Trash2 className="size-4" aria-hidden />

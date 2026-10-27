@@ -77,7 +77,7 @@ export default function GoalProjectionCards({ projection, currency }: Props) {
 
       <section className="rounded-xl border border-[var(--color-border-subtle)] p-4">
         <header className="mb-3 flex items-center gap-2">
-          <Shuffle className="size-4 text-[var(--color-warning,var(--color-accent))]" aria-hidden />
+          <Shuffle className="size-4 text-[var(--color-warning)]" aria-hidden />
           <h3 className="text-sm font-semibold">{t('prediction.probabilistic_title')}</h3>
         </header>
 

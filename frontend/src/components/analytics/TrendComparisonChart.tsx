@@ -3,7 +3,8 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_NEGATIVE, SERIES_POSITIVE, SERIES_PRIMARY } from '@/theme/palette';
 import ReactECharts from 'echarts-for-react';
 
 export default function TrendComparisonChart({
@@ -54,14 +55,14 @@ export default function TrendComparisonChart({
         name: t('metrics.income'),
         type: 'bar',
         barMaxWidth: 20,
-        itemStyle: { color: '#4ea87c', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: SERIES_POSITIVE, borderRadius: [3, 3, 0, 0] },
         data: points.map((point) => Number(point.income)),
       },
       {
         name: t('metrics.expense'),
         type: 'bar',
         barMaxWidth: 20,
-        itemStyle: { color: '#c76a5e', borderRadius: [3, 3, 0, 0] },
+        itemStyle: { color: SERIES_NEGATIVE, borderRadius: [3, 3, 0, 0] },
         data: points.map((point) => Number(point.expense)),
       },
       {
@@ -69,8 +70,8 @@ export default function TrendComparisonChart({
         type: 'line',
         smooth: true,
         symbolSize: 5,
-        lineStyle: { width: 2, color: '#5b8def' },
-        itemStyle: { color: '#5b8def' },
+        lineStyle: { width: 2, color: SERIES_PRIMARY },
+        itemStyle: { color: SERIES_PRIMARY },
         data: points.map((point) => (point.isComplete ? Number(point.net) : null)),
       },
     ],

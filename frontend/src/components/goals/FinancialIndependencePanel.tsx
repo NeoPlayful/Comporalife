@@ -93,7 +93,7 @@ export default function FinancialIndependencePanel({ data, currency, onRateChang
       )}
 
       {data.unavailableReasons.length > 0 && (
-        <ul className="rounded-lg bg-[var(--color-warning,var(--color-border-subtle))]/10 px-3 py-2 text-xs text-[var(--color-content-muted)]">
+        <ul className="rounded-lg bg-[var(--color-warning)]/10 px-3 py-2 text-xs text-[var(--color-content-muted)]">
           {data.unavailableReasons.map((reason) => (
             <li key={reason}>{t(`fi.reasons.${reason}`, { defaultValue: reason })}</li>
           ))}

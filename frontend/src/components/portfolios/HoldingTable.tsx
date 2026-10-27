@@ -43,7 +43,7 @@ export default function HoldingTable({
   return (
     <div className="space-y-3">
       {hasMissing && (
-        <p className="rounded-lg bg-[var(--color-warning,#d3a35a)]/10 px-3 py-2 text-sm">
+        <p className="rounded-lg bg-[var(--color-warning)]/10 px-3 py-2 text-sm">
           {t('holdings.no_price_hint')}
         </p>
       )}
@@ -73,7 +73,7 @@ export default function HoldingTable({
               </dd>
             </dl>
             {holding.price === null ? (
-              <p className="mt-2 flex items-center gap-2 text-xs text-[var(--color-warning,#d3a35a)]">
+              <p className="mt-2 flex items-center gap-2 text-xs text-[var(--color-warning)]">
                 {t('holdings.missing_price')}
                 {onRecordPrice && (
                   <PriceAction onClick={() => onRecordPrice(holding.instrumentId)}>
@@ -123,7 +123,7 @@ export default function HoldingTable({
                 <td className="py-2 text-right tabular-nums">
                   {holding.price === null ? (
                     <>
-                      <span className="text-[var(--color-warning,#d3a35a)]">
+                      <span className="text-[var(--color-warning)]">
                         {t('holdings.missing_price')}
                       </span>
                       {onRecordPrice && (

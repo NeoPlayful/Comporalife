@@ -3,6 +3,7 @@ import HoldingTable from '@/components/portfolios/HoldingTable';
 import PerformanceChart from '@/components/portfolios/PerformanceChart';
 import PortfolioSummaryCards from '@/components/portfolios/PortfolioSummaryCards';
 import TradeForm, { emptyTradeDraft, type TradeDraft } from '@/components/portfolios/TradeForm';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import { translateError } from '@/lib/error-message';
@@ -37,6 +38,7 @@ export default function PortfolioDetailPage() {
   const { t } = useTranslation('portfolios');
   const { t: tEnums } = useTranslation('enums');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const [tab, setTab] = useState<Tab>('holdings');
   const [error, setError] = useState<string | null>(null);
@@ -314,7 +316,7 @@ export default function PortfolioDetailPage() {
             {t('summary.price_date')} {formatDate(detail.priceDate)}
           </p>
           {detail.stale && (
-            <p className="mt-1 flex items-center justify-end gap-1 text-[var(--color-warning,#d3a35a)]">
+            <p className="mt-1 flex items-center justify-end gap-1 text-[var(--color-warning)]">
               <AlertTriangle className="size-3.5" aria-hidden />
               {t('holdings.stale')}
             </p>
@@ -331,7 +333,7 @@ export default function PortfolioDetailPage() {
       <PortfolioSummaryCards detail={detail} returns={returnsQuery.data} />
 
       {!detail.isComplete && detail.missingPrices.length > 0 && (
-        <p className="rounded-lg bg-[var(--color-warning,#d3a35a)]/10 px-3 py-2 text-sm">
+        <p className="rounded-lg bg-[var(--color-warning)]/10 px-3 py-2 text-sm">
           {t('basis.unpriced_hint', {
             symbols: detail.missingPrices.map((item) => item.symbol).join(', '),
           })}
@@ -717,7 +719,7 @@ export default function PortfolioDetailPage() {
                   <dd
                     className={
                       riskQuery.data.concentrationWarning
-                        ? 'text-[var(--color-warning,#d3a35a)]'
+                        ? 'text-[var(--color-warning)]'
                         : ''
                     }
                   >
@@ -812,10 +814,13 @@ export default function PortfolioDetailPage() {
                               type="button"
                               aria-label={t('trades.void')}
                               disabled={voidTradeMutation.isPending}
-                              onClick={() => {
-                                if (window.confirm(t('trades.confirm_void'))) {
-                                  voidTradeMutation.mutate(trade.id);
-                                }
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: t('trades.void'),
+                                  message: t('trades.confirm_void'),
+                                  tone: 'danger',
+                                });
+                                if (ok) voidTradeMutation.mutate(trade.id);
                               }}
                               className="rounded-lg p-1 text-[var(--color-negative)] hover:bg-[var(--color-negative)]/10 disabled:opacity-50"
                             >
@@ -910,10 +915,13 @@ export default function PortfolioDetailPage() {
                         type="button"
                         aria-label={t('cashflows.delete')}
                         disabled={removeCashflowMutation.isPending}
-                        onClick={() => {
-                          if (window.confirm(t('cashflows.confirm_delete'))) {
-                            removeCashflowMutation.mutate(flow.id);
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: t('cashflows.delete'),
+                            message: t('cashflows.confirm_delete'),
+                            tone: 'danger',
+                          });
+                          if (ok) removeCashflowMutation.mutate(flow.id);
                         }}
                         className="rounded-lg p-1 text-[var(--color-negative)] hover:bg-[var(--color-negative)]/10 disabled:opacity-50"
                       >
@@ -941,6 +949,7 @@ export default function PortfolioDetailPage() {
 function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
   const { t } = useTranslation('portfolios');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [draft, setDraft] = useState({
     valuationDate: new Date().toISOString().slice(0, 10),
     marketValue: '',
@@ -972,9 +981,13 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
       setError(null);
       invalidate();
     },
-    onError: (err) => {
+    onError: async (err) => {
       // 同日已存在快照时后端要求显式覆盖，这里让用户确认后重试
-      if (window.confirm(t('valuations.overwrite_confirm'))) {
+      const ok = await confirm({
+        title: t('valuations.overwrite_confirm'),
+        message: t('valuations.overwrite_confirm'),
+      });
+      if (ok) {
         addMutation.mutate(true);
         return;
       }
@@ -1054,10 +1067,13 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
               </span>
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm(t('valuations.delete_confirm'))) {
-                    removeMutation.mutate(item.id);
-                  }
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: t('valuations.delete'),
+                    message: t('valuations.delete_confirm'),
+                    tone: 'danger',
+                  });
+                  if (ok) removeMutation.mutate(item.id);
                 }}
                 className="rounded-lg p-1 text-[var(--color-negative)] hover:bg-[var(--color-negative)]/10 disabled:opacity-50"
                 aria-label={t('valuations.delete')}
