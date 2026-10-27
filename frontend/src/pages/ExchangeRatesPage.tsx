@@ -5,6 +5,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { exchangeRatesApi, type WatchlistEntry } from '@/lib/dashboard';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { currencyName, formatDate, formatRate } from '@/lib/format';
 import { sortedCurrencyCodes } from '@/components/finance/CurrencyFlag';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -26,7 +27,6 @@ export default function ExchangeRatesPage() {
   const queryClient = useQueryClient();
 
   const [picking, setPicking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState({ from: 'USD', to: 'CNY' });
 
   const queryKey = ['exchange-rates', 'watchlist'];
@@ -49,29 +49,35 @@ export default function ExchangeRatesPage() {
     if (next) queryClient.setQueryData(queryKey, next);
     // 汇率变化会影响诊断与统计，缓存一并失效
     void queryClient.invalidateQueries({ queryKey: ['market-data', 'status'] });
-    setError(null);
   }
 
   const add = useMutation({
     mutationFn: (body: { from: string; to: string }) => exchangeRatesApi.addPair(body),
     onSuccess: (next) => {
+      toastSuccess(t('common:feedback.created'));
       onWriteSuccess(next);
       // 加入成功后关闭面板：列表本身已经给出结果，留着面板反而挡住内容
       setPicking(false);
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const remove = useMutation({
     mutationFn: (body: { from: string; to: string }) => exchangeRatesApi.removePair(body),
-    onSuccess: (next) => onWriteSuccess(next),
-    onError: (err) => setError(translateError(err, t)),
+    onSuccess: (next) => {
+      toastSuccess(t('common:feedback.deleted'));
+      onWriteSuccess(next);
+    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const reset = useMutation({
     mutationFn: () => exchangeRatesApi.resetWatchlist(),
-    onSuccess: (next) => onWriteSuccess(next),
-    onError: (err) => setError(translateError(err, t)),
+    onSuccess: (next) => {
+      toastSuccess(t('common:feedback.done'));
+      onWriteSuccess(next);
+    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const busy = add.isPending || remove.isPending || reset.isPending;
@@ -169,9 +175,7 @@ export default function ExchangeRatesPage() {
           </div>
 
           <p className="text-xs">
-            {error ? (
-              <span className="text-[var(--color-negative)]">{error}</span>
-            ) : draftSameCurrency ? (
+            {draftSameCurrency ? (
               <span className="text-[var(--color-negative)]">
                 {t('exchange_rates.page.same_currency')}
               </span>
@@ -225,8 +229,6 @@ export default function ExchangeRatesPage() {
           </div>
         </div>
       </Modal>
-
-      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
       {viewQuery.isLoading && <LoadingState />}
       {viewQuery.isError && <ErrorState onRetry={() => void viewQuery.refetch()} />}

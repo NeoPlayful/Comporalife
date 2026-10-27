@@ -8,6 +8,7 @@ import { exportsApi, type ExportDetail, type ExportScope } from '@/lib/data-mana
 import { translateError } from '@/lib/error-message';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { downloadUrlAsFile } from '@/lib/download';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { useAuthStore } from '@/stores/auth-store';
 
 const SCOPES: ExportScope[] = ['full', 'ledger', 'investments', 'simulations', 'planning', 'settings'];
@@ -30,8 +31,6 @@ export default function ExportPanel() {
   const [from, setFrom] = useState(firstDayOfYear());
   const [to, setTo] = useState(today());
   const [includeArchived, setIncludeArchived] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
   const list = useQuery({
@@ -56,8 +55,7 @@ export default function ExportPanel() {
         ...(useRange ? { from, to } : {}),
       }),
     onSuccess: (result) => {
-      setError(null);
-      setMessage(
+      toastSuccess(
         result.async
           ? t('export.async_queued', { rows: result.estimatedRows })
           : t('export.sync_done', { rows: result.rowCount }),
@@ -65,16 +63,14 @@ export default function ExportPanel() {
       void queryClient.invalidateQueries({ queryKey: ['exports'] });
       void queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
-    onError: (err) => {
-      setMessage(null);
-      setError(err instanceof ApiError ? translateError(err, t) : String(err));
-    },
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => exportsApi.remove(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['exports'] });
+      toastSuccess(t('common:feedback.deleted'));
+      queryClient.invalidateQueries({ queryKey: ['exports'] });
     },
   });
 
@@ -133,9 +129,6 @@ export default function ExportPanel() {
         >
           {create.isPending ? t('export.creating') : t('export.create')}
         </button>
-
-        {message && <p className="text-sm text-emerald-600 dark:text-emerald-400">{message}</p>}
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
 
       <div>

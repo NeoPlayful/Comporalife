@@ -6,6 +6,7 @@ import QualitySummaryCards from '@/components/data/QualitySummaryCards';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { dataQualityApi } from '@/lib/data-management';
+import { toastSuccess } from '@/lib/toast';
 import { formatDateTime } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -28,6 +29,7 @@ export default function DataPage() {
   const recheck = useMutation({
     mutationFn: () => dataQualityApi.recheck(),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.submitted'));
       void queryClient.invalidateQueries({ queryKey: ['quality'] });
       void queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },

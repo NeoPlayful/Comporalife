@@ -1,4 +1,5 @@
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatNumber } from '@/lib/format';
 import {
   DEFAULT_PARAMS,
@@ -22,7 +23,6 @@ export default function CompoundPage() {
   const { t } = useTranslation();
   const [params, setParams] = useState<CompoundParams>(DEFAULT_PARAMS);
   const [debounced, setDebounced] = useState<CompoundParams>(DEFAULT_PARAMS);
-  const [error, setError] = useState<string | null>(null);
   const [saveName, setSaveName] = useState('');
   const [saveOpen, setSaveOpen] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>([]);
@@ -55,26 +55,29 @@ export default function CompoundPage() {
   const saveMutation = useMutation({
     mutationFn: () => simulationsApi.save({ ...params, name: saveName.trim() }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       setSaveOpen(false);
       setSaveName('');
-      setError(null);
       queryClient.invalidateQueries({ queryKey: ['scenarios'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => simulationsApi.remove(id),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       setCompareIds((ids) => ids.filter((id) => id !== ''));
       queryClient.invalidateQueries({ queryKey: ['scenarios'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const duplicateMutation = useMutation({
     mutationFn: (id: string) => simulationsApi.duplicate(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scenarios'] }),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.copied'));
+      queryClient.invalidateQueries({ queryKey: ['scenarios'] });
+    },
   });
 
   const result = calculateQuery.data?.result;
@@ -128,12 +131,6 @@ export default function CompoundPage() {
           {t('compound:save_scenario')}
         </button>
       </div>
-
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       {saveOpen && (
         <form

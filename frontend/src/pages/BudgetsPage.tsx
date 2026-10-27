@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import { budgetsApi, type BudgetProgressResponse, type BudgetPeriodType } from '@/lib/budgets';
 import { categoriesApi, type CategoryNode } from '@/lib/categories';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatNumber } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Copy, Pencil, Plus, Trash2 } from 'lucide-react';
@@ -106,6 +107,7 @@ export default function BudgetsPage() {
           .map((item) => ({ categoryId: item.categoryId, amount: item.amount })),
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setCreating(false);
       setEditing(false);
       setError(null);
@@ -126,6 +128,7 @@ export default function BudgetsPage() {
           .map((item) => ({ categoryId: item.categoryId, amount: item.amount })),
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       setEditing(false);
       setError(null);
       invalidate();
@@ -143,16 +146,15 @@ export default function BudgetsPage() {
       });
       invalidate();
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => budgetsApi.remove(data!.budget.id),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       invalidate();
       void refetch();
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   function startEdit(budget: BudgetProgressResponse) {
@@ -233,12 +235,6 @@ export default function BudgetsPage() {
           </div>
         </div>
       </div>
-
-      {error && (
-        <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       {/* 无预警时不渲染整块，避免留下空白占位 */}
       {alerts.length > 0 && (

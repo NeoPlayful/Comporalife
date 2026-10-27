@@ -47,7 +47,6 @@ export default function TradeForm({
   holdings,
   currency,
   saving,
-  error,
   onChange,
   onSubmit,
   onCancel,
@@ -57,7 +56,6 @@ export default function TradeForm({
   holdings: Holding[];
   currency: string;
   saving: boolean;
-  error: string | null;
   onChange: (draft: TradeDraft) => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -111,12 +109,6 @@ export default function TradeForm({
   return (
     <section className="card space-y-3">
       <h3 className="text-base font-medium">{t('trade_form.title')}</h3>
-
-      {error && (
-        <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="space-y-1 text-sm">

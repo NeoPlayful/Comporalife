@@ -1,6 +1,7 @@
 import { LIABILITY_TYPES, accountsApi, type Reconciliation } from '@/lib/accounts';
 import { useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatDate, formatNumber } from '@/lib/format';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import ErrorState from '@/components/ui/ErrorState';
@@ -236,7 +237,6 @@ function ReconcileSection({
   const [statementBalance, setStatementBalance] = useState('');
   const [reconciledAt, setReconciledAt] = useState(new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState('');
-  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -251,7 +251,7 @@ function ReconcileSection({
       setStatementBalance('');
       setNote('');
       setError(null);
-      setResult(
+      toastSuccess(
         data.suggestion
           ? t('accounts:detail.reconciliation.result_with_diff', {
               difference: formatNumber(data.reconciliation.difference),
@@ -276,12 +276,6 @@ function ReconcileSection({
           {open ? t('common:actions.cancel') : t('accounts:detail.reconciliation.new')}
         </button>
       </div>
-
-      {result && (
-        <p role="status" className="mb-3 rounded-lg bg-[var(--color-positive)]/10 px-3 py-2 text-sm text-[var(--color-positive)]">
-          {result}
-        </p>
-      )}
 
       {open && (
         <form

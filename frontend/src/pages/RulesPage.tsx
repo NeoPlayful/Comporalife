@@ -11,6 +11,7 @@ import Modal from '@/components/ui/Modal';
 import { accountsApi } from '@/lib/accounts';
 import { useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
+import { toastError } from '@/lib/toast';
 import { toastSuccess } from '@/lib/toast';
 import { categoriesApi } from '@/lib/categories';
 import {
@@ -26,7 +27,6 @@ export default function RulesPage() {
   const { t } = useTranslation('imports');
   const [editing, setEditing] = useState<ClassificationRule | 'new' | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ rule: ClassificationRule; matched: number } | null>(null);
 
   const rulesQuery = useQuery({ queryKey: ['rules'], queryFn: () => classificationRulesApi.list() });
@@ -42,11 +42,11 @@ export default function RulesPage() {
         ? classificationRulesApi.create(input.payload)
         : classificationRulesApi.update(input.rule.id, input.payload),
     onSuccess: async () => {
-      setError(null);
+      toastSuccess(t('common:feedback.saved'));
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ['rules'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const toggleRule = useMutation({
@@ -56,24 +56,26 @@ export default function RulesPage() {
 
   const removeRule = useMutation({
     mutationFn: (id: string) => classificationRulesApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['rules'] }),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
+      queryClient.invalidateQueries({ queryKey: ['rules'] });
+    },
   });
 
   const testRule = useMutation({
     mutationFn: (rule: ClassificationRule) => classificationRulesApi.test(rule.id),
     onSuccess: (result, rule) => setTestResult({ rule, matched: result.matched }),
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const applyRules = useMutation({
     mutationFn: () => classificationRulesApi.apply({ onlyUncategorized: true }),
     onSuccess: async (result) => {
-      setError(null);
       setTestResult(null);
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       toastSuccess(t('rules.applied', { matched: result.matched, categorized: result.categorized }));
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   if (rulesQuery.isPending) return <LoadingState label={t('rules.loading')} />;
@@ -116,12 +118,6 @@ export default function RulesPage() {
           </button>
         </div>
       </div>
-
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       <Modal
         open={editing !== null}

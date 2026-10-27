@@ -3,6 +3,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { accountsApi, type Account } from '@/lib/accounts';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatDate, formatNumber } from '@/lib/format';
 import { portfoliosApi } from '@/lib/portfolios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -48,6 +49,7 @@ export default function PortfoliosPage() {
   const createMutation = useMutation({
     mutationFn: () => portfoliosApi.create({ accountId, name: name.trim() }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setCreating(false);
       setName('');
       setAccountId('');
@@ -89,12 +91,6 @@ export default function PortfoliosPage() {
           </button>
         </div>
       </div>
-
-      {error && (
-        <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       {creating && (
         <Modal

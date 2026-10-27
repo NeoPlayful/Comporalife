@@ -6,6 +6,7 @@ import {
 } from '@/lib/accounts';
 import { ACCOUNT_TYPES, useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import CurrencySelect from '@/components/finance/CurrencySelect';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import EmptyState from '@/components/ui/EmptyState';
@@ -23,7 +24,6 @@ export default function AccountsPage() {
   const { t } = useTranslation();
   const [showArchived, setShowArchived] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const accountsQuery = useQuery({
     queryKey: ['accounts', showArchived],
@@ -32,14 +32,18 @@ export default function AccountsPage() {
 
   const archiveMutation = useMutation({
     mutationFn: (id: string) => accountsApi.archive(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
-    onError: (err) => setError(translateError(err, t)),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.archived'));
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
   });
 
   const unarchiveMutation = useMutation({
     mutationFn: (id: string) => accountsApi.unarchive(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['accounts'] }),
-    onError: (err) => setError(translateError(err, t)),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.unarchived'));
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
   });
 
   const { assets, liabilities } = useMemo(() => {
@@ -92,10 +96,7 @@ export default function AccountsPage() {
           </label>
           <button
             type="button"
-            onClick={() => {
-              setError(null);
-              setDialogOpen(true);
-            }}
+            onClick={() => setDialogOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
           >
             <Plus className="size-4" />
@@ -103,12 +104,6 @@ export default function AccountsPage() {
           </button>
         </div>
       </div>
-
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       {(assets.length > 0 || liabilities.length > 0) && (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -175,6 +170,7 @@ export default function AccountsPage() {
         <AccountDialog
           onClose={() => setDialogOpen(false)}
           onCreated={() => {
+            toastSuccess(t('common:feedback.created'));
             setDialogOpen(false);
             queryClient.invalidateQueries({ queryKey: ['accounts'] });
           }}

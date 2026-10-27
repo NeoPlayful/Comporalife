@@ -2,6 +2,7 @@ import type { Preferences } from '@/lib/auth';
 import { api } from '@/lib/client';
 import { formatDateTime } from '@/lib/format';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import CurrencySelect from '@/components/finance/CurrencySelect';
 import LoadingState from '@/components/ui/LoadingState';
 import { useUiStore } from '@/stores/ui-store';
@@ -40,8 +41,6 @@ export default function SettingsPage() {
   const { t } = useTranslation();
 
   const [form, setForm] = useState<Preferences | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const settingsQuery = useQuery({
     queryKey: ['settings'],
@@ -59,16 +58,12 @@ export default function SettingsPage() {
       api.patch<SettingsResponse>('/api/settings', body),
     onSuccess: (data) => {
       setForm(data.settings);
-      setMessage(t('settings:saved'));
-      setError(null);
+      toastSuccess(t('settings:saved'));
       setTheme(data.settings.theme);
       setLanguage(data.settings.language);
       queryClient.invalidateQueries({ queryKey: ['settings'] });
     },
-    onError: (err) => {
-      setMessage(null);
-      setError(translateError(err, t));
-    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   if (settingsQuery.isLoading || !form) {
@@ -82,19 +77,6 @@ export default function SettingsPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-semibold">{t('settings:title')}</h1>
-
-      {(message || error) && (
-        <p
-          role="status"
-          className={`rounded-lg px-3 py-2 text-sm ${
-            error
-              ? 'bg-[var(--color-negative)]/10 text-[var(--color-negative)]'
-              : 'bg-[var(--color-positive)]/10 text-[var(--color-positive)]'
-          }`}
-        >
-          {error ?? message}
-        </p>
-      )}
 
       <section className="card space-y-4 p-5">
         <h2 className="text-sm font-medium">{t('settings:basic')}</h2>

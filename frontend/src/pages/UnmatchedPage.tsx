@@ -1,19 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDate, formatNumber } from '@/lib/format';
 import { transferMatchApi, type TransferCandidate } from '@/lib/imports';
 
 export default function UnmatchedPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation('imports');
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const query = useQuery({ queryKey: ['unmatched'], queryFn: () => transferMatchApi.unmatched({ limit: 200 }) });
 
@@ -21,13 +19,12 @@ export default function UnmatchedPage() {
     mutationFn: (candidate: TransferCandidate) =>
       transferMatchApi.match(candidate.outgoing.id, candidate.incoming.id),
     onSuccess: async () => {
-      setError(null);
-      setMessage(t('unmatched.matched'));
+      toastSuccess(t('unmatched.matched'));
       await queryClient.invalidateQueries({ queryKey: ['unmatched'] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   if (query.isPending) return <LoadingState label={t('unmatched.loading')} />;
@@ -48,13 +45,6 @@ export default function UnmatchedPage() {
           {t('unmatched.back')}
         </Link>
       </div>
-
-      {message && <p className="rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">{message}</p>}
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium">

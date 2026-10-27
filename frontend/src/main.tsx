@@ -1,12 +1,14 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { configureAuthBridge } from './lib/client';
+import { ApiError, configureAuthBridge } from './lib/client';
 import { ConfirmProvider } from './components/ui/ConfirmProvider';
-import { Toaster } from './lib/toast';
-import './i18n';
+import { translateError } from './lib/error-message';
+import { Toaster, toastError } from './lib/toast';
+import i18n from './i18n';
 import { useAuthStore } from './stores/auth-store';
 import './styles/index.css';
 
@@ -20,7 +22,28 @@ configureAuthBridge({
   onAuthLost: () => useAuthStore.getState().clear(),
 });
 
+// 这里在 React 之外，拿不到 useTranslation；每次调用读当前语言，切换语言后仍然生效
+const t: TFunction = ((key: string, options?: Record<string, unknown>) =>
+  i18n.t(key, options as never)) as unknown as TFunction;
+
+/**
+ * 兜底：没有自带 onError 的 mutation 失败也必须有反馈。
+ *
+ * 以往漏写 onError 的调用点会让失败的 Promise 被静默吞掉——用户点了按钮却
+ * 什么都没发生。这里统一转成错误提示；页面自己写了 onError 的照旧走自己那套，
+ * 避免同一错误弹两次。
+ *
+ * 401 不提示：会话失效已由请求层清理并跳登录页，再弹一条反而干扰。
+ */
 const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _context, mutation) => {
+      if (mutation.options.onError) return;
+      if (mutation.meta?.silent) return;
+      if (error instanceof ApiError && error.status === 401) return;
+      toastError(translateError(error, t));
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

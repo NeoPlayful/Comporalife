@@ -7,6 +7,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { assetsApi, type Asset, type AssetKind, type ValuationBasis } from '@/lib/assets';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatDate } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
@@ -50,6 +51,7 @@ function AssetForm({ onClose }: { onClose: () => void }) {
         note: form.note || null,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       onClose();
@@ -199,6 +201,7 @@ function ValuationRow({ asset }: { asset: Asset }) {
         overwrite,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setForm({ ...form, value: '' });
@@ -224,6 +227,7 @@ function ValuationRow({ asset }: { asset: Asset }) {
   const removeValuation = useMutation({
     mutationFn: (valuationId: string) => assetsApi.removeValuation(asset.id, valuationId),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
@@ -323,7 +327,6 @@ export default function AssetsPage() {
   const confirm = useConfirm();
   const [showArchived, setShowArchived] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const listQuery = useQuery({
     queryKey: ['assets', showArchived],
@@ -335,10 +338,10 @@ export default function AssetsPage() {
   const archive = useMutation({
     mutationFn: (id: string) => assetsApi.archive(id),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.archived'));
       void queryClient.invalidateQueries({ queryKey: ['assets'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   return (
@@ -355,8 +358,6 @@ export default function AssetsPage() {
       </header>
 
       <DuplicateGuardNotice />
-
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       {formOpen && <AssetForm onClose={() => setFormOpen(false)} />}
 

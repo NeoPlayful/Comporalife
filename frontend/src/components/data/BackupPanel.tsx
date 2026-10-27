@@ -7,6 +7,7 @@ import { ApiError } from '@/lib/client';
 import { backupsApi, type BackupRecord } from '@/lib/data-management';
 import { downloadUrlAsFile } from '@/lib/download';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { useAuthStore } from '@/stores/auth-store';
 import RestoreWizard from './RestoreWizard';
@@ -17,7 +18,6 @@ export default function BackupPanel() {
   const accessToken = useAuthStore((state) => state.accessToken);
 
   const [restoring, setRestoring] = useState<BackupRecord | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const list = useQuery({
     queryKey: ['backups'],
@@ -29,16 +29,19 @@ export default function BackupPanel() {
   const create = useMutation({
     mutationFn: () => backupsApi.create(),
     onSuccess: () => {
-      setError(null);
+      toastSuccess(t('backup.created'));
       void queryClient.invalidateQueries({ queryKey: ['backups'] });
       void queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   const remove = useMutation({
     mutationFn: (id: string) => backupsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups'] }),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
+      queryClient.invalidateQueries({ queryKey: ['backups'] });
+    },
   });
 
   return (
@@ -54,8 +57,6 @@ export default function BackupPanel() {
         >
           {create.isPending ? t('backup.creating') : t('backup.create')}
         </button>
-        {create.isSuccess && <p className="text-sm text-emerald-600 dark:text-emerald-400">{t('backup.created')}</p>}
-        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
 
       <div>

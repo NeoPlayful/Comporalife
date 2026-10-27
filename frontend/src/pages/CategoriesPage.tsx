@@ -6,6 +6,7 @@ import {
 } from '@/lib/categories';
 import { useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -36,6 +37,7 @@ export default function CategoriesPage() {
   const createTag = useMutation({
     mutationFn: () => tagsApi.create(tagName.trim()),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setTagName('');
       setError(null);
       queryClient.invalidateQueries({ queryKey: ['tags'] });
@@ -45,13 +47,17 @@ export default function CategoriesPage() {
 
   const deleteTag = useMutation({
     mutationFn: (id: string) => tagsApi.remove(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tags'] }),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+    },
   });
 
   const createCategory = useMutation({
     mutationFn: (payload: { name: string; parentId: string | null }) =>
       categoriesApi.create({ kind, name: payload.name, parentId: payload.parentId }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setNewName('');
       setAddingUnder(null);
       setError(null);
@@ -63,10 +69,9 @@ export default function CategoriesPage() {
   const deleteCategory = useMutation({
     mutationFn: (id: string) => categoriesApi.remove(id),
     onSuccess: () => {
-      setError(null);
+      toastSuccess(t('common:feedback.deleted'));
       queryClient.invalidateQueries({ queryKey: ['categories'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const roots = treeQuery.data?.categories ?? [];

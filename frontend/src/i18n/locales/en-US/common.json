@@ -47,6 +47,20 @@
     "discard_keep_editing": "Keep editing"
   },
   "network_error": "Network error, please try again",
+  "feedback": {
+    "created": "Created",
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "archived": "Archived",
+    "unarchived": "Unarchived",
+    "voided": "Voided",
+    "copied": "Copied",
+    "submitted": "Submitted",
+    "cancelled": "Cancelled",
+    "updated": "Updated",
+    "run_started": "Calculation started",
+    "done": "Restored to default"
+  },
   "list_separator": ", ",
   "pagination": {
     "total": "{{total}} total",

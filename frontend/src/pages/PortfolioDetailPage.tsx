@@ -7,6 +7,7 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDate, formatNumber, formatPrice } from '@/lib/format';
 import {
   instrumentsApi,
@@ -41,7 +42,6 @@ export default function PortfolioDetailPage() {
   const confirm = useConfirm();
 
   const [tab, setTab] = useState<Tab>('holdings');
-  const [error, setError] = useState<string | null>(null);
   const [dimension, setDimension] = useState<AllocationDimension>('asset_class');
   const [editingTargets, setEditingTargets] = useState(false);
   const [targetDraft, setTargetDraft] = useState<Record<string, string>>({});
@@ -168,22 +168,21 @@ export default function PortfolioDetailPage() {
       });
     },
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setShowTradeForm(false);
       setTradeDraft(emptyTradeDraft());
-      setError(null);
       invalidatePortfolio();
       void queryClient.invalidateQueries({ queryKey: ['portfolio', id, 'trades'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const voidTradeMutation = useMutation({
     mutationFn: (tradeId: string) => tradesApi.remove(tradeId),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.voided'));
       invalidatePortfolio();
       void queryClient.invalidateQueries({ queryKey: ['portfolio', id, 'trades'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const addCashflowMutation = useMutation({
@@ -194,21 +193,20 @@ export default function PortfolioDetailPage() {
         amount: cashflowDraft.amount,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setCashflowDraft({ ...cashflowDraft, amount: '' });
-      setError(null);
       invalidatePortfolio();
       void queryClient.invalidateQueries({ queryKey: ['portfolio', id, 'cashflows'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const removeCashflowMutation = useMutation({
     mutationFn: (cashflowId: string) => portfoliosApi.removeCashflow(id, cashflowId),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       invalidatePortfolio();
       void queryClient.invalidateQueries({ queryKey: ['portfolio', id, 'cashflows'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const createInstrumentMutation = useMutation({
@@ -220,12 +218,11 @@ export default function PortfolioDetailPage() {
         currency,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       setShowNewInstrument(false);
       setInstrumentDraft({ symbol: '', name: '', assetClass: 'etf' });
-      setError(null);
       void queryClient.invalidateQueries({ queryKey: ['instruments'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const addPriceMutation = useMutation({
@@ -235,12 +232,11 @@ export default function PortfolioDetailPage() {
         price: priceDraft.price,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       setPriceDraft({ instrumentId: '', priceDate: '', price: '' });
-      setError(null);
       void queryClient.invalidateQueries({ queryKey: ['instruments'] });
       invalidatePortfolio();
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const saveTargetsMutation = useMutation({
@@ -251,17 +247,17 @@ export default function PortfolioDetailPage() {
       return portfoliosApi.saveTargets(id, { dimension, targets });
     },
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       setEditingTargets(false);
-      setError(null);
       void queryClient.invalidateQueries({ queryKey: ['portfolio', id, 'targets'] });
       void queryClient.invalidateQueries({ queryKey: ['portfolio', id, 'drift'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
+  // 再平衡只算预览、不写数据，不给成功提示，否则每次切维度都会弹一条
   const rebalanceMutation = useMutation({
     mutationFn: () => portfoliosApi.rebalancePreview(id, { dimension }),
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const allocationItems = useMemo(() => {
@@ -323,12 +319,6 @@ export default function PortfolioDetailPage() {
           )}
         </div>
       </div>
-
-      {error && (
-        <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       <PortfolioSummaryCards detail={detail} returns={returnsQuery.data} />
 
@@ -747,7 +737,6 @@ export default function PortfolioDetailPage() {
               holdings={holdings}
               currency={currency}
               saving={createTradeMutation.isPending}
-              error={null}
               onChange={setTradeDraft}
               onSubmit={() => createTradeMutation.mutate()}
               onCancel={() => setShowTradeForm(false)}
@@ -955,8 +944,6 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
     marketValue: '',
     note: '',
   });
-  const [error, setError] = useState<string | null>(null);
-
   const listQuery = useQuery({
     queryKey: ['portfolio', portfolioId, 'valuations'],
     queryFn: () => portfoliosApi.valuations(portfolioId),
@@ -977,8 +964,8 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
         overwrite,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       setDraft({ valuationDate: new Date().toISOString().slice(0, 10), marketValue: '', note: '' });
-      setError(null);
       invalidate();
     },
     onError: async (err) => {
@@ -991,17 +978,16 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
         addMutation.mutate(true);
         return;
       }
-      setError(translateError(err, t));
+      toastError(translateError(err, t));
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (valuationId: string) => portfoliosApi.removeValuation(portfolioId, valuationId),
     onSuccess: () => {
-      setError(null);
+      toastSuccess(t('common:feedback.deleted'));
       invalidate();
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const items = listQuery.data?.items ?? [];
@@ -1045,8 +1031,6 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
           {t('valuations.add')}
         </button>
       </div>
-
-      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
       {listQuery.isLoading && <LoadingState />}
 

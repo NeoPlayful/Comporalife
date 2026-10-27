@@ -6,6 +6,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatDate } from '@/lib/format';
 import { liabilitiesApi, type Liability, type LiabilityKind } from '@/lib/liabilities';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +42,7 @@ function LiabilityForm({ onClose }: { onClose: () => void }) {
         note: form.note || null,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.created'));
       void queryClient.invalidateQueries({ queryKey: ['liabilities'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       onClose();
@@ -199,6 +201,7 @@ function SnapshotRow({ liability }: { liability: Liability }) {
         overwrite,
       }),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.saved'));
       void queryClient.invalidateQueries({ queryKey: ['liabilities'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setForm({ ...form, balance: '' });
@@ -223,6 +226,7 @@ function SnapshotRow({ liability }: { liability: Liability }) {
   const removeSnapshot = useMutation({
     mutationFn: (snapshotId: string) => liabilitiesApi.removeSnapshot(liability.id, snapshotId),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
       void queryClient.invalidateQueries({ queryKey: ['liabilities'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
@@ -308,7 +312,6 @@ export default function LiabilitiesPage() {
   const confirm = useConfirm();
   const [showArchived, setShowArchived] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const listQuery = useQuery({
     queryKey: ['liabilities', showArchived],
@@ -323,10 +326,10 @@ export default function LiabilitiesPage() {
   const archive = useMutation({
     mutationFn: (id: string) => liabilitiesApi.archive(id),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.archived'));
       void queryClient.invalidateQueries({ queryKey: ['liabilities'] });
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   return (
@@ -350,7 +353,6 @@ export default function LiabilitiesPage() {
         {t('notice_no_account')}
       </p>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {formOpen && <LiabilityForm onClose={() => setFormOpen(false)} />}
 
       {summaryQuery.data && (

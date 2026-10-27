@@ -1,7 +1,7 @@
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
 import { useEnumLabels, TRANSACTION_TYPE_KEYS } from '@/lib/enum-labels';
-import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { formatDate } from '@/lib/format';
 import {
   transactionsApi,
@@ -29,7 +29,6 @@ export default function TransactionsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [showVoided, setShowVoided] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<Transaction | null>(null);
 
   const [filters, setFilters] = useState<{
@@ -72,23 +71,21 @@ export default function TransactionsPage() {
   const voidMutation = useMutation({
     mutationFn: (id: string) => transactionsApi.void(id),
     onSuccess: () => {
-      setError(null);
+      toastSuccess(t('common:feedback.voided'));
       setDetail(null);
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const bulkCategorize = useMutation({
     mutationFn: (categoryId: string) =>
       transactionsApi.bulkCategorize([...selected], categoryId || null),
     onSuccess: () => {
+      toastSuccess(t('common:feedback.updated'));
       setSelected(new Set());
-      setError(null);
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
-    onError: (err) => setError(translateError(err, t)),
   });
 
   const transactions = listQuery.data?.transactions ?? [];
@@ -135,12 +132,6 @@ export default function TransactionsPage() {
           </button>
         </div>
       </div>
-
-      {error && (
-        <p role="alert" className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-sm text-[var(--color-negative)]">
-          {error}
-        </p>
-      )}
 
       <div className="card space-y-3 p-4">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
