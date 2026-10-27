@@ -268,13 +268,7 @@
     "filter_base": "筛选基准币",
     "filter_quote": "筛选计价币",
     "filter_source": "筛选来源",
-    "filter_from": "起始日期",
-    "filter_to": "结束日期",
     "search_placeholder": "搜索币种代码",
-    "tab": {
-      "latest": "当前汇率",
-      "records": "同步记录"
-    },
     "stats": {
       "pairs": "覆盖币种对",
       "pairs_desc": "已有汇率的币种对数量",
@@ -408,16 +402,19 @@
       "saving": "提交中…",
       "delete_title": "删除 {{count}} 条汇率"
     },
-    "editDrawer": {
+    "editForm": {
       "title": "编辑汇率",
+      "subtitle": "修改这条汇率的数值或来源，保存后立即影响所有用户的折算。",
       "close": "关闭",
-      "decimals": "{{decimals}} 位小数",
+      "decimals": "计价币 {{decimals}} 位小数，实际折算按存储精度计算。",
       "rate_label": "汇率（1 {{base}} = ? {{quote}}）",
       "current_value": "当前值 {{rate}}",
+      "date_locked": "币种对与生效日期是这条记录的身份，需要改动请新建一条。",
       "source_label": "来源",
       "source_provider_hint": "标记为自动同步后，下次同步会覆盖这一行的值。",
       "source_manual_hint": "人工录入是权威值，自动同步不会覆盖同一天的记录。",
       "rate_invalid": "汇率必须是大于 0 的数值。",
+      "updated_at_hint": "最近一次更新于 {{time}}。{{decimals}} 位小数只是计价币的常规精度，实际折算按存储精度计算。",
       "saving": "保存中…"
     },
     "notice": {

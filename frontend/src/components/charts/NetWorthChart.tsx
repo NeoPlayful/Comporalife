@@ -4,9 +4,11 @@ import './echarts';
 import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
+import { useChartTheme } from './chart-theme';
 
 export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
   const { t } = useTranslation('dashboard');
+  const chartTheme = useChartTheme();
 
   if (data.series.length === 0) {
     return (
@@ -21,23 +23,23 @@ export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
     grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       valueFormatter: (value: number) => `${formatNumber(value)} ${data.baseCurrency}`,
     },
     xAxis: {
       type: 'category',
       data: data.series.map((point) => point.period),
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
       axisTick: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
     },
     series: [
       {

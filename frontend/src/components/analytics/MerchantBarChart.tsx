@@ -3,6 +3,7 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
+import { useChartTheme } from '../charts/chart-theme';
 import ReactECharts from 'echarts-for-react';
 
 export default function MerchantBarChart({
@@ -13,6 +14,7 @@ export default function MerchantBarChart({
   currency: string;
 }) {
   const { t } = useTranslation('analytics');
+  const chartTheme = useChartTheme();
 
   if (items.length === 0) {
     return <EmptyState title={t('merchants.empty')} />;
@@ -26,21 +28,21 @@ export default function MerchantBarChart({
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       valueFormatter: (value: number) => `${formatNumber(value)} ${currency}`,
     },
     xAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 11 },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
     },
     yAxis: {
       type: 'category',
       data: top.map((item) => item.merchant),
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.12)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.55)', fontSize: 11, width: 120, overflow: 'truncate' },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11, width: 120, overflow: 'truncate' },
       axisTick: { show: false },
     },
     series: [

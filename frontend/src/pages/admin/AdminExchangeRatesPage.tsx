@@ -1,21 +1,17 @@
 import RateBulkDrawer, { type BulkDraft } from '@/components/admin/RateBulkDrawer';
 import RateCreateDialog from '@/components/admin/RateCreateDialog';
-import RateEditDrawer from '@/components/admin/RateEditDrawer';
+import RateEditDialog from '@/components/admin/RateEditDialog';
 import RateHistoryDialog from '@/components/admin/RateHistoryDialog';
 import RateStats from '@/components/admin/RateStats';
 import RateSyncBar from '@/components/admin/RateSyncBar';
 import RateSyncDrawer, { type SyncDrawerSave } from '@/components/admin/RateSyncDrawer';
-import RateTable, { type RateTableMode } from '@/components/admin/RateTable';
+import RateTable from '@/components/admin/RateTable';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
-import {
-  adminApi,
-  type AdminExchangeRate,
-  type AdminLatestExchangeRate,
-} from '@/lib/admin';
+import { adminApi, type AdminLatestExchangeRate } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
 import { currencyName } from '@/lib/format';
@@ -28,15 +24,13 @@ import { useTranslation } from 'react-i18next';
 const CODES = sortedCurrencyCodes();
 const SEARCH_DEBOUNCE_MS = 300;
 
-type RateRow = AdminExchangeRate | AdminLatestExchangeRate;
+type RateRow = AdminLatestExchangeRate;
 
-/** 筛选条件分成「输入型」与「立即生效型」：搜索框防抖，下拉和日期即刻生效 */
+/** 筛选条件下拉即刻生效，只有搜索框走防抖 */
 type Filter = {
   base: string;
   quote: string;
   source: string;
-  from: string;
-  to: string;
 };
 
 /**
@@ -45,20 +39,19 @@ type Filter = {
  * 汇率是全局系统参考数据，这里的每一次改动都会改变所有用户的折算结果，
  * 因此删除需要二次确认，且操作全部进后台审计。
  *
- * 页面骨架：头部三个动作 → 统计卡 → 一行工具栏（视图/搜索/筛选/批量）→ 表格。
+ * 页面骨架：头部三个动作 → 统计卡 → 一行工具栏（搜索/筛选/批量）→ 表格。
  * 同步状态压在头部第二行而不是单独一张卡：它是一句状态，不是内容。
  *
- * 两个视图：「当前汇率」每个币种对一行，回答「现在生效的是多少」；
- * 「同步记录」保留按日期的流水，用于查某天的明细。
+ * 表格每个币种对一行，回答「现在生效的是多少」；按日期的流水仍保留在后端
+ * 接口里，只是页面不再提供入口，日常排查走单对走势图。
  */
 export default function AdminExchangeRatesPage() {
   const { t } = useTranslation('admin');
   const queryClient = useQueryClient();
 
-  const [mode, setMode] = useState<RateTableMode>('latest');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [filter, setFilter] = useState<Filter>({ base: '', quote: '', source: '', from: '', to: '' });
+  const [filter, setFilter] = useState<Filter>({ base: '', quote: '', source: '' });
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -92,31 +85,8 @@ export default function AdminExchangeRatesPage() {
         source: filter.source,
         q: search,
       }),
-    enabled: mode === 'latest',
     // 换页或改筛选时保留上一份结果，避免表格闪成空白
     placeholderData: (previous) => previous,
-  });
-
-  const recordsQuery = useQuery({
-    queryKey: ['admin', 'exchange-rates', page, pageSize, filter],
-    queryFn: () =>
-      adminApi.exchangeRates({
-        page,
-        pageSize,
-        base: filter.base,
-        quote: filter.quote,
-        source: filter.source,
-        from: filter.from,
-        to: filter.to,
-      }),
-    enabled: mode === 'records',
-    placeholderData: (previous) => previous,
-  });
-
-  // 统计卡独立取数：切到「同步记录」时当前汇率视图不请求，统计仍要保留
-  const statsQuery = useQuery({
-    queryKey: ['admin', 'exchange-rates-stats'],
-    queryFn: () => adminApi.latestExchangeRates({ page: 1, pageSize: 1 }),
   });
 
   const providerQuery = useQuery({
@@ -141,31 +111,19 @@ export default function AdminExchangeRatesPage() {
   });
   const canEditProvider = settingsOverviewQuery.data?.capabilities.canManageAdmins ?? false;
 
+  // 保持引用稳定：下面的选中集合与批量草稿都依赖它，每次渲染换新数组会让它们白算
   const rows: RateRow[] = useMemo(
-    () =>
-      mode === 'latest'
-        ? (latestQuery.data?.data.exchangeRates ?? [])
-        : (recordsQuery.data?.data.exchangeRates ?? []),
-    [mode, latestQuery.data, recordsQuery.data],
+    () => latestQuery.data?.data.exchangeRates ?? [],
+    [latestQuery.data],
   );
-
-  const stats = statsQuery.data?.data.stats ?? latestQuery.data?.data.stats ?? null;
-  const pagination =
-    mode === 'latest'
-      ? (latestQuery.data?.pagination ?? null)
-      : (recordsQuery.data?.pagination ?? null);
+  const stats = latestQuery.data?.data.stats ?? null;
+  const pagination = latestQuery.data?.pagination ?? null;
   const provider = providerQuery.data ?? null;
   const staleDays = stats?.staleDays ?? 7;
   const staleFailures = provider?.lastRun?.failures ?? [];
 
-  const activeLoading = mode === 'latest' ? latestQuery.isLoading : recordsQuery.isLoading;
-  const activeError = mode === 'latest' ? latestQuery.isError : recordsQuery.isError;
-  const activeFetching = mode === 'latest' ? latestQuery.isFetching : recordsQuery.isFetching;
-
   function invalidate() {
-    void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates'] });
     void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates-latest'] });
-    void queryClient.invalidateQueries({ queryKey: ['admin', 'exchange-rates-stats'] });
     void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-provider'] });
     // 手动同步成功会顺带把开关重新打开，不同步刷新这里，抽屉就会拿着旧值把开关写回关闭
     void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-sync-settings'] });
@@ -184,12 +142,6 @@ export default function AdminExchangeRatesPage() {
   function updateFilter(patch: Partial<Filter>) {
     setFilter((prev) => ({ ...prev, ...patch }));
     setPage(1);
-  }
-
-  function switchMode(next: RateTableMode) {
-    setMode(next);
-    setPage(1);
-    resetSelection();
   }
 
   const save = useMutation({
@@ -366,9 +318,9 @@ export default function AdminExchangeRatesPage() {
       selectedRows.map((row) => ({
         baseCurrency: row.baseCurrency,
         quoteCurrency: row.quoteCurrency,
-        currentRate: mode === 'latest' ? row.rate : null,
+        currentRate: row.rate,
       })),
-    [selectedRows, mode],
+    [selectedRows],
   );
 
   const canDelete = deleteTargets !== null;
@@ -438,39 +390,19 @@ export default function AdminExchangeRatesPage() {
       )}
       {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
-      {/* 工具栏：视图切换 + 搜索筛选 + 刷新，批量条选中后才出现 */}
+      {/* 工具栏：搜索筛选 + 刷新，批量条选中后才出现 */}
       <section className="card space-y-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg border border-[var(--color-border-subtle)] p-0.5">
-            {(['latest', 'records'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => switchMode(value)}
-                aria-pressed={mode === value}
-                className={`rounded-md px-3 py-1.5 text-sm ${
-                  mode === value
-                    ? 'bg-[var(--color-accent)] text-white'
-                    : 'hover:bg-black/5 dark:hover:bg-white/5'
-                }`}
-              >
-                {t(`exchangeRates.tab.${value}`)}
-              </button>
-            ))}
-          </div>
-
-          {mode === 'latest' && (
-            <input
-              className="input sm:max-w-xs"
-              value={searchInput}
-              placeholder={t('exchangeRates.search_placeholder')}
-              onChange={(event) => {
-                setSearchInput(event.target.value);
-                setPage(1);
-              }}
-              aria-label={t('exchangeRates.search_placeholder')}
-            />
-          )}
+          <input
+            className="input sm:max-w-xs"
+            value={searchInput}
+            placeholder={t('exchangeRates.search_placeholder')}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setPage(1);
+            }}
+            aria-label={t('exchangeRates.search_placeholder')}
+          />
 
           <select
             className="input sm:w-auto"
@@ -511,34 +443,16 @@ export default function AdminExchangeRatesPage() {
             <option value="provider">{t('exchangeRates.source_provider')}</option>
           </select>
 
-          {mode === 'records' && (
-            <>
-              <input
-                type="date"
-                className="input sm:w-auto"
-                value={filter.from}
-                onChange={(event) => updateFilter({ from: event.target.value })}
-                aria-label={t('exchangeRates.filter_from')}
-              />
-              <input
-                type="date"
-                className="input sm:w-auto"
-                value={filter.to}
-                onChange={(event) => updateFilter({ to: event.target.value })}
-                aria-label={t('exchangeRates.filter_to')}
-              />
-            </>
-          )}
-
           <button
             type="button"
-            onClick={() =>
-              void (mode === 'latest' ? latestQuery.refetch() : recordsQuery.refetch())
-            }
+            onClick={() => void latestQuery.refetch()}
             aria-label={t('exchangeRates.refresh')}
             className="ml-auto flex items-center gap-1.5 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
           >
-            <RefreshCw className={`size-4 ${activeFetching ? 'animate-spin' : ''}`} aria-hidden />
+            <RefreshCw
+              className={`size-4 ${latestQuery.isFetching ? 'animate-spin' : ''}`}
+              aria-hidden
+            />
             <span className="hidden sm:inline">{t('exchangeRates.refresh')}</span>
           </button>
         </div>
@@ -573,14 +487,10 @@ export default function AdminExchangeRatesPage() {
         )}
       </section>
 
-      {activeLoading && <LoadingState />}
-      {activeError && (
-        <ErrorState
-          onRetry={() => void (mode === 'latest' ? latestQuery.refetch() : recordsQuery.refetch())}
-        />
-      )}
+      {latestQuery.isLoading && <LoadingState />}
+      {latestQuery.isError && <ErrorState onRetry={() => void latestQuery.refetch()} />}
 
-      {!activeLoading && !activeError && rows.length === 0 && (
+      {!latestQuery.isLoading && !latestQuery.isError && rows.length === 0 && (
         <EmptyState
           title={t('exchangeRates.empty_title')}
           description={t('exchangeRates.empty_description')}
@@ -601,7 +511,6 @@ export default function AdminExchangeRatesPage() {
 
       {rows.length > 0 && (
         <RateTable
-          mode={mode}
           rows={rows}
           staleDays={staleDays}
           selected={selected}
@@ -685,7 +594,7 @@ export default function AdminExchangeRatesPage() {
 
       <RateHistoryDialog pair={historyPair} onClose={() => setHistoryPair(null)} />
 
-      <RateEditDrawer
+      <RateEditDialog
         row={editingRow}
         saving={update.isPending}
         onClose={() => setEditingRow(null)}

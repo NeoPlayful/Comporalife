@@ -131,7 +131,8 @@ async function main() {
   };
 
   report.toolbar = {
-    hasTabs: text.includes('当前汇率') && text.includes('同步记录'),
+    // 视图切换已移除：两个按钮都不该再出现，页面上只剩当前汇率这一张表
+    tabsRemoved: !text.includes('同步记录') && !text.includes('当前汇率'),
     hasSearch: await evaluate(`document.querySelectorAll('input').length > 0`),
     hasFilters: ['筛选基准币', '筛选计价币', '筛选来源'].every((v) => text.includes(v)),
     hasRefresh: text.includes('刷新'),
@@ -203,7 +204,7 @@ async function main() {
   await sleep(500);
   report.bulkEscCloses = await evaluate(`!document.querySelector('[role="dialog"]')`);
 
-  // 编辑抽屉
+  // 编辑弹窗：与新建同为居中弹窗，不是右侧抽屉
   await evaluate(`
     (() => {
       const btn = document.querySelector('table tbody button[aria-label="编辑"]');
@@ -213,10 +214,13 @@ async function main() {
     })()
   `);
   await sleep(700);
-  report.editDrawer = await evaluate(`
+  report.editDialog = await evaluate(`
     (() => {
       const d = document.querySelector('[role="dialog"]');
       if (!d) return { missing: true };
+      const r = d.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
       const text = d.innerText;
       return {
         hasTitle: text.includes('编辑汇率'),
@@ -224,6 +228,10 @@ async function main() {
         hasSourceManual: text.includes('人工录入'),
         hasSourceProvider: text.includes('自动同步'),
         hasCurrentValue: text.includes('当前值'),
+        // 居中而不是贴右边：两侧留白都要有
+        centered: Math.abs(cx - window.innerWidth / 2) < 3 && r.right < window.innerWidth - 8,
+        notFullHeight: r.height < window.innerHeight - 8,
+        dateLocked: !!d.querySelector('input[type="date"][disabled]'),
         saveDisabledInitially: (() => {
           const b = [...d.querySelectorAll('button')].find(x => x.textContent.trim() === '保存');
           return b ? b.disabled : 'no-save';

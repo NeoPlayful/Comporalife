@@ -3,6 +3,7 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
+import { useChartTheme } from '../charts/chart-theme';
 import ReactECharts from 'echarts-for-react';
 import { useState } from 'react';
 
@@ -21,6 +22,7 @@ export default function PerformanceChart({
   currency: string;
 }) {
   const { t } = useTranslation('portfolios');
+  const chartTheme = useChartTheme();
   const { t: tEnums } = useTranslation('enums');
   const [showSegments, setShowSegments] = useState(false);
 
@@ -34,22 +36,22 @@ export default function PerformanceChart({
     grid: { left: 12, right: 16, top: 24, bottom: 28, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       valueFormatter: (value: number | null) =>
         value === null ? '—' : `${formatNumber(value)} ${currency}`,
     },
     xAxis: {
       type: 'category',
       data: performance.points.map((point) => point.date),
-      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.15)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10 },
+      axisLine: { lineStyle: { color: chartTheme.axisLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 10 },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
-      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10 },
+      splitLine: { lineStyle: { color: chartTheme.splitLine } },
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 10 },
     },
     series: [
       {
