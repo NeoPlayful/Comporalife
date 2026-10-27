@@ -52,9 +52,27 @@ describe('价格与汇率的位宽', () => {
     expect(formatPrice('12.5')).toBe('12.5');
   });
 
-  it('汇率保留 10 位，极小额币种对不会被抹成 0', () => {
-    expect(formatRate('0.0000001234')).toBe('0.0000001234');
-    expect(formatRate('7.1234567891')).toBe('7.1234567891');
+  it('汇率默认保留 4 位小数', () => {
+    expect(formatRate('6.6837510000')).toBe('6.6838');
+    expect(formatRate('0.8939350000')).toBe('0.8939');
+    expect(formatRate('151.0000000000')).toBe('151.0000');
+    expect(formatRate('1')).toBe('1.0000');
+  });
+
+  it('极小汇率放开到 8 位，不会被抹成 0.0000', () => {
+    // 1 VND ≈ 0.0000387 USD：按 4 位会显示成 0.0000，看起来像没有数据
+    expect(formatRate('0.0000387124')).toBe('0.00003871');
+    expect(formatRate('0.0000551000')).toBe('0.00005510');
+  });
+
+  it('空值与非数字显示为占位符，不报错', () => {
+    expect(formatRate(null)).toBe('—');
+    expect(formatRate(undefined)).toBe('—');
+    expect(formatRate('abc')).toBe('—');
+  });
+
+  it('0 仍按常规位数显示，不走小币种分支', () => {
+    expect(formatRate(0)).toBe('0.0000');
   });
 
   it('编辑汇率时去掉尾零，且不出现科学计数法', () => {

@@ -114,6 +114,15 @@ export default function RateSyncDrawer({
     providerChanged || anchorChanged || customUrlChanged || pathsChanged || keyChanged;
   const dirty = strategyDirty || sourceDirty;
 
+  /**
+   * 数据库里从来没有这一行配置。
+   *
+   * 此时表单上显示的都是服务端给的默认值，与「当前值」逐字段比较必然相等，
+   * 于是 dirty 恒为 false、保存按钮永远点不动，而开关又因为没有可用数据源
+   * 被禁用——界面自己把自己锁死了。没配置过本身就是一种「可以保存」的状态。
+   */
+  const needsInitialSetup = config?.source === 'none';
+
   const needsKey = REQUIRES_KEY[providerId];
   const willHaveKey = clearKey
     ? false
@@ -122,7 +131,16 @@ export default function RateSyncDrawer({
       : (config?.keyConfigured ?? false);
   const customUrlOk = providerId !== 'custom' || customUrl.trim().startsWith('https://');
   const keyOk = !needsKey || willHaveKey;
-  const canSubmit = dirty && customUrlOk && keyOk;
+  // 首次建立配置本身就是一次数据源写入，只有超管能做；按钮不能显示成可点
+  const canSubmit = (dirty || (needsInitialSetup && canEdit)) && customUrlOk && keyOk;
+
+  /**
+   * 开关能否操作。
+   *
+   * 开启自动同步的前提是有可用数据源。未配置时只有超管能在这一次保存里把它
+   * 建起来，普通管理员即使打开开关也只会得到一个永远不会跑的开关。
+   */
+  const canToggle = canEdit || (provider?.configured ?? false);
 
   const frequencyLabel = (value: RateSyncFrequency) =>
     t(`exchangeRates.sync.frequency.${value}`);
@@ -194,7 +212,11 @@ export default function RateSyncDrawer({
           <div className="flex items-start gap-2 rounded-lg border border-[var(--color-border-subtle)] px-3 py-2.5">
             <Info className="mt-0.5 size-4 shrink-0 text-[var(--color-content-muted)]" aria-hidden />
             <p className="text-xs text-[var(--color-content-muted)]">
-              {t('exchangeRates.syncDrawer.super_admin_only')}
+              {t(
+                needsInitialSetup
+                  ? 'exchangeRates.syncDrawer.super_admin_setup_only'
+                  : 'exchangeRates.syncDrawer.super_admin_only',
+              )}
             </p>
           </div>
         )}
@@ -223,8 +245,8 @@ export default function RateSyncDrawer({
           title={t('exchangeRates.syncDrawer.enable')}
           hint={t('exchangeRates.syncDrawer.enable_hint')}
           checked={enabled}
-          // 没有可用数据源时开启等于承诺一件做不到的事
-          disabled={!provider?.configured}
+          // 没有可用数据源时开启等于承诺一件做不到的事；未配置时由本次保存一并建好
+          disabled={!canToggle}
           onCheckedChange={setEnabled}
           className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-3"
         />

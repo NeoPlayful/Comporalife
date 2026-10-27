@@ -47,8 +47,13 @@ async function statsFor(query = ''): Promise<{ stats: Stats; rowCount: number; t
     url: `/api/admin/exchange-rates/latest${query}`,
     headers: auth(adminToken),
   });
-  const body = res.json().data;
-  return { stats: body.stats, rowCount: body.exchangeRates.length, total: body.pagination.total };
+  const payload = res.json();
+  // 分页信息在 meta 里：与前端 api.getPaged 的读法保持一致
+  return {
+    stats: payload.data.stats,
+    rowCount: payload.data.exchangeRates.length,
+    total: payload.meta.pagination.total,
+  };
 }
 
 beforeAll(async () => {
@@ -152,6 +157,30 @@ describe('当前汇率视图', () => {
     expect(paged.rowCount).toBe(1);
     expect(paged.total).toBe(paged.stats.pairs);
     expect(paged.total).toBeGreaterThanOrEqual(2);
+  });
+
+  /**
+   * 分页信息必须在 meta 里。
+   *
+   * 前端 api.getPaged 只从 meta.pagination 取总数，一旦这里退回 data，
+   * 页面就既没有页码也翻不了页——第二页之后的币种对永远看不到。
+   */
+  it('分页信息放在 meta，两个列表接口都是', async () => {
+    await createRate(A, B, '150', '2026-01-01');
+    await createRate(A, C, '890', '2026-01-01');
+
+    for (const url of [
+      '/api/admin/exchange-rates/latest?page=1&pageSize=1',
+      '/api/admin/exchange-rates?page=1&pageSize=1',
+    ]) {
+      const res = await app.inject({ method: 'GET', url, headers: auth(adminToken) });
+      const payload = res.json();
+
+      expect(payload.meta.pagination).toMatchObject({ page: 1, pageSize: 1 });
+      expect(payload.meta.pagination.totalPages).toBeGreaterThan(1);
+      // data 里不再重复一份，避免两处口径漂移
+      expect(payload.data.pagination).toBeUndefined();
+    }
   });
 
   it('普通用户访问当前汇率视图被拒绝', async () => {

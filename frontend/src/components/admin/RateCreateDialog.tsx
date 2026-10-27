@@ -157,9 +157,13 @@ export default function RateCreateDialog({
             placeholder="0.0000"
             aria-invalid={rate.trim() !== '' && !positive}
           />
-          {rate.trim() !== '' && !positive && (
+          {rate.trim() !== '' && !positive ? (
             <span className="mt-1 block text-xs text-[var(--color-negative)]">
               {t('exchangeRates.editDrawer.rate_invalid')}
+            </span>
+          ) : (
+            <span className="mt-1 block text-xs text-[var(--color-content-muted)]">
+              {t('exchangeRates.rate_precision_hint')}
             </span>
           )}
         </label>

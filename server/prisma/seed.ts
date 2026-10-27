@@ -1,14 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 import argon2 from 'argon2';
 import { CATEGORY_TEMPLATE } from '../src/modules/categories/category-template.js';
-import { seedRateSettings } from './seed-rate-settings.js';
+import { seedRateData } from './seed-rate-settings.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const applied = await seedRateSettings(prisma);
-  if (applied.length > 0) {
-    console.log(`已写入默认汇率配置：${applied.join(', ')}`);
+  const rates = await seedRateData(prisma);
+  if (rates.settingsApplied.length > 0) {
+    console.log(`已写入默认汇率配置：${rates.settingsApplied.join(', ')}`);
+  }
+  if (rates.written > 0) {
+    console.log(`已写入 ${rates.written} 条初始汇率（${rates.date}，锚定 USD）`);
+  } else {
+    console.log(`初始汇率已存在，跳过写入（${rates.date}）`);
   }
 
   const email = process.env.ADMIN_EMAIL ?? 'admin@comporalife.com';

@@ -89,8 +89,8 @@ export interface RateProviderConfigView {
   customUrl: string;
   ratesPath: string;
   datePath: string;
-  /** database = 后台可改；environment = 仍在读部署环境变量 */
-  source: 'database' | 'environment';
+  /** database = 后台可改；environment = 仍在读部署环境变量；none = 尚未配置 */
+  source: 'database' | 'environment' | 'none';
 }
 
 export interface RateProviderUpdateInput {
@@ -110,8 +110,8 @@ export interface RateProviderStatus {
   keyConfigured: boolean;
   /** 已配置密钥的末四位；未配置时为空串 */
   keyHint: string;
-  /** 数据源来自数据库还是部署环境（回退） */
-  configSource: 'database' | 'environment';
+  /** 数据源来自数据库、部署环境（回退），或尚未配置 */
+  configSource: 'database' | 'environment' | 'none';
   customUrlConfigured: boolean;
   enabled: boolean;
   frequency: RateSyncFrequency;
