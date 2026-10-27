@@ -266,7 +266,10 @@ export default function AdminExchangeRatesPage() {
     mutationFn: async (input: SyncDrawerSave) => {
       // 数据源只在真的改过时才写：每次都 PATCH 会把「密钥保持不变」也当成一次改动，
       // 超管之外的管理员只改频率时会因此被 403 挡住。
+      // 例外是「从未配置」：表单显示的都是服务端默认值，逐字段比较必然相等，
+      // 但这一行确实还不存在，必须写一次才能把默认数据源落到库里。
       const sourceChanged =
+        providerConfigQuery.data?.source === 'none' ||
         (providerConfigQuery.data?.provider ?? null) !== input.provider ||
         (providerConfigQuery.data?.anchorCurrency ?? null) !== input.anchorCurrency ||
         (providerConfigQuery.data?.customUrl ?? '') !== input.customUrl ||

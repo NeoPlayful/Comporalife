@@ -155,12 +155,12 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
       }),
     ]);
 
+    // 分页信息放 meta：前端 api.getPaged 统一从 meta.pagination 读取，
+    // 塞进 data 会让分页条永远拿不到总数，页面既没有页码也翻不了页
     return ok(
-      {
-        exchangeRates: rows.map((row) => ({ ...row, rate: rateToString(row.rate.toString()) })),
-        pagination: buildPagination(page.page, page.pageSize, total),
-      },
+      { exchangeRates: rows.map((row) => ({ ...row, rate: rateToString(row.rate.toString()) })) },
       request.id,
+      { pagination: buildPagination(page.page, page.pageSize, total) },
     );
   });
 
@@ -258,13 +258,14 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
     const total = filtered.length;
     const start = (page.page - 1) * page.pageSize;
 
+    // 同上：分页信息必须在 meta 里，前端只从 meta.pagination 取值
     return ok(
       {
         exchangeRates: filtered.slice(start, start + page.pageSize),
         stats,
-        pagination: buildPagination(page.page, page.pageSize, total),
       },
       request.id,
+      { pagination: buildPagination(page.page, page.pageSize, total) },
     );
   });
 

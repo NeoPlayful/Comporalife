@@ -46,8 +46,14 @@ export interface RateProviderView {
   customUrl: string;
   ratesPath: string;
   datePath: string;
-  /** 配置来自数据库还是部署环境（回退） */
-  source: 'database' | 'environment';
+  /**
+   * 配置来源。
+   *
+   * none 与 environment 必须分开：两者都没有数据库行，但前者是「什么都没配」，
+   * 后者是「老部署仍在读环境变量」。混成同一个值会让界面把「从未配置」显示成
+   * 「来自环境变量」，也会让抽屉误以为当前值已经是管理员的选择而不允许保存。
+   */
+  source: 'database' | 'environment' | 'none';
 }
 
 interface StoredProvider {
@@ -145,6 +151,8 @@ export async function isRateProviderAvailable(prisma: PrismaClient): Promise<boo
 export async function getRateProviderView(prisma: PrismaClient): Promise<RateProviderView> {
   const resolved = await getRateProviderConfig(prisma);
   if (!resolved) {
+    // 一条配置都没有：给出一组可用的默认值，但把来源标成 none，
+    // 界面据此显示「尚未配置」并允许管理员直接保存这份默认配置。
     return {
       provider: DEFAULT_RATE_PROVIDER,
       anchorCurrency: 'USD',
@@ -153,7 +161,7 @@ export async function getRateProviderView(prisma: PrismaClient): Promise<RatePro
       customUrl: '',
       ratesPath: 'rates',
       datePath: '',
-      source: 'environment',
+      source: 'none',
     };
   }
 

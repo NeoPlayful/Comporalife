@@ -35,16 +35,43 @@ export function formatNumber(
 }
 
 /**
- * 价格是 DECIMAL(20,8)，汇率是 DECIMAL(20,10)。
+ * 价格是 DECIMAL(20,8)。
  * 用 formatNumber 的默认位数会截断报价的有效位，这里按字段位宽给上限。
  */
 export function formatPrice(value: number | string | null | undefined): string {
   return formatNumber(value, { maximumFractionDigits: 8 });
 }
 
+/** 常规汇率的展示位数 */
+const RATE_DISPLAY_DIGITS = 4;
+/** 极小汇率的展示位数：4 位会把它们抹成 0.0000 */
+const SMALL_RATE_DISPLAY_DIGITS = 8;
+/** 小于这个值的汇率按极小汇率处理，例如 VND、IDR 的反向报价 */
+const SMALL_RATE_THRESHOLD = 0.01;
+
+/**
+ * 汇率展示。
+ *
+ * 存储仍是 DECIMAL(20,10)：小币种的反向报价（1 VND ≈ 0.0000387 USD）在写库时
+ * 就需要 10 位才有意义，截断存储会让它归零，折算随之失败。展示收窄到 4 位只是
+ * 让表格可读，不参与任何计算。
+ *
+ * 小于 0.01 的汇率放开到 8 位，否则越南盾、印尼盾这类币种会显示成 0.0000，
+ * 看起来像没有数据。
+ */
 export function formatRate(value: number | string | null | undefined): string {
-  // 上限取字段位宽：小额币种对（如 JPY→CNY）在 6 位会被截成 0
-  return formatNumber(value, { maximumFractionDigits: 10 });
+  const numeric = typeof value === 'string' ? Number(value) : value;
+  if (numeric == null || Number.isNaN(numeric)) return '—';
+
+  const digits =
+    numeric !== 0 && Math.abs(numeric) < SMALL_RATE_THRESHOLD
+      ? SMALL_RATE_DISPLAY_DIGITS
+      : RATE_DISPLAY_DIGITS;
+
+  return formatNumber(numeric, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 /**

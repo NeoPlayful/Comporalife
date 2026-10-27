@@ -279,6 +279,43 @@ describe('回显脱敏', () => {
   });
 });
 
+describe('未配置状态', () => {
+  /**
+   * none 必须与环境变量回退区分开：抽屉用这个值判断表单上显示的是默认值
+   * 还是管理员的选择。混成 environment 会让界面把从未配置说成来自环境变量，
+   * 又会因为逐字段比较相等而始终不允许保存。
+   */
+  it('完全没有配置时视图来源为 none 并给出默认值', async () => {
+    const view = await getRateProviderView(app.prisma);
+    expect(view.source).toBe('none');
+    expect(view.provider).toBe('exchangerate-api');
+    expect(view.anchorCurrency).toBe('USD');
+    expect(view.keyConfigured).toBe(false);
+  });
+
+  it('按视图给出的默认值原样保存即可建立配置', async () => {
+    const draft = await getRateProviderView(app.prisma);
+    expect(draft.source).toBe('none');
+
+    const saved = await saveRateProviderConfig(
+      app.prisma,
+      {
+        provider: draft.provider,
+        anchorCurrency: draft.anchorCurrency,
+        customUrl: draft.customUrl,
+        ratesPath: draft.ratesPath,
+        datePath: draft.datePath,
+      },
+      null,
+    );
+
+    expect(saved.source).toBe('database');
+    expect(saved.provider).toBe('exchangerate-api');
+    // 免密钥数据源保存后立刻可用，管理员不必再填任何凭据
+    expect(await isRateProviderAvailable(app.prisma)).toBe(true);
+  });
+});
+
 describe('接口权限', () => {
   it('普通用户读取数据源配置返回 403', async () => {
     const res = await app.inject({
@@ -405,6 +442,8 @@ describe('供应商状态接口', () => {
     });
     expect(before.statusCode).toBe(200);
     expect(before.json().data.configured).toBe(false);
+    // 前端据此判断「要不要给出一键建立默认配置」
+    expect(before.json().data.configSource).toBe('none');
 
     await saveRateProviderConfig(
       app.prisma,

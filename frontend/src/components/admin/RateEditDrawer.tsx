@@ -121,12 +121,15 @@ export default function RateEditDrawer({
               quote: row.quoteCurrency,
             })}
           </span>
+          {/* 不加 step：step 只对 type="number" 生效，而数字框会把 6.683751
+              这类非整步长的合法汇率判为 stepMismatch，反而挡住精确录入 */}
           <input
             data-autofocus
             inputMode="decimal"
             value={rate}
             onChange={(event) => setRate(event.target.value)}
             className="input font-mono"
+            placeholder="0.0000"
             aria-invalid={!positive}
           />
           <span className="mt-1 block text-xs text-[var(--color-content-muted)]">
