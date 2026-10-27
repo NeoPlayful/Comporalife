@@ -101,8 +101,7 @@ function ActivityList({
  *
  * 行内展开会把操作按钮和列表挤在一起，且一次只能看一个账号的细节；
  * 改成抽屉后列表保持可扫读，操作与记录集中在一处。
- * 破坏性操作不再用 window.confirm，而是交给页面统一的确认层，
- * 这样确认框会压在抽屉之上，只有它响应 Esc。
+ * 破坏性操作交给页面的 ConfirmDialog，确认框会压在抽屉之上，只有它响应 Esc。
  */
 export default function UserDetailDrawer({
   user,

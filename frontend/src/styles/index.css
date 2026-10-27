@@ -1,0 +1,11 @@
+/*
+ * 样式入口。
+ *
+ * 只做导入，不写任何规则：CSS 的 @import 必须排在其余内容之前，
+ * 一旦这里出现规则，后面的导入就会失效。按「变量 → 基础 → 组件」
+ * 的顺序引入，保证浅色覆盖能压过后面的默认值。
+ */
+@import 'tailwindcss';
+@import './theme.css';
+@import './base.css';
+@import './components.css';

@@ -1,7 +1,9 @@
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { adminApi } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
 import { formatDateTime } from '@/lib/format';
+import { toastError } from '@/lib/toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,10 +11,10 @@ import { useTranslation } from 'react-i18next';
 export default function AdminAdminsPage() {
   const { t } = useTranslation('admin');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [keyword, setKeyword] = useState('');
   /** 已提交的关键词：搜索是显式动作，避免每次输入都查库 */
   const [submitted, setSubmitted] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const admins = useQuery({ queryKey: ['admin', 'admins'], queryFn: () => adminApi.admins() });
 
@@ -26,12 +28,11 @@ export default function AdminAdminsPage() {
     mutationFn: (input: { id: string; action: 'grant' | 'revoke' }) =>
       input.action === 'grant' ? adminApi.grant(input.id) : adminApi.revoke(input.id),
     onSuccess: () => {
-      setError(null);
       setKeyword('');
       setSubmitted('');
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
-    onError: (err) => setError(err instanceof ApiError ? translateError(err, t) : String(err)),
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
   return (
@@ -66,7 +67,6 @@ export default function AdminAdminsPage() {
         </button>
       </form>
 
-      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
       {submitted.length >= 2 && (
         <section>
@@ -94,10 +94,13 @@ export default function AdminAdminsPage() {
                     type="button"
                     disabled={act.isPending || candidate.role !== 'user'}
                     title={candidate.role !== 'user' ? t('admins.already_admin') : undefined}
-                    onClick={() => {
-                      if (window.confirm(t('admins.grant_confirm', { email: candidate.email }))) {
-                        act.mutate({ id: candidate.id, action: 'grant' });
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: t('admins.grant'),
+                        message: t('admins.grant_confirm', { email: candidate.email }),
+                        confirmLabel: t('admins.grant'),
+                      });
+                      if (ok) act.mutate({ id: candidate.id, action: 'grant' });
                     }}
                     className="rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs disabled:opacity-40"
                   >
@@ -130,10 +133,14 @@ export default function AdminAdminsPage() {
                   <button
                     type="button"
                     disabled={act.isPending}
-                    onClick={() => {
-                      if (window.confirm(t('admins.revoke_confirm', { email: admin.email }))) {
-                        act.mutate({ id: admin.id, action: 'revoke' });
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: t('admins.revoke'),
+                        message: t('admins.revoke_confirm', { email: admin.email }),
+                        confirmLabel: t('admins.revoke'),
+                        tone: 'danger',
+                      });
+                      if (ok) act.mutate({ id: admin.id, action: 'revoke' });
                     }}
                     className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-xs text-red-600 disabled:opacity-50 dark:text-red-400"
                   >

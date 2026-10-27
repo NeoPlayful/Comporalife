@@ -1,3 +1,4 @@
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -28,6 +29,7 @@ const STATUS_FILTERS: Array<GoalStatus | 'all'> = ['all', 'active', 'achieved', 
 export default function GoalsPage() {
   const { t } = useTranslation('goals');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const [tab, setTab] = useState<Tab>('goals');
   const [statusFilter, setStatusFilter] = useState<GoalStatus | 'all'>('active');
@@ -331,8 +333,13 @@ export default function GoalsPage() {
                         )}
                         <button
                           type="button"
-                          onClick={() => {
-                            if (window.confirm(t('actions.delete_confirm'))) deleteMutation.mutate(detail.goal.id);
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: t('actions.delete'),
+                              message: t('actions.delete_confirm'),
+                              tone: 'danger',
+                            });
+                            if (ok) deleteMutation.mutate(detail.goal.id);
                           }}
                           className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs text-[var(--color-negative)]"
                         >

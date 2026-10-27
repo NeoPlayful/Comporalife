@@ -7,6 +7,7 @@ import DuplicateReview from '@/components/imports/DuplicateReview';
 import ImportStepper from '@/components/imports/ImportStepper';
 import MappingEditor from '@/components/imports/MappingEditor';
 import PreviewTable from '@/components/imports/PreviewTable';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { ApiError } from '@/lib/client';
@@ -25,6 +26,7 @@ export default function ImportWorkbenchPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { t } = useTranslation('imports');
 
   const [step, setStep] = useState(2);
@@ -374,8 +376,13 @@ export default function ImportWorkbenchPage() {
           <button
             type="button"
             disabled={cancel.isPending}
-            onClick={() => {
-              if (window.confirm(t('workbench.cancel.confirm'))) cancel.mutate();
+            onClick={async () => {
+              const ok = await confirm({
+                title: t('workbench.cancel.action'),
+                message: t('workbench.cancel.confirm'),
+                tone: 'danger',
+              });
+              if (ok) cancel.mutate();
             }}
             className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-1.5 text-sm text-[var(--color-content-muted)]"
           >
@@ -387,8 +394,13 @@ export default function ImportWorkbenchPage() {
           <button
             type="button"
             disabled={rollback.isPending}
-            onClick={() => {
-              if (window.confirm(t('workbench.rollback.confirm'))) rollback.mutate();
+            onClick={async () => {
+              const ok = await confirm({
+                title: t('workbench.rollback.action'),
+                message: t('workbench.rollback.confirm'),
+                tone: 'danger',
+              });
+              if (ok) rollback.mutate();
             }}
             className="rounded-lg border border-[var(--color-negative)] px-3 py-1.5 text-sm text-[var(--color-negative)]"
           >

@@ -3,7 +3,7 @@ import { formatNumber } from '@/lib/format';
 import type { GoalHistoryPoint } from '@/lib/goals';
 import { useTranslation } from 'react-i18next';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
 import ReactECharts from 'echarts-for-react';
 
 interface Props {

@@ -14,10 +14,11 @@ import Pagination from '@/components/ui/Pagination';
 import { adminApi, type AdminLatestExchangeRate } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { currencyName } from '@/lib/format';
 import { sortedCurrencyCodes } from '@/components/finance/CurrencyFlag';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, RefreshCw, Settings2, X } from 'lucide-react';
+import { Plus, RefreshCw, Settings2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -65,8 +66,6 @@ export default function AdminExchangeRatesPage() {
   const [historyPair, setHistoryPair] = useState<{ from: string; to: string } | null>(null);
   const [syncDrawerOpen, setSyncDrawerOpen] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<RateRow[] | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   // 搜索框每击键都换 queryKey 会让整张表被加载态顶掉，等停顿后再发请求
   useEffect(() => {
@@ -153,18 +152,14 @@ export default function AdminExchangeRatesPage() {
     }) => adminApi.createExchangeRate(body),
     onSuccess: (result) => {
       setCreating(false);
-      setError(null);
-      setNotice(
+      toastSuccess(
         result.replaced
           ? t('exchangeRates.notice.created_replaced')
           : t('exchangeRates.notice.created'),
       );
       invalidate();
     },
-    onError: (err) => {
-      setNotice(null);
-      setError(translateError(err, t));
-    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const update = useMutation({
@@ -172,11 +167,10 @@ export default function AdminExchangeRatesPage() {
       adminApi.updateExchangeRate(input.id, { rate: input.rate, source: input.source }),
     onSuccess: () => {
       setEditingRow(null);
-      setError(null);
-      setNotice(t('exchangeRates.notice.updated'));
+      toastSuccess(t('exchangeRates.notice.updated'));
       invalidate();
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const bulk = useMutation({
@@ -187,11 +181,10 @@ export default function AdminExchangeRatesPage() {
     onSuccess: (result) => {
       setBulkOpen(false);
       resetSelection();
-      setError(null);
-      setNotice(t('exchangeRates.notice.bulk_saved', { count: result.writtenRows }));
+      toastSuccess(t('exchangeRates.notice.bulk_saved', { count: result.writtenRows }));
       invalidate();
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const remove = useMutation({
@@ -204,13 +197,12 @@ export default function AdminExchangeRatesPage() {
     onSuccess: (count) => {
       setDeleteTargets(null);
       resetSelection();
-      setError(null);
-      setNotice(t('exchangeRates.notice.deleted', { count }));
+      toastSuccess(t('exchangeRates.notice.deleted', { count }));
       invalidate();
     },
     onError: (err) => {
       setDeleteTargets(null);
-      setError(translateError(err, t));
+      toastError(translateError(err, t));
     },
   });
 
@@ -258,20 +250,15 @@ export default function AdminExchangeRatesPage() {
       // 数据源或频率变更后调度器已重排，下次运行时间与可用性必须重新取
       void queryClient.invalidateQueries({ queryKey: ['admin', 'rate-provider'] });
       setSyncDrawerOpen(false);
-      setError(null);
-      setNotice(t('exchangeRates.syncDrawer.saved'));
+      toastSuccess(t('exchangeRates.syncDrawer.saved'));
     },
-    onError: (err) => {
-      setNotice(null);
-      setError(translateError(err, t));
-    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const syncNow = useMutation({
     mutationFn: () => adminApi.refreshRates(),
     onSuccess: (summary) => {
-      setError(null);
-      setNotice(
+      toastSuccess(
         t('exchangeRates.syncDrawer.last_result', {
           written: summary.writtenRows,
           skipped: summary.skippedManual,
@@ -280,9 +267,8 @@ export default function AdminExchangeRatesPage() {
       invalidate();
     },
     onError: (err) => {
-      setNotice(null);
       // 同步进行中不是错误状态，单独给一句提示更准确
-      setError(
+      toastError(
         err instanceof ApiError && err.code === 'RATE_SYNC_IN_PROGRESS'
           ? t('exchangeRates.sync.busy')
           : translateError(err, t),
@@ -374,21 +360,6 @@ export default function AdminExchangeRatesPage() {
       </header>
 
       <RateStats stats={stats} provider={provider} />
-
-      {notice && (
-        <div className="flex items-start justify-between gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
-          <span>{notice}</span>
-          <button
-            type="button"
-            onClick={() => setNotice(null)}
-            aria-label={t('exchangeRates.dismiss')}
-            className="shrink-0 opacity-70 hover:opacity-100"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        </div>
-      )}
-      {error && <p className="text-sm text-[var(--color-negative)]">{error}</p>}
 
       {/* 工具栏：搜索筛选 + 刷新，批量条选中后才出现 */}
       <section className="card space-y-3 p-3">

@@ -3,7 +3,8 @@ import ReactECharts from 'echarts-for-react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '@/lib/format';
 import EmptyState from '../ui/EmptyState';
-import { useChartTheme } from './chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SCENARIO_PALETTE } from '@/theme/palette';
 
 export interface CompoundSeriesPoint {
   year: number;
@@ -70,7 +71,7 @@ export default function CompoundChart({ series, currency = 'CNY' }: Props) {
           symbol: 'none',
           lineStyle: {
             width: 2,
-            color: ['#5b8def', '#4ea87c', '#d9a55b', '#b58ce0'][index % 4],
+            color: SCENARIO_PALETTE[index % SCENARIO_PALETTE.length],
           },
           data: item.points.map((point) => Number(point.nominalValue)),
         })),

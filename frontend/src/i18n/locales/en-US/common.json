@@ -41,7 +41,10 @@
     "version": "Version v{{version}}"
   },
   "modal": {
-    "discard_confirm": "You have unsaved changes. Close anyway?"
+    "discard_title": "Discard unsaved changes?",
+    "discard_confirm": "You have unsaved changes. They will be lost if you close now.",
+    "discard_confirm_action": "Discard and close",
+    "discard_keep_editing": "Keep editing"
   },
   "network_error": "Network error, please try again",
   "list_separator": ", ",

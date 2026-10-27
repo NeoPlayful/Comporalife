@@ -2,7 +2,7 @@ import {
   ArrowLeftRight,
   History,
   LayoutDashboard,
-  ServerCog,
+  Settings,
   ShieldCheck,
   UserCog,
   Users,
@@ -19,7 +19,7 @@ const ADMIN_NAV_KEYS: { to: string; key: string; icon: LucideIcon; end?: boolean
   { to: '/admin/admins', key: 'admins', icon: UserCog },
   { to: '/admin/audit', key: 'audit', icon: History },
   { to: '/admin/exchange-rates', key: 'exchangeRates', icon: ArrowLeftRight },
-  { to: '/admin/settings', key: 'settings', icon: ServerCog },
+  { to: '/admin/settings', key: 'settings', icon: Settings },
 ];
 
 export default function AdminLayout() {

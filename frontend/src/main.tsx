@@ -4,9 +4,11 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { configureAuthBridge } from './lib/client';
+import { ConfirmProvider } from './components/ui/ConfirmProvider';
+import { Toaster } from './lib/toast';
 import './i18n';
 import { useAuthStore } from './stores/auth-store';
-import './index.css';
+import './styles/index.css';
 
 // 让请求层能读取内存中的 access token，并在刷新成功/会话失效时同步状态
 configureAuthBridge({
@@ -37,7 +39,32 @@ createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        {/* 命令式确认框要让页面内任意组件都能 await，因此挂在路由之内、页面之外 */}
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
+        <Toaster
+          position="top-right"
+          gutter={8}
+          containerStyle={{ zIndex: 90 }}
+          toastOptions={{
+            duration: 3500,
+            className: 'cl-toast',
+            // 走设计令牌而不是库自带的固定浅色底，否则深色主题下会浮出一块白卡
+            style: {
+              background: 'var(--color-surface-raised)',
+              color: 'var(--color-content)',
+              border: '1px solid var(--color-border-subtle)',
+              borderRadius: '0.625rem',
+              padding: '10px 14px',
+              fontSize: '14px',
+              maxWidth: '420px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.18)',
+            },
+            success: { iconTheme: { primary: 'var(--color-positive)', secondary: 'var(--color-surface-raised)' } },
+            error: { iconTheme: { primary: 'var(--color-negative)', secondary: 'var(--color-surface-raised)' } },
+          }}
+        />
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

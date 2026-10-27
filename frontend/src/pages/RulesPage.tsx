@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -10,6 +11,7 @@ import Modal from '@/components/ui/Modal';
 import { accountsApi } from '@/lib/accounts';
 import { useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
+import { toastSuccess } from '@/lib/toast';
 import { categoriesApi } from '@/lib/categories';
 import {
   classificationRulesApi,
@@ -20,6 +22,7 @@ import {
 
 export default function RulesPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { t } = useTranslation('imports');
   const [editing, setEditing] = useState<ClassificationRule | 'new' | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
@@ -68,7 +71,7 @@ export default function RulesPage() {
       setError(null);
       setTestResult(null);
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      alert(t('rules.applied', { matched: result.matched, categorized: result.categorized }));
+      toastSuccess(t('rules.applied', { matched: result.matched, categorized: result.categorized }));
     },
     onError: (err) => setError(translateError(err, t)),
   });
@@ -211,8 +214,13 @@ export default function RulesPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(t('rules.delete_confirm'))) removeRule.mutate(rule.id);
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: t('rules.delete'),
+                      message: t('rules.delete_confirm'),
+                      tone: 'danger',
+                    });
+                    if (ok) removeRule.mutate(rule.id);
                   }}
                   className="text-[var(--color-negative)]"
                 >

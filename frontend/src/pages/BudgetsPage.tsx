@@ -1,6 +1,7 @@
 import BudgetCarryoverNote from '@/components/budgets/BudgetCarryoverNote';
 import BudgetItemEditor, { type DraftItem } from '@/components/budgets/BudgetItemEditor';
 import BudgetProgressBar from '@/components/budgets/BudgetProgressBar';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
@@ -57,6 +58,7 @@ interface FormState {
 export default function BudgetsPage() {
   const { t } = useTranslation('budgets');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const [period, setPeriod] = useState<Period>(() => currentPeriod('monthly'));
   const [editing, setEditing] = useState(false);
@@ -338,10 +340,13 @@ export default function BudgetsPage() {
                 <button
                   type="button"
                   disabled={deleteMutation.isPending}
-                  onClick={() => {
-                    if (window.confirm(`${t('form.confirm_delete')}${t('form.delete_hint')}`)) {
-                      deleteMutation.mutate();
-                    }
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: t('form.confirm_delete'),
+                      message: t('form.delete_hint'),
+                      tone: 'danger',
+                    });
+                    if (ok) deleteMutation.mutate();
                   }}
                   className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-[var(--color-negative)] hover:bg-[var(--color-negative)]/10 disabled:opacity-50"
                 >
@@ -382,7 +387,7 @@ export default function BudgetsPage() {
             />
 
             {Number(data.uncategorizedSpent) > 0 && (
-              <p className="rounded-lg bg-[var(--color-warning,#d3a35a)]/10 px-3 py-2 text-sm">
+              <p className="rounded-lg bg-[var(--color-warning)]/10 px-3 py-2 text-sm">
                 <span className="font-medium">
                   {t('uncategorized.title', { amount: `${formatNumber(data.uncategorizedSpent)} ${currency}` })}
                 </span>

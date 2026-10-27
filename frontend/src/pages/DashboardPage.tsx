@@ -8,6 +8,8 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { useEnumLabels } from '@/lib/enum-labels';
+import { useChartTheme } from '@/theme/chart-theme';
+import { ASSET_PALETTE } from '@/theme/palette';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
@@ -481,6 +483,7 @@ function MetricCard({
 function AllocationChart({ data }: { data: ReturnType<typeof dashboardApi.assetAllocation> extends Promise<infer T> ? T : never }) {
   const { t } = useTranslation('dashboard');
   const { accountType } = useEnumLabels();
+  const chartTheme = useChartTheme();
   const items = data.byType.filter((item) => Number(item.amount) !== 0);
 
   if (items.length === 0) {
@@ -490,15 +493,15 @@ function AllocationChart({ data }: { data: ReturnType<typeof dashboardApi.assetA
   const option = {
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(30,32,38,0.95)',
+      backgroundColor: chartTheme.tooltipBg,
       borderWidth: 0,
-      textStyle: { color: '#e8e9ed', fontSize: 12 },
+      textStyle: { color: chartTheme.tooltipText, fontSize: 12 },
       formatter: (params: { name: string; value: number; percent: number }) =>
         `${params.name}<br/>${formatNumber(params.value)} ${data.baseCurrency} (${params.percent}%)`,
     },
     legend: {
       bottom: 0,
-      textStyle: { color: 'rgba(255,255,255,0.55)', fontSize: 11 },
+      textStyle: { color: chartTheme.legend, fontSize: 11 },
       itemWidth: 8,
       itemHeight: 8,
     },
@@ -514,7 +517,7 @@ function AllocationChart({ data }: { data: ReturnType<typeof dashboardApi.assetA
           name: accountType(item.type),
           value: Number(item.amount),
         })),
-        color: ['#5b8def', '#4ea87c', '#c76a5e', '#b58ce0', '#d9a55b', '#5aa9c7'],
+        color: ASSET_PALETTE,
       },
     ],
   };

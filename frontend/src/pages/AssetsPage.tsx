@@ -1,5 +1,6 @@
 import CurrencySelect from '@/components/finance/CurrencySelect';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -172,6 +173,7 @@ function AssetForm({ onClose }: { onClose: () => void }) {
 function ValuationRow({ asset }: { asset: Asset }) {
   const { t } = useTranslation('assets');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -202,11 +204,15 @@ function ValuationRow({ asset }: { asset: Asset }) {
       setForm({ ...form, value: '' });
       setError(null);
     },
-    onError: (err) => {
+    onError: async (err) => {
       const message = translateError(err, t);
       // 同日已存在时提示用户可以覆盖，而不是让用户猜
       if (message.includes('ASSET_VALUATION_EXISTS') || message.includes('覆盖')) {
-        if (window.confirm(t('valuation.overwrite_confirm'))) {
+        const ok = await confirm({
+          title: t('valuation.overwrite_confirm'),
+          message: t('valuation.overwrite_confirm'),
+        });
+        if (ok) {
           add.mutate(true);
           return;
         }
@@ -314,6 +320,7 @@ function ValuationRow({ asset }: { asset: Asset }) {
 export default function AssetsPage() {
   const { t } = useTranslation('assets');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showArchived, setShowArchived] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -460,10 +467,13 @@ export default function AssetsPage() {
                   <button
                     type="button"
                     className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] px-2 py-1 text-xs"
-                    onClick={() => {
-                      if (window.confirm(t('archive_confirm', { name: asset.name }))) {
-                        archive.mutate(asset.id);
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: t('archive'),
+                        message: t('archive_confirm', { name: asset.name }),
+                        tone: 'danger',
+                      });
+                      if (ok) archive.mutate(asset.id);
                     }}
                   >
                     <Archive className="size-3.5" />

@@ -2,10 +2,10 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { CATEGORY_PALETTE } from '@/theme/palette';
 import ReactECharts from 'echarts-for-react';
 
-const PALETTE = ['#5b8def', '#4ea87c', '#c76a5e', '#d3a35a', '#8b7ec8', '#5aa8b8', '#c17ba5'];
 
 export default function AllocationPieChart({
   items,
@@ -41,7 +41,7 @@ export default function AllocationPieChart({
       itemWidth: 10,
       itemHeight: 10,
     },
-    color: PALETTE,
+    color: CATEGORY_PALETTE,
     series: [
       {
         name: title ?? t('allocation.current'),

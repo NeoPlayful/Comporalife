@@ -2,7 +2,9 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import { ApiError } from '@/lib/client';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { reportsApi, type ReportDetail, type ReportType } from '@/lib/goals';
 import { useAuthStore } from '@/stores/auth-store';
@@ -70,13 +72,12 @@ async function downloadBlob(id: string, format: 'csv' | 'xlsx', accessToken: str
 export default function ReportsPage() {
   const { t } = useTranslation('reports');
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const [type, setType] = useState<ReportType>('cashflow');
   const [from, setFrom] = useState(firstDayOfYear);
   const [to, setTo] = useState(today);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
 
   const listQuery = useQuery({ queryKey: ['reports'], queryFn: () => reportsApi.list(), retry: false });
@@ -107,46 +108,38 @@ export default function ReportsPage() {
     mutationFn: () => reportsApi.create({ type, from, to }),
     onSuccess: (result) => {
       setSelectedId(result.report.id);
-      setError(null);
-      setNotice(t('notice.generated', { rows: result.report.rowCount }));
+      toastSuccess(t('notice.generated', { rows: result.report.rowCount }));
       void queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
-    onError: (err) => {
-      setNotice(null);
-      setError(translateError(err, t));
-    },
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const regenerateMutation = useMutation({
     mutationFn: () => reportsApi.regenerate(selectedId!),
     onSuccess: (result) => {
-      setError(null);
-      setNotice(t('notice.regenerated', { rows: result.report.rowCount }));
+      toastSuccess(t('notice.regenerated', { rows: result.report.rowCount }));
       void queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => reportsApi.remove(selectedId!),
     onSuccess: () => {
       setSelectedId(null);
-      setNotice(null);
       void queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
-    onError: (err) => setError(translateError(err, t)),
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const handleDownload = async (format: 'csv' | 'xlsx') => {
     if (!selectedId) return;
     setDownloading(true);
-    setError(null);
-    setNotice(null);
 
     try {
       // 令牌保存在内存中的认证 store，不落盘
       const bytes = await downloadBlob(selectedId, format, useAuthStore.getState().accessToken);
-      setNotice(
+      toastSuccess(
         t('notice.downloaded', {
           format: format.toUpperCase(),
           rows: detailQuery.data?.rowCount ?? 0,
@@ -154,7 +147,7 @@ export default function ReportsPage() {
         }),
       );
     } catch (err) {
-      setError(err instanceof ApiError ? translateError(err, t) : t('notice.download_failed'));
+      toastError(err instanceof ApiError ? translateError(err, t) : t('notice.download_failed'));
     } finally {
       setDownloading(false);
     }
@@ -218,11 +211,7 @@ export default function ReportsPage() {
               <li key={report.id}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedId(report.id);
-                    setNotice(null);
-                    setError(null);
-                  }}
+                  onClick={() => setSelectedId(report.id)}
                   className={`flex w-full items-start gap-2 rounded-xl border p-3 text-left transition-colors ${
                     report.id === selectedId
                       ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5'
@@ -246,17 +235,6 @@ export default function ReportsPage() {
         </aside>
 
         <section className="space-y-4">
-          {(error || notice) && (
-            <div
-              role="status"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                error ? 'bg-[var(--color-negative)]/10 text-[var(--color-negative)]' : 'bg-[var(--color-positive)]/10 text-[var(--color-positive)]'
-              }`}
-            >
-              {error ?? notice}
-            </div>
-          )}
-
           {!selectedId && <EmptyState title={t('preview.empty')} description={t('preview.empty_hint')} />}
 
           {selectedId && detailQuery.isLoading && <LoadingState />}
@@ -306,8 +284,13 @@ export default function ReportsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (window.confirm(t('actions.delete_confirm'))) deleteMutation.mutate();
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: t('actions.delete'),
+                          message: t('actions.delete_confirm'),
+                          tone: 'danger',
+                        });
+                        if (ok) deleteMutation.mutate();
                       }}
                       className="flex items-center gap-1 rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs text-[var(--color-negative)]"
                     >

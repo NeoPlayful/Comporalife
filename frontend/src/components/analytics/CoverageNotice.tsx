@@ -17,8 +17,8 @@ export default function CoverageNotice({ coverage }: { coverage: Coverage }) {
   if (!hasUncategorized && !hasMissingRates) return null;
 
   return (
-    <div className="rounded-lg bg-[var(--color-warning,#d3a35a)]/10 px-3 py-2 text-sm">
-      <p className="flex items-center gap-1.5 font-medium text-[var(--color-warning,#d3a35a)]">
+    <div className="rounded-lg bg-[var(--color-warning)]/10 px-3 py-2 text-sm">
+      <p className="flex items-center gap-1.5 font-medium text-[var(--color-warning)]">
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
         {t('coverage.title', {
           ratio: coverage.coverageRatio

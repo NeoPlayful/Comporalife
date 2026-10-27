@@ -254,7 +254,7 @@ export default function PortfoliosPage() {
                     </p>
                   )}
                   {(item.stale || !item.isComplete) && (
-                    <p className="flex items-center gap-1 text-xs text-[var(--color-warning,#d3a35a)]">
+                    <p className="flex items-center gap-1 text-xs text-[var(--color-warning)]">
                       <AlertTriangle className="size-3.5" aria-hidden />
                       {item.stale ? t('list.stale') : t('list.incomplete')}
                     </p>

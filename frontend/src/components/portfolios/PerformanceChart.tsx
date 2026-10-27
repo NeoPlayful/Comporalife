@@ -3,7 +3,8 @@ import { formatNumber } from '@/lib/format';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_PRIMARY } from '@/theme/palette';
 import ReactECharts from 'echarts-for-react';
 import { useState } from 'react';
 
@@ -62,7 +63,7 @@ export default function PerformanceChart({
         connectNulls: false,
         // 缺价处断开，不做插值连线
         data: performance.points.map((point) => (point.complete ? Number(point.value) : null)),
-        lineStyle: { width: 2, color: '#5b8def' },
+        lineStyle: { width: 2, color: SERIES_PRIMARY },
         areaStyle: { color: 'rgba(91,141,239,0.12)' },
       },
     ],
@@ -90,7 +91,7 @@ export default function PerformanceChart({
       <ReactECharts option={option} style={{ height: 280 }} notMerge />
 
       {!performance.isComplete && missing && (
-        <p className="rounded-lg bg-[var(--color-warning,#d3a35a)]/10 px-3 py-2 text-xs">
+        <p className="rounded-lg bg-[var(--color-warning)]/10 px-3 py-2 text-xs">
           {t('performance.missing_dates', { dates: missing })}
         </p>
       )}

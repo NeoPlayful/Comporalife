@@ -9,7 +9,12 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
         'actions.close': '关闭',
-        'modal.discard_confirm': '还有未保存的内容，确定关闭？',
+        'actions.cancel': '取消',
+        'actions.confirm': '确认',
+        'modal.discard_title': '放弃未保存的修改？',
+        'modal.discard_confirm': '还有未保存的内容，关闭后这些修改会丢失。',
+        'modal.discard_confirm_action': '放弃并关闭',
+        'modal.discard_keep_editing': '继续编辑',
       };
       return map[key] ?? key;
     },
@@ -107,35 +112,45 @@ describe('Modal', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  it('有脏数据时取消确认可阻止关闭，确认后关闭', () => {
+  it('有脏数据时弹出确认层，继续编辑可阻止关闭', () => {
     const onClose = vi.fn();
-    const confirmSpy = vi.spyOn(window, 'confirm');
 
     render(<Harness dirty onClose={onClose} />);
     fireEvent.click(screen.getByText('打开'));
 
-    confirmSpy.mockReturnValueOnce(false);
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    // 原弹窗仍在，确认层叠在它之上
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    expect(screen.getByText('放弃未保存的修改？')).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
-    confirmSpy.mockReturnValueOnce(true);
+    fireEvent.click(screen.getByText('继续编辑'));
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('有脏数据时确认后才关闭', () => {
+    const onClose = vi.fn();
+
+    render(<Harness dirty onClose={onClose} />);
+    fireEvent.click(screen.getByText('打开'));
+
     fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByText('放弃并关闭'));
+
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(onClose).toHaveBeenCalledTimes(1);
-
-    confirmSpy.mockRestore();
   });
 
   it('无脏数据时不弹确认', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm');
     render(<Harness />);
     fireEvent.click(screen.getByText('打开'));
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(confirmSpy).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
+    // 直接关掉，不会出现第二层
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('放弃未保存的修改？')).not.toBeInTheDocument();
   });
 
   it('Tab 在最后一个可聚焦元素上回环到第一个', () => {

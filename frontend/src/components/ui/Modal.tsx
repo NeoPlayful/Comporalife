@@ -112,11 +112,16 @@ export default function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const [layer, setLayer] = useState<number | null>(null);
+  // 脏数据关窗的二次确认：不用 window.confirm，原生框不认主题也不能叠在本弹窗之上
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   // 关闭前统一走这里：脏数据与提交中都要拦
   function requestClose() {
     if (busy) return;
-    if (dirty && !window.confirm(t('modal.discard_confirm'))) return;
+    if (dirty) {
+      setConfirmDiscard(true);
+      return;
+    }
     onClose();
   }
 
@@ -261,6 +266,38 @@ export default function Modal({
           </footer>
         )}
       </div>
+
+      {/* 丢弃确认叠在本弹窗之上：原内容保持可见，确认层单独接管 Esc 与焦点 */}
+      <Modal
+        open={confirmDiscard}
+        size="sm"
+        title={t('modal.discard_title')}
+        onClose={() => setConfirmDiscard(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setConfirmDiscard(false)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('modal.discard_keep_editing')}
+            </button>
+            <button
+              type="button"
+              data-autofocus
+              onClick={() => {
+                setConfirmDiscard(false);
+                onClose();
+              }}
+              className="rounded-lg bg-[var(--color-negative)] px-3 py-2 text-sm font-medium text-white"
+            >
+              {t('modal.discard_confirm_action')}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-[var(--color-content-muted)]">{t('modal.discard_confirm')}</p>
+      </Modal>
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import EmptyState from '@/components/ui/EmptyState';
 import Modal from '@/components/ui/Modal';
 import '@/components/charts/echarts';
-import { useChartTheme } from '@/components/charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
+import { SERIES_PRIMARY } from '@/theme/palette';
 import { adminApi, type AdminRateHistoryPoint } from '@/lib/admin';
 import { ApiError } from '@/lib/client';
 import { translateError } from '@/lib/error-message';
@@ -93,9 +94,9 @@ export default function RateHistoryDialog({
         data: points.map((point) => Number(point.rate)),
         smooth: true,
         showSymbol: points.length <= 14,
-        lineStyle: { width: 2, color: '#5b8def' },
-        itemStyle: { color: '#5b8def' },
-        areaStyle: { opacity: 0.12, color: '#5b8def' },
+        lineStyle: { width: 2, color: SERIES_PRIMARY },
+        itemStyle: { color: SERIES_PRIMARY },
+        areaStyle: { opacity: 0.12, color: SERIES_PRIMARY },
       },
     ],
   };

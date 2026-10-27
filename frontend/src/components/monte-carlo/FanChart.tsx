@@ -3,7 +3,7 @@ import type { SimulationResult } from '@/lib/monte-carlo';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../ui/EmptyState';
 import '../charts/echarts';
-import { useChartTheme } from '../charts/chart-theme';
+import { useChartTheme } from '@/theme/chart-theme';
 import ReactECharts from 'echarts-for-react';
 
 interface Props {

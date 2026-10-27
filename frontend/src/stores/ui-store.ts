@@ -7,8 +7,7 @@ import i18n, {
   syncHtmlLang,
   type SupportedLanguage,
 } from '@/i18n';
-
-type Theme = 'dark' | 'light' | 'system';
+import { applyTheme, readStoredTheme, watchSystemTheme, type Theme } from '@/theme/theme';
 
 interface UiState {
   sidebarCollapsed: boolean;
@@ -17,13 +16,6 @@ interface UiState {
   toggleSidebar: () => void;
   setTheme: (theme: Theme) => void;
   setLanguage: (language: SupportedLanguage) => void;
-}
-
-function applyTheme(theme: Theme) {
-  const root = document.documentElement;
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
-  root.classList.toggle('dark', isDark);
 }
 
 function applyLanguage(language: SupportedLanguage) {
@@ -35,7 +27,7 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
-      theme: 'dark',
+      theme: readStoredTheme(),
       // 首屏先用浏览器语言，登录后由用户偏好覆盖
       language: detectLanguage(),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -63,4 +55,10 @@ export const useUiStore = create<UiState>()(
       },
     },
   ),
+);
+
+// 「跟随系统」时，系统配色变化要实时反映到页面上。
+watchSystemTheme(
+  () => useUiStore.getState().theme,
+  (resolved) => applyTheme(resolved),
 );
