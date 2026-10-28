@@ -1,6 +1,6 @@
 {
   "name": "comporalife-server",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "private": true,
   "type": "module",
   "engines": {
@@ -20,6 +20,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "test:db:setup": "node scripts/setup-test-db.mjs",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "seed": "tsx --env-file=.env prisma/seed.ts",

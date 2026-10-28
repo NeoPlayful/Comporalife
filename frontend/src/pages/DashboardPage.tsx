@@ -12,9 +12,22 @@ import { useChartTheme } from '@/theme/chart-theme';
 import { ASSET_PALETTE } from '@/theme/palette';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { useQuery } from '@tanstack/react-query';
+import { subDays } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+
+/** 趋势区间：天数即「含今天在内往前推几天」，30 天 = 今天与前 29 天 */
+const TREND_RANGES = [30, 90, 180, 365] as const;
+type TrendRange = (typeof TREND_RANGES)[number];
+
+function trendWindowFor(days: TrendRange): { from: string; to: string } {
+  const today = new Date();
+  const to = today.toISOString().slice(0, 10);
+  const from = subDays(today, days - 1).toISOString().slice(0, 10);
+  return { from, to };
+}
 
 /**
  * 首页只提示「哪些组合有问题」，但用户真正要操作的是单个组合。
@@ -40,10 +53,20 @@ function InvestmentLink({
 export default function DashboardPage() {
   const { t } = useTranslation();
   const { accountType, transactionType } = useEnumLabels();
+  const [trendRange, setTrendRange] = useState<TrendRange>(30);
+  // 日期只在切换区间时重算，不随每次渲染变化，查询键才稳定可缓存
+  const [trendWindow, setTrendWindow] = useState(() => trendWindowFor(30));
+
+  useEffect(() => {
+    setTrendWindow(trendWindowFor(trendRange));
+  }, [trendRange]);
 
   const overviewQuery = useQuery({ queryKey: ['dashboard', 'overview'], queryFn: dashboardApi.overview });
   const cashflowQuery = useQuery({ queryKey: ['dashboard', 'cashflow'], queryFn: () => dashboardApi.cashflow() });
-  const trendQuery = useQuery({ queryKey: ['dashboard', 'trend'], queryFn: () => dashboardApi.netWorthTrend() });
+  const trendQuery = useQuery({
+    queryKey: ['dashboard', 'trend', trendWindow],
+    queryFn: () => dashboardApi.netWorthTrend(trendWindow.from, trendWindow.to),
+  });
   const balancesQuery = useQuery({ queryKey: ['dashboard', 'balances'], queryFn: dashboardApi.accountBalances });
   const allocationQuery = useQuery({ queryKey: ['dashboard', 'allocation'], queryFn: dashboardApi.assetAllocation });
   const recentQuery = useQuery({ queryKey: ['dashboard', 'recent'], queryFn: () => dashboardApi.recentTransactions() });
@@ -234,7 +257,26 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
-          <h2 className="mb-3 text-sm font-medium">{t('dashboard:sections.net_worth_trend')}</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-medium">{t('dashboard:sections.net_worth_trend')}</h2>
+            <div className="flex items-center gap-1">
+              {TREND_RANGES.map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  aria-pressed={trendRange === days}
+                  onClick={() => setTrendRange(days)}
+                  className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                    trendRange === days
+                      ? 'btn-action'
+                      : 'text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5'
+                  }`}
+                >
+                  {t('dashboard:sections.trend_range', { days })}
+                </button>
+              ))}
+            </div>
+          </div>
           {trendQuery.data ? (
             <NetWorthChart data={trendQuery.data} />
           ) : (
@@ -251,7 +293,22 @@ export default function DashboardPage() {
               note: trendQuery.data?.basis.note ?? '',
               currency: overview.baseCurrency,
             })}
+            {trendQuery.data && (
+              <>
+                {' · '}
+                {t(
+                  trendQuery.data.granularity === 'day'
+                    ? 'dashboard:sections.granularity_day'
+                    : 'dashboard:sections.granularity_month',
+                )}
+              </>
+            )}
           </p>
+          {trendQuery.data?.rateFallback && (
+            <p className="mt-1 text-xs text-[var(--color-content-muted)]">
+              {t('dashboard:sections.trend_rate_fallback')}
+            </p>
+          )}
         </section>
 
         <section className="card p-4">

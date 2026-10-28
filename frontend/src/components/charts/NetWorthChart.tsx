@@ -33,7 +33,8 @@ export default function NetWorthChart({ data }: { data: NetWorthTrend }) {
       type: 'category',
       data: data.series.map((point) => point.period),
       axisLine: { lineStyle: { color: chartTheme.axisLine } },
-      axisLabel: { color: chartTheme.axisLabel, fontSize: 11 },
+      // 日粒度下 30 个日期标签会挤成一团，交给 ECharts 自动跳着显示
+      axisLabel: { color: chartTheme.axisLabel, fontSize: 11, hideOverlap: true },
       axisTick: { show: false },
     },
     yAxis: {

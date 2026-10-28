@@ -11,8 +11,12 @@ export default defineConfig({
     // 通过 vitest 注入到 worker 进程，不依赖开发者本地 .env
     env: {
       NODE_ENV: 'test',
+      // 测试必须连独立库：汇率等表是全局共享的，测试套件会整表清理，
+      // 指向开发库就会把开发数据删掉。默认库名加 _test 后缀，
+      // 需要临时覆盖时可显式传 TEST_DATABASE_URL。
       DATABASE_URL:
-        process.env.DATABASE_URL ?? 'postgresql://comporalife:comporalife@localhost:5432/comporalife',
+        process.env.TEST_DATABASE_URL ??
+        'postgresql://comporalife:comporalife@localhost:5432/comporalife_test',
       REDIS_URL: process.env.REDIS_URL ?? 'redis://localhost:6379',
       JWT_SECRET: process.env.JWT_SECRET ?? 'test-secret-at-least-32-characters-long',
       LOG_LEVEL: 'fatal',

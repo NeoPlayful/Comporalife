@@ -75,6 +75,10 @@ export async function promoteToAdmin(
  * - `codes`：双向匹配，任一币种出现在任一侧就删除。适合独占若干币种的套件。
  *
  * 两者都不传则清空全表——仅用于串行执行的场景，并行下会误删其他套件的数据。
+ *
+ * 注意：测试跑在独立的 comporalife_test 库（见 vitest.config.ts），
+ * 这里的删除不会影响开发库；但同一轮内并行套件之间仍会互相干扰，
+ * 所以上面的作用域限制依旧要遵守。
  */
 export async function clearExchangeRates(
   app: FastifyInstance,
