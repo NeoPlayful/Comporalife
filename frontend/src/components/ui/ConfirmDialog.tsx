@@ -38,7 +38,7 @@ export default function ConfirmDialog({
   const confirmClass =
     tone === 'danger'
       ? 'rounded-lg bg-[var(--color-negative)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50'
-      : 'rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50';
+      : 'rounded-lg btn-action px-3 py-2 text-sm font-medium';
 
   return (
     <Modal

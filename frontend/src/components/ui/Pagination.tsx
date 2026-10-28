@@ -116,7 +116,7 @@ export default function Pagination({
                 aria-current={item === page ? 'page' : undefined}
                 className={`min-w-8 rounded-lg border px-2 py-1 tabular-nums ${
                   item === page
-                    ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-white'
+                    ? 'border-[var(--color-action)] btn-action'
                     : 'border-[var(--color-border-subtle)] hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
               >

@@ -371,7 +371,7 @@ export default function PortfolioDetailPage() {
                   setShowTradeForm(true);
                   setTab('trades');
                 }}
-                className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"
+                className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-1.5 text-sm font-medium"
               >
                 <Plus className="size-4" aria-hidden />
                 {t('trades.add')}
@@ -421,13 +421,19 @@ export default function PortfolioDetailPage() {
                 </select>
                 <button
                   type="button"
-                  disabled={
-                    !instrumentDraft.symbol.trim() ||
-                    !instrumentDraft.name.trim() ||
-                    createInstrumentMutation.isPending
-                  }
-                  onClick={() => createInstrumentMutation.mutate()}
-                  className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                  disabled={createInstrumentMutation.isPending}
+                  onClick={() => {
+                    if (!instrumentDraft.symbol.trim()) {
+                      toastError(t('common:validation.required', { field: t('instruments.symbol') }));
+                      return;
+                    }
+                    if (!instrumentDraft.name.trim()) {
+                      toastError(t('common:validation.required', { field: t('instruments.name') }));
+                      return;
+                    }
+                    createInstrumentMutation.mutate();
+                  }}
+                  className="rounded-lg btn-action px-3 py-1.5 text-sm"
                 >
                   {t('actions.save')}
                 </button>
@@ -600,7 +606,7 @@ export default function PortfolioDetailPage() {
                   type="button"
                   disabled={saveTargetsMutation.isPending}
                   onClick={() => saveTargetsMutation.mutate()}
-                  className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                  className="rounded-lg btn-action px-3 py-1.5 text-sm"
                 >
                   {t('allocation.save_targets')}
                 </button>
@@ -745,7 +751,7 @@ export default function PortfolioDetailPage() {
             <button
               type="button"
               onClick={() => setShowTradeForm(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white"
+              className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-1.5 text-sm font-medium"
             >
               <Plus className="size-4" aria-hidden />
               {t('trades.add')}
@@ -867,9 +873,15 @@ export default function PortfolioDetailPage() {
               />
               <button
                 type="button"
-                disabled={!cashflowDraft.amount || addCashflowMutation.isPending}
-                onClick={() => addCashflowMutation.mutate()}
-                className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
+                disabled={addCashflowMutation.isPending}
+                onClick={() => {
+                  if (!cashflowDraft.amount) {
+                    toastError(t('common:validation.required', { field: t('cashflows.amount') }));
+                    return;
+                  }
+                  addCashflowMutation.mutate();
+                }}
+                className="rounded-lg btn-action px-3 py-1.5 text-sm"
               >
                 {t('actions.save')}
               </button>
@@ -1024,9 +1036,19 @@ function ValuationSnapshotPanel({ portfolioId }: { portfolioId: string }) {
         />
         <button
           type="button"
-          disabled={!draft.valuationDate || !draft.marketValue.trim() || addMutation.isPending}
-          onClick={() => addMutation.mutate(false)}
-          className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          disabled={addMutation.isPending}
+          onClick={() => {
+            if (!draft.valuationDate) {
+              toastError(t('common:validation.required', { field: t('valuations.date') }));
+              return;
+            }
+            if (!draft.marketValue.trim()) {
+              toastError(t('common:validation.required', { field: t('valuations.market_value') }));
+              return;
+            }
+            addMutation.mutate(false);
+          }}
+          className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
         >
           {t('valuations.add')}
         </button>

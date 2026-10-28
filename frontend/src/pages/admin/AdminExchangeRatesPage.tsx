@@ -351,7 +351,7 @@ export default function AdminExchangeRatesPage() {
               setCreateSeed({ baseCurrency: 'USD', quoteCurrency: 'CNY' });
               setCreating(true);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             <Plus className="size-4" aria-hidden />
             {t('exchangeRates.new')}
@@ -436,7 +436,7 @@ export default function AdminExchangeRatesPage() {
             <button
               type="button"
               onClick={() => setBulkOpen(true)}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-xs font-medium text-white"
+              className="rounded-lg btn-action px-3 py-1.5 text-xs font-medium"
             >
               {t('exchangeRates.bulk.open')}
             </button>
@@ -472,7 +472,7 @@ export default function AdminExchangeRatesPage() {
                 setCreateSeed({ baseCurrency: 'USD', quoteCurrency: 'CNY' });
                 setCreating(true);
               }}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+              className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
             >
               {t('exchangeRates.new')}
             </button>

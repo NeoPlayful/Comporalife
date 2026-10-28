@@ -147,14 +147,14 @@ export default function GoalsPage() {
           <button
             type="button"
             onClick={() => setTab('goals')}
-            className={`rounded-md px-3 py-1.5 ${tab === 'goals' ? 'bg-[var(--color-accent)] text-white' : ''}`}
+            className={`rounded-md px-3 py-1.5 ${tab === 'goals' ? 'btn-action' : ''}`}
           >
             {t('tabs.goals')}
           </button>
           <button
             type="button"
             onClick={() => setTab('fi')}
-            className={`rounded-md px-3 py-1.5 ${tab === 'fi' ? 'bg-[var(--color-accent)] text-white' : ''}`}
+            className={`rounded-md px-3 py-1.5 ${tab === 'fi' ? 'btn-action' : ''}`}
           >
             {t('tabs.fi')}
           </button>
@@ -222,7 +222,7 @@ export default function GoalsPage() {
                   setFormDirty(false);
                   setError(null);
                 }}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
               >
                 <Plus className="size-4" aria-hidden />
                 {t('actions.create')}
@@ -417,7 +417,7 @@ export default function GoalsPage() {
               type="submit"
               form="goal-create-form"
               disabled={createMutation.isPending}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
             >
               {createMutation.isPending
                 ? t('common:state.saving', { ns: 'common' })
@@ -475,7 +475,7 @@ export default function GoalsPage() {
               type="submit"
               form="goal-edit-form"
               disabled={updateMutation.isPending}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
             >
               {updateMutation.isPending
                 ? t('common:state.saving', { ns: 'common' })

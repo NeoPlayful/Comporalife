@@ -68,7 +68,7 @@ export default function RestoreWizard({ backup, onDone, onCancel }: Props) {
           <li
             key={index}
             className={`rounded-full px-2.5 py-1 ${
-              step === index ? 'bg-[var(--color-accent)] text-white' : 'bg-black/5 dark:bg-white/10'
+              step === index ? 'btn-action' : 'bg-black/5 dark:bg-white/10'
             }`}
           >
             {t(`backup.wizard.step${index}`)}
@@ -91,7 +91,7 @@ export default function RestoreWizard({ backup, onDone, onCancel }: Props) {
             <button
               type="button"
               onClick={() => setStep(2)}
-              className="flex items-center gap-1 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white"
+              className="flex items-center gap-1 rounded-lg btn-action px-3 py-1.5 text-sm"
             >
               {t('backup.wizard.next')}
               <ArrowRight className="size-3.5" aria-hidden />
@@ -160,7 +160,7 @@ export default function RestoreWizard({ backup, onDone, onCancel }: Props) {
               type="button"
               disabled={preview.isLoading}
               onClick={() => setStep(3)}
-              className="flex items-center gap-1 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white disabled:opacity-60"
+              className="flex items-center gap-1 rounded-lg btn-action px-3 py-1.5 text-sm"
             >
               {t('backup.wizard.next')}
               <ArrowRight className="size-3.5" aria-hidden />

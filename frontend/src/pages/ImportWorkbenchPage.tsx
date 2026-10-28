@@ -231,7 +231,7 @@ export default function ImportWorkbenchPage() {
                   type="button"
                   disabled={saveMapping.isPending}
                   onClick={() => saveMapping.mutate()}
-                  className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
                 >
                   {saveMapping.isPending ? t('mapping.saving') : t('mapping.save_mapping')}
                 </button>
@@ -258,7 +258,7 @@ export default function ImportWorkbenchPage() {
                   type="button"
                   disabled={validate.isPending}
                   onClick={() => validate.mutate()}
-                  className="rounded-lg bg-[var(--color-accent)] px-4 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-lg btn-action px-4 py-1.5 text-sm font-medium"
                 >
                   {validate.isPending ? t('preview.validating') : t('preview.start_validate')}
                 </button>
@@ -351,7 +351,7 @@ export default function ImportWorkbenchPage() {
                 type="button"
                 disabled={commit.isPending || counts.valid === 0}
                 onClick={() => commit.mutate()}
-                className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
               >
                 {commit.isPending ? t('workbench.result.committing') : t('workbench.result.confirm_import')}
               </button>

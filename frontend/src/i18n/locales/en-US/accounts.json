@@ -24,8 +24,8 @@
     "opening_balance": "Opening balance",
     "opening_date": "Opening date",
     "liability_hint": "Balances on credit card and loan accounts count as liabilities. Enter the amount owed.",
-    "create": "Create",
-    "creating": "Creating…",
+    "create": "Save",
+    "creating": "Saving…",
     "create_failed": "Failed to create"
   },
   "detail": {

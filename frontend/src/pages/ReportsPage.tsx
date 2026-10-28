@@ -193,7 +193,7 @@ export default function ReportsPage() {
               type="button"
               onClick={() => generateMutation.mutate()}
               disabled={generateMutation.isPending}
-              className="w-full rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="w-full rounded-lg btn-action px-3 py-2 text-sm font-medium"
             >
               {generateMutation.isPending ? t('builder.generating') : t('builder.generate')}
             </button>

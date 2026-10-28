@@ -125,7 +125,7 @@ export default function TransactionsPage() {
           <button
             type="button"
             onClick={() => setFormOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             <Plus className="size-4" />
             {t('transactions:new')}
@@ -234,7 +234,7 @@ export default function TransactionsPage() {
               <button
                 type="button"
                 onClick={() => setFormOpen(true)}
-                className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+                className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
               >
                 {t('transactions:empty_action')}
               </button>

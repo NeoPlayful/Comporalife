@@ -69,5 +69,8 @@
     "prev": "Previous",
     "next": "Next",
     "per_page": "Per page"
+  },
+  "validation": {
+    "required": "Please fill in {{field}}"
   }
 }

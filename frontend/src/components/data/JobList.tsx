@@ -55,7 +55,7 @@ export default function JobList({ compact = false }: { compact?: boolean }) {
             type="button"
             onClick={() => setFilter(key)}
             className={`rounded-full px-3 py-1 text-xs ${
-              filter === key ? 'bg-[var(--color-accent)] text-white' : 'bg-black/5 dark:bg-white/10'
+              filter === key ? 'btn-action' : 'bg-black/5 dark:bg-white/10'
             }`}
           >
             {t(`jobs.filter_${key}`)}

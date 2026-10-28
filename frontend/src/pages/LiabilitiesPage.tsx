@@ -6,7 +6,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { translateError } from '@/lib/error-message';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDate } from '@/lib/format';
 import { liabilitiesApi, type Liability, type LiabilityKind } from '@/lib/liabilities';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -76,8 +76,8 @@ function LiabilityForm({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             form="liability-create-form"
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            disabled={create.isPending || !form.name.trim()}
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
+            disabled={create.isPending}
           >
             {create.isPending ? t('form.saving') : t('form.save')}
           </button>
@@ -89,7 +89,10 @@ function LiabilityForm({ onClose }: { onClose: () => void }) {
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!form.name.trim()) return;
+          if (!form.name.trim()) {
+            toastError(t('common:validation.required', { field: t('form.name') }));
+            return;
+          }
           create.mutate();
         }}
       >
@@ -341,7 +344,7 @@ export default function LiabilitiesPage() {
         </div>
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+          className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           onClick={() => setFormOpen(true)}
         >
           <Plus className="size-4" />
@@ -420,7 +423,7 @@ export default function LiabilitiesPage() {
           action={
             <button
               type="button"
-              className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+              className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
               onClick={() => setFormOpen(true)}
             >
               {t('new_liability')}

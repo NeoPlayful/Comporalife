@@ -14,6 +14,17 @@
   --color-warning: oklch(0.745 0.107 76.3);
   --color-accent: oklch(0.7 0.15 255);
 
+  /*
+   * 主操作按钮的实心底。
+   * 与 accent 同色，但单独成一个变量：按钮要独享悬停、按下与禁用态，
+   * 且以后调深浅时不会连带改动 Logo 与淡色底。
+   */
+  --color-action: oklch(0.7 0.15 255);
+  --color-action-hover: oklch(0.67 0.15 255);
+  --color-action-active: oklch(0.62 0.15 255);
+  /* 禁用态用固定色而不是整体透明度：浅色主题下白底透出来会淡到看不见 */
+  --color-action-disabled: oklch(0.62 0.05 255);
+
   /* 开关轨道自带底色，不能借用 border-subtle：浅色主题下它接近白，白色滑块会看不见 */
   --color-switch-on: oklch(0.596 0.145 163);
   --color-switch-off: oklch(0.42 0.015 265);
@@ -35,6 +46,7 @@
   --color-positive: oklch(0.75 0.16 155);
   --color-negative: oklch(0.68 0.19 25);
   --color-accent: oklch(0.7 0.15 255);
+  /* 动作色两套主题同值：白字对比与品牌观感都已在上方@theme 定过，浅色无需另调 */
   /* 浅色下轨道要比卡片底色明显更深，白色滑块才看得出停在哪一侧 */
   --color-switch-off: oklch(0.68 0.012 265);
 }

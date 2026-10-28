@@ -303,7 +303,7 @@ export default function GoalForm({
           <button type="button" onClick={onCancel} className="rounded-lg border border-[var(--color-border-subtle)] px-4 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5">
             {t('common:actions.cancel', { ns: 'common' })}
           </button>
-          <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          <button type="submit" disabled={submitting} className="rounded-lg btn-action px-4 py-2 text-sm font-medium">
             {submitting ? t('common:state.saving', { ns: 'common' }) : t('form.submit')}
           </button>
         </div>

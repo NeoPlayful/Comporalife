@@ -84,7 +84,7 @@ export default function PortfoliosPage() {
               setCreating(true);
               setError(null);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-4 py-2 text-sm font-medium"
           >
             <Plus className="size-4" aria-hidden />
             {t('list.create')}
@@ -121,9 +121,19 @@ export default function PortfoliosPage() {
               </button>
               <button
                 type="button"
-                disabled={!accountId || !name.trim() || createMutation.isPending}
-                onClick={() => createMutation.mutate()}
-                className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={createMutation.isPending}
+                onClick={() => {
+                  if (!accountId) {
+                    setError(t('common:validation.required', { field: t('create.account') }));
+                    return;
+                  }
+                  if (!name.trim()) {
+                    setError(t('common:validation.required', { field: t('create.name') }));
+                    return;
+                  }
+                  createMutation.mutate();
+                }}
+                className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
               >
                 {createMutation.isPending ? t('create.saving') : t('create.submit')}
               </button>
@@ -188,7 +198,7 @@ export default function PortfoliosPage() {
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+                className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
               >
                 {t('list.empty_action')}
               </button>

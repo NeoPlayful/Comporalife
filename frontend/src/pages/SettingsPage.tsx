@@ -192,7 +192,7 @@ export default function SettingsPage() {
             })
           }
           disabled={saveSettings.isPending}
-          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
         >
           {saveSettings.isPending ? t('settings:saving') : t('settings:save')}
         </button>

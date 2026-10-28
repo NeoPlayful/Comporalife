@@ -73,7 +73,7 @@ export default function UserCreateDialog({
             type="submit"
             form="user-create-form"
             disabled={!canSubmit}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {saving ? t('common:actions.saving') : t('users.create_submit')}
           </button>

@@ -72,7 +72,7 @@ export default function UnmatchedPage() {
                   type="button"
                   disabled={match.isPending}
                   onClick={() => match.mutate(candidate)}
-                  className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-lg btn-action px-3 py-1.5 text-sm font-medium"
                 >
                   {t('unmatched.merge')}
                 </button>

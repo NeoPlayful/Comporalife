@@ -192,7 +192,7 @@ export default function RateSyncDrawer({
                 datePath: datePath.trim(),
               })
             }
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {saving ? t('exchangeRates.syncDrawer.saving') : t('exchangeRates.syncDrawer.save')}
           </button>

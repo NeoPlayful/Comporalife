@@ -22,13 +22,15 @@ export default function ImportStepper({
 
         return (
           <li key={key} className="flex items-center gap-2">
+            {/* 当前步骤是状态而非操作：不设 disabled，否则会套上禁用底色，高亮就没了 */}
             <button
               type="button"
-              disabled={!clickable}
+              disabled={!clickable && !active}
+              aria-current={active ? 'step' : undefined}
               onClick={() => clickable && onSelect(step)}
               className={`flex items-center gap-2 rounded-full px-3 py-1 transition-colors ${
                 active
-                  ? 'bg-[var(--color-accent)] text-white'
+                  ? 'btn-action'
                   : done
                     ? 'bg-[var(--color-accent)]/15 text-[var(--color-accent)]'
                     : 'text-[var(--color-content-muted)]'

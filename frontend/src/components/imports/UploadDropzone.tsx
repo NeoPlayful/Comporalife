@@ -63,7 +63,7 @@ export default function UploadDropzone({
           type="button"
           disabled={disabled}
           onClick={() => inputRef.current?.click()}
-          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
         >
           {t('dropzone.choose')}
         </button>

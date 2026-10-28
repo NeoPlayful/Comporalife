@@ -161,7 +161,7 @@ export default function AnalyticsPage() {
               onClick={() => applyPreset(item)}
               className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 preset === item
-                  ? 'bg-[var(--color-accent)] text-white'
+                  ? 'btn-action'
                   : 'bg-black/5 text-[var(--color-content-muted)] hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10'
               }`}
             >
@@ -188,7 +188,7 @@ export default function AnalyticsPage() {
               <button
                 type="button"
                 onClick={() => setRange(draft)}
-                className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white"
+                className="rounded-lg btn-action px-3 py-1.5 text-sm"
               >
                 {t('range.apply')}
               </button>

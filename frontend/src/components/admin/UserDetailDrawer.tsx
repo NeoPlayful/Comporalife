@@ -289,7 +289,7 @@ export default function UserDetailDrawer({
                   aria-pressed={tab === value}
                   className={`rounded-md px-2.5 py-1 ${
                     tab === value
-                      ? 'bg-[var(--color-accent)] text-white'
+                      ? 'btn-action'
                       : 'hover:bg-black/5 dark:hover:bg-white/5'
                   }`}
                 >

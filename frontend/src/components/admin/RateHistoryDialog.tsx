@@ -124,7 +124,7 @@ export default function RateHistoryDialog({
               onClick={() => setRange(value)}
               className={`rounded-lg px-2.5 py-1 text-xs ${
                 range === value
-                  ? 'bg-[var(--color-accent)] text-white'
+                  ? 'btn-action'
                   : 'border border-[var(--color-border-subtle)] hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
