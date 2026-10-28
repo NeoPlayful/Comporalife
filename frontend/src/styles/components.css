@@ -7,6 +7,41 @@
     border-radius: 0.75rem;
   }
 
+  /*
+   * 主操作按钮（实心底 + 白字）。
+   *
+   * 用动作色而不是 accent：accent 要照顾 Logo、选中态淡色底和强调文字，
+   * 那个亮度压白字只有 2.68:1。尺寸（内边距、圆角、字号）仍由各调用点的
+   * 工具类决定，这里只固定颜色与交互反馈。
+   *
+   * 禁用态用固定底色而不是整体透明度——浅色主题下白卡片透出来会把按钮
+   * 洗成 rgb(172,208,252)，白字只剩 1.27:1，等于消失。
+   */
+  .btn-action {
+    background-color: var(--color-action);
+    color: #fff;
+    font-weight: 500;
+    transition: background-color 150ms ease;
+  }
+
+  .btn-action:hover:not(:disabled) {
+    background-color: var(--color-action-hover);
+  }
+
+  .btn-action:active:not(:disabled) {
+    background-color: var(--color-action-active);
+  }
+
+  .btn-action:focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
+
+  .btn-action:disabled {
+    background-color: var(--color-action-disabled);
+    cursor: not-allowed;
+  }
+
   .input {
     width: 100%;
     border-radius: 0.5rem;

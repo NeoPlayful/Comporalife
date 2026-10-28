@@ -113,7 +113,7 @@ export default function DuplicateReview({
               .map((row) => ({ rowId: row.id, action: decisions[row.id]! })),
           )
         }
-        className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
       >
         {submitting ? t('duplicates.saving') : t('duplicates.save')}
       </button>

@@ -96,9 +96,15 @@ export default function ProfilePage() {
 
         <button
           type="button"
-          onClick={() => updateProfile.mutate()}
-          disabled={updateProfile.isPending || nickname.trim().length === 0}
-          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          onClick={() => {
+            if (nickname.trim().length === 0) {
+              toastError(t('common:validation.required', { field: t('profile.nickname') }));
+              return;
+            }
+            updateProfile.mutate();
+          }}
+          disabled={updateProfile.isPending}
+          className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
         >
           {updateProfile.isPending ? t('profile.saving') : t('profile.save')}
         </button>

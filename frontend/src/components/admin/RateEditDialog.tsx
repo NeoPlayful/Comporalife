@@ -73,7 +73,7 @@ export default function RateEditDialog({
             type="submit"
             form="rate-edit-form"
             disabled={saving || !positive || !dirty}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {saving ? t('exchangeRates.editForm.saving') : t('exchangeRates.save')}
           </button>

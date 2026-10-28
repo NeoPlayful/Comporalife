@@ -125,7 +125,7 @@ export default function CompoundPage() {
         <button
           type="button"
           onClick={() => setSaveOpen((open) => !open)}
-          className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+          className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
         >
           <Save className="size-4" />
           {t('compound:save_scenario')}
@@ -136,7 +136,11 @@ export default function CompoundPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (saveName.trim()) saveMutation.mutate();
+            if (!saveName.trim()) {
+              toastError(t('common:validation.required', { field: t('compound:save_scenario') }));
+              return;
+            }
+            saveMutation.mutate();
           }}
           className="card flex flex-wrap gap-2 p-3"
         >
@@ -150,8 +154,8 @@ export default function CompoundPage() {
           />
           <button
             type="submit"
-            disabled={!saveName.trim() || saveMutation.isPending}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            disabled={saveMutation.isPending}
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {t('compound:save')}
           </button>

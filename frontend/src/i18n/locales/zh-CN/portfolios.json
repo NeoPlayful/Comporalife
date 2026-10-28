@@ -24,8 +24,8 @@
     "account_empty": "没有可用的证券账户，请先到账户页创建。",
     "name": "组合名称",
     "note": "备注",
-    "submit": "创建",
-    "saving": "创建中…",
+    "submit": "保存",
+    "saving": "保存中…",
     "cancel": "取消"
   },
   "summary": {

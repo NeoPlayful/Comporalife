@@ -7,7 +7,7 @@ import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { assetsApi, type Asset, type AssetKind, type ValuationBasis } from '@/lib/assets';
 import { translateError } from '@/lib/error-message';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDate } from '@/lib/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
@@ -85,8 +85,8 @@ function AssetForm({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             form="asset-create-form"
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            disabled={create.isPending || !form.name.trim()}
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
+            disabled={create.isPending}
           >
             {create.isPending ? t('form.saving') : t('form.save')}
           </button>
@@ -98,7 +98,10 @@ function AssetForm({ onClose }: { onClose: () => void }) {
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!form.name.trim()) return;
+          if (!form.name.trim()) {
+            toastError(t('common:validation.required', { field: t('form.name') }));
+            return;
+          }
           create.mutate();
         }}
       >
@@ -351,7 +354,7 @@ export default function AssetsPage() {
           <h1 className="text-xl font-semibold">{t('title')}</h1>
           <p className="mt-1 text-sm text-[var(--color-content-muted)]">{t('subtitle')}</p>
         </div>
-        <button type="button" className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white" onClick={() => setFormOpen(true)}>
+        <button type="button" className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium" onClick={() => setFormOpen(true)}>
           <Plus className="size-4" />
           {t('new_asset')}
         </button>
@@ -426,7 +429,7 @@ export default function AssetsPage() {
           title={t('empty.title')}
           description={t('empty.description')}
           action={
-            <button type="button" className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white" onClick={() => setFormOpen(true)}>
+            <button type="button" className="rounded-lg btn-action px-4 py-2 text-sm font-medium" onClick={() => setFormOpen(true)}>
               {t('new_asset')}
             </button>
           }

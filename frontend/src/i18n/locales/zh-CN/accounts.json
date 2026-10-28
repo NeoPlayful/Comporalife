@@ -24,8 +24,8 @@
     "opening_balance": "期初余额",
     "opening_date": "期初日期",
     "liability_hint": "信用卡与贷款账户的余额会计入负债，请填写欠款金额。",
-    "create": "创建",
-    "creating": "创建中…",
+    "create": "保存",
+    "creating": "保存中…",
     "create_failed": "创建失败"
   },
   "detail": {

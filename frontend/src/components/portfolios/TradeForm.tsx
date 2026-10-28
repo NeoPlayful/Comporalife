@@ -278,7 +278,7 @@ export default function TradeForm({
           type="button"
           disabled={saving || sellExceeds}
           onClick={onSubmit}
-          className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
         >
           {saving ? t('trade_form.saving') : t('trade_form.submit')}
         </button>

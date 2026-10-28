@@ -231,7 +231,7 @@ export default function AdminUsersPage() {
             disabled={!createEnabled}
             title={createEnabled ? t('users.new_hint') : t('users.create_disabled')}
             onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             <Plus className="size-4" aria-hidden />
             {t('users.new')}
@@ -329,7 +329,7 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+                className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
               >
                 {t('users.new')}
               </button>
@@ -390,7 +390,7 @@ export default function AdminUsersPage() {
               disabled={act.isPending}
               onClick={() => confirm && act.mutate({ id: confirm.user.id, action: confirm.action })}
               className={`rounded-lg px-3 py-2 text-sm font-medium text-white disabled:opacity-50 ${
-                confirmCopy?.danger ? 'bg-[var(--color-negative)]' : 'bg-[var(--color-accent)]'
+                confirmCopy?.danger ? 'bg-[var(--color-negative)]' : 'btn-action'
               }`}
             >
               {confirmCopy?.title ?? t('common:actions.confirm')}

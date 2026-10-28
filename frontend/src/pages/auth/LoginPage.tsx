@@ -88,7 +88,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-lg bg-[var(--color-accent)] py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="w-full rounded-lg btn-action py-2 text-sm font-medium"
         >
           {submitting ? t('auth:login.submitting') : t('auth:login.submit')}
         </button>

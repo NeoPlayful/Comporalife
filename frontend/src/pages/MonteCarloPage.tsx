@@ -284,7 +284,7 @@ export default function MonteCarloPage() {
           */}
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+            className="inline-flex items-center gap-1.5 rounded-lg btn-action px-4 py-2 text-sm font-medium"
             onClick={() => {
               setCreating(true);
               setSelectedId(null);
@@ -346,7 +346,7 @@ export default function MonteCarloPage() {
                 action={
                   <button
                     type="button"
-                    className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+                    className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
                     onClick={() => {
                       setCreating(true);
                       setDraft(defaultBody());
@@ -373,9 +373,15 @@ export default function MonteCarloPage() {
 
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                  disabled={saveMutation.isPending || (creating && !(draft.name ?? '').trim())}
-                  onClick={() => saveMutation.mutate()}
+                  className="inline-flex items-center gap-1.5 rounded-lg btn-action px-3 py-1.5 text-sm font-medium"
+                  disabled={saveMutation.isPending}
+                  onClick={() => {
+                    if (creating && !(draft.name ?? '').trim()) {
+                      toastError(t('common:validation.required', { field: t('form.name') }));
+                      return;
+                    }
+                    saveMutation.mutate();
+                  }}
                 >
                   {saveMutation.isPending ? t('form.saving') : t('form.save')}
                 </button>
@@ -806,7 +812,7 @@ function RunsTab({
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg btn-action px-4 py-2 text-sm font-medium"
           disabled={!canRun || running}
           onClick={onRun}
         >

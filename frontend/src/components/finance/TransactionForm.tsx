@@ -95,13 +95,6 @@ export default function TransactionForm({
   const currencyMismatch =
     type === 'transfer' && toAccount !== undefined && toAccount.currency !== accountCurrency;
 
-  const canSubmit =
-    accountId &&
-    amount.trim() &&
-    description.trim().length > 0 &&
-    (type !== 'adjustment' || categoryId) &&
-    (type !== 'transfer' || (toAccountId && toAccountId !== accountId && !currencyMismatch));
-
   // 交易表单字段多，只有记录过内容才值得在关闭时拦一下
   const dirty =
     amount !== '' || description !== '' || merchant !== '' || note !== '' || categoryId !== '';
@@ -127,8 +120,8 @@ export default function TransactionForm({
           <button
             type="submit"
             form="transaction-create-form"
-            disabled={!canSubmit || saveMutation.isPending}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            disabled={saveMutation.isPending}
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {saveMutation.isPending ? t('transactions:form.saving') : t('transactions:form.save')}
           </button>
@@ -139,7 +132,32 @@ export default function TransactionForm({
           id="transaction-create-form"
           onSubmit={(e) => {
             e.preventDefault();
-            if (canSubmit) saveMutation.mutate();
+            if (!accountId) {
+              setError(t('common:validation.required', { field: t('transactions:form.account') }));
+              return;
+            }
+            if (!amount.trim()) {
+              setError(t('common:validation.required', { field: t('transactions:form.amount', { currency: accountCurrency }) }));
+              return;
+            }
+            if (!description.trim()) {
+              setError(t('common:validation.required', { field: t('transactions:form.description') }));
+              return;
+            }
+            if (type === 'adjustment' && !categoryId) {
+              setError(t('common:validation.required', { field: t('transactions:form.adjustment_category') }));
+              return;
+            }
+            if (type === 'transfer' && (!toAccountId || toAccountId === accountId)) {
+              setError(t('common:validation.required', { field: t('transactions:form.to_account') }));
+              return;
+            }
+            if (currencyMismatch) {
+              setError(t('transactions:form.cross_currency_unsupported'));
+              return;
+            }
+            setError(null);
+            saveMutation.mutate();
           }}
           className="space-y-3"
         >

@@ -6,7 +6,7 @@ import {
 } from '@/lib/categories';
 import { useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -112,7 +112,7 @@ export default function CategoriesPage() {
               setAddingUnder('root');
               setNewName('');
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             <Plus className="size-4" />
             {t('categories:new_category')}
@@ -126,7 +126,7 @@ export default function CategoriesPage() {
             onChange={setNewName}
             onCancel={() => setAddingUnder(null)}
             onSubmit={() => createCategory.mutate({ name: newName.trim(), parentId: null })}
-            disabled={!newName.trim()}
+            busy={createCategory.isPending}
           />
         )}
 
@@ -172,7 +172,11 @@ export default function CategoriesPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (tagName.trim()) createTag.mutate();
+            if (!tagName.trim()) {
+              toastError(t('common:validation.required', { field: t('categories:tags.placeholder') }));
+              return;
+            }
+            createTag.mutate();
           }}
           className="mb-3 flex gap-2"
         >
@@ -185,8 +189,8 @@ export default function CategoriesPage() {
           />
           <button
             type="submit"
-            disabled={!tagName.trim() || createTag.isPending}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            disabled={createTag.isPending}
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {t('categories:tags.add')}
           </button>
@@ -296,7 +300,6 @@ function CategoryGroup({
             onChange={onNewNameChange}
             onCancel={onCancelAdd}
             onSubmit={onSubmitAdd}
-            disabled={!newName.trim()}
           />
         </div>
       )}
@@ -310,14 +313,15 @@ function InlineInput({
   onChange,
   onCancel,
   onSubmit,
-  disabled,
+  busy = false,
 }: {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
-  disabled: boolean;
+  /** 提交中：此时才禁用按钮，空名称交给提交时提示 */
+  busy?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -325,7 +329,12 @@ function InlineInput({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (!disabled) onSubmit();
+        if (busy) return;
+        if (!value.trim()) {
+          toastError(t('common:validation.required', { field: placeholder }));
+          return;
+        }
+        onSubmit();
       }}
       className="flex gap-2"
     >
@@ -339,8 +348,8 @@ function InlineInput({
       />
       <button
         type="submit"
-        disabled={disabled}
-        className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm text-white disabled:opacity-60"
+        disabled={busy}
+        className="rounded-lg btn-action px-3 py-2 text-sm"
       >
         {t('common:actions.save')}
       </button>

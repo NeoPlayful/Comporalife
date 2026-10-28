@@ -106,7 +106,7 @@ export default function ExchangeRatesPage() {
           <button
             type="button"
             onClick={() => setPicking((prev) => !prev)}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             <Plus className="size-4" aria-hidden />
             {t('exchange_rates.page.add_pair')}
@@ -134,7 +134,7 @@ export default function ExchangeRatesPage() {
               type="button"
               disabled={busy || draftSameCurrency || !draftAddable}
               onClick={() => add.mutate({ from: draft.from, to: draft.to })}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
             >
               {t('exchange_rates.page.confirm_add')}
             </button>
@@ -241,7 +241,7 @@ export default function ExchangeRatesPage() {
             <button
               type="button"
               onClick={() => setPicking(true)}
-              className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+              className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
             >
               {t('exchange_rates.page.add_pair')}
             </button>

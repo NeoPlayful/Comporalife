@@ -97,7 +97,7 @@ export default function AccountsPage() {
           <button
             type="button"
             onClick={() => setDialogOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white"
+            className="flex items-center gap-1.5 rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             <Plus className="size-4" />
             {t('accounts:new')}
@@ -147,7 +147,7 @@ export default function AccountsPage() {
               <button
                 type="button"
                 onClick={() => setDialogOpen(true)}
-                className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white"
+                className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
               >
                 {t('accounts:empty_action')}
               </button>
@@ -287,7 +287,7 @@ function AccountDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
             type="submit"
             form="account-create-form"
             disabled={createMutation.isPending}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg btn-action px-3 py-2 text-sm font-medium"
           >
             {createMutation.isPending
               ? t('accounts:dialog.creating')

@@ -24,8 +24,8 @@
     "account_empty": "No brokerage account available. Create one on the accounts page first.",
     "name": "Portfolio name",
     "note": "Note",
-    "submit": "Create",
-    "saving": "Creating…",
+    "submit": "Save",
+    "saving": "Saving…",
     "cancel": "Cancel"
   },
   "summary": {

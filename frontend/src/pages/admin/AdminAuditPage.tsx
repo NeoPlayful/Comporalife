@@ -122,7 +122,7 @@ export default function AdminAuditPage() {
           <button
             type="button"
             onClick={applyFilters}
-            className="rounded-lg bg-[var(--color-accent)] px-3 py-1.5 text-sm text-white"
+            className="rounded-lg btn-action px-3 py-1.5 text-sm"
           >
             {t('audit.filter.apply')}
           </button>
