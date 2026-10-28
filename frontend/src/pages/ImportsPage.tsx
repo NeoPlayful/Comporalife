@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import BatchStatusBadge from '@/components/imports/BatchStatusBadge';
+import ImportUploadDialog from '@/components/imports/ImportUploadDialog';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -16,6 +17,7 @@ const FILTER_KEYS: Array<ImportStatus | 'all'> = ['all', 'parsed', 'validated', 
 export default function ImportsPage() {
   const [status, setStatus] = useState<ImportStatus | 'all'>('all');
   const [page, setPage] = useState(1);
+  const [uploadOpen, setUploadOpen] = useState(false);
   const { t } = useTranslation('imports');
 
   const { data, isPending, error, refetch } = useQuery({
@@ -46,12 +48,13 @@ export default function ImportsPage() {
           >
             {t('unmatched_link')}
           </Link>
-          <Link
-            to="/imports/new"
+          <button
+            type="button"
+            onClick={() => setUploadOpen(true)}
             className="rounded-lg btn-action px-3 py-1.5 text-sm font-medium"
           >
             {t('import_link')}
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -80,12 +83,13 @@ export default function ImportsPage() {
           title={t('empty_title')}
           description={t('empty_description')}
           action={
-            <Link
-              to="/imports/new"
+            <button
+              type="button"
+              onClick={() => setUploadOpen(true)}
               className="rounded-lg btn-action px-4 py-2 text-sm font-medium"
             >
               {t('empty_action')}
-            </Link>
+            </button>
           }
         />
       ) : (
@@ -133,6 +137,8 @@ export default function ImportsPage() {
         totalPages={data.pagination.totalPages}
         onPageChange={setPage}
       />
+
+      <ImportUploadDialog open={uploadOpen} onClose={() => setUploadOpen(false)} />
     </div>
   );
 }

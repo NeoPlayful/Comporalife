@@ -39,7 +39,6 @@ const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const ImportsPage = lazy(() => import('./pages/ImportsPage'));
-const ImportNewPage = lazy(() => import('./pages/ImportNewPage'));
 const ImportWorkbenchPage = lazy(() => import('./pages/ImportWorkbenchPage'));
 const RulesPage = lazy(() => import('./pages/RulesPage'));
 const UnmatchedPage = lazy(() => import('./pages/UnmatchedPage'));
@@ -75,7 +74,8 @@ export default function App() {
           <Route path="portfolios/:id" element={<PortfolioDetailPage />} />
           <Route path="exchange-rates" element={<ExchangeRatesPage />} />
           <Route path="imports" element={<ImportsPage />} />
-          <Route path="imports/new" element={<ImportNewPage />} />
+          {/* 上传已改为列表页弹窗，旧链接仍能落地 */}
+          <Route path="imports/new" element={<Navigate to="/imports" replace />} />
           <Route path="imports/rules" element={<RulesPage />} />
           <Route path="imports/unmatched" element={<UnmatchedPage />} />
           <Route path="imports/:id" element={<ImportWorkbenchPage />} />

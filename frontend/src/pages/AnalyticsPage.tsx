@@ -152,7 +152,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <section className="card space-y-3">
+      <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           {(['this_month', 'last_month', 'this_quarter', 'this_year', 'custom'] as const).map((item) => (
             <button

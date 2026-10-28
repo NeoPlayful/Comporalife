@@ -91,7 +91,7 @@ export default function UploadDropzone({
           id="encoding"
           value={encoding}
           onChange={(event) => setEncoding(event.target.value as typeof encoding)}
-          className="rounded-lg border border-[var(--color-border-subtle)] bg-transparent px-2 py-1"
+          className="input w-auto py-1"
         >
           <option value="auto">{t('dropzone.encoding_auto')}</option>
           <option value="utf-8">{t('dropzone.encoding_utf8')}</option>
