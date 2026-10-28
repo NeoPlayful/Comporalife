@@ -290,6 +290,254 @@ describe('用户管理', () => {
     expect(login.statusCode).toBe(200);
   });
 
+  it('修改昵称与邮箱生效，改邮箱同时标记为已验证', async () => {
+    const target = await createUser(app, DOMAIN, 'edit');
+    const nextEmail = `edited-${Date.now()}${DOMAIN}`;
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+      payload: { nickname: '改过昵称', email: nextEmail },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const user = res.json().data.user;
+    expect(user.nickname).toBe('改过昵称');
+    expect(user.email).toBe(nextEmail);
+    // 新邮箱没走过验证流程，登录又不校验验证状态，留着未验证只会让账号卡在提示里
+    expect(user.emailVerifiedAt).not.toBeNull();
+  });
+
+  it('空改动返回 400，邮箱冲突返回 409', async () => {
+    const target = await createUser(app, DOMAIN, 'edit-guard');
+    const other = await createUser(app, DOMAIN, 'edit-guard-other');
+
+    const empty = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+      payload: {},
+    });
+    expect(empty.statusCode).toBe(400);
+
+    // 改成另一个已存在账号的邮箱
+    const conflict = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+      payload: { email: other.email },
+    });
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.code).toBe('EMAIL_EXISTS');
+  });
+
+  it('修改写审计且只记字段名不记值', async () => {
+    const target = await createUser(app, DOMAIN, 'edit-audit');
+
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+      payload: { nickname: '审计用昵称' },
+    });
+
+    const log = await app.prisma.auditLog.findFirst({
+      where: { userId: adminId, action: 'admin.user_updated', targetId: target.userId },
+    });
+    expect(log).not.toBeNull();
+    expect(log!.metadata).toMatchObject({ changedFields: 'nickname' });
+    // 审计里不能出现昵称原文
+    expect(JSON.stringify(log!.metadata)).not.toContain('审计用昵称');
+  });
+
+  it('删除为软删除，账号被禁用且会话立即失效', async () => {
+    const target = await createUser(app, DOMAIN, 'delete');
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.disposition).toBe('soft_deleted');
+
+    // 数据保留而不是物理删除
+    const row = await app.prisma.user.findUnique({
+      where: { id: target.userId },
+      select: { status: true, deletedAt: true },
+    });
+    expect(row?.status).toBe('disabled');
+    expect(row?.deletedAt).not.toBeNull();
+
+    // 已签发的 token 立即失效
+    const after = await app.inject({
+      method: 'GET',
+      url: '/api/profile',
+      headers: auth(target.token),
+    });
+    expect(after.statusCode).toBe(401);
+  });
+
+  it('重复删除与删除后修改都返回 409', async () => {
+    const target = await createUser(app, DOMAIN, 'delete-twice');
+
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+    });
+
+    const again = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+    });
+    expect(again.statusCode).toBe(409);
+
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+      payload: { nickname: '不能改' },
+    });
+    expect(patch.statusCode).toBe(409);
+  });
+
+  it('不能删除自己', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${adminId}`,
+      headers: auth(adminToken),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('ADMIN_SELF_MODIFICATION');
+  });
+
+  it('永久删除会物理清除账号及其全部数据', async () => {
+    const target = await createUser(app, DOMAIN, 'purge');
+
+    // 造一点关联数据，确认级联生效而不是只删了用户行
+    const account = await app.prisma.account.create({
+      data: {
+        userId: target.userId,
+        name: 'purge-account',
+        type: 'cash',
+        currency: 'CNY',
+        openingBalance: 0,
+        openingBalanceDate: new Date('2026-01-01'),
+      },
+    });
+    const category = await app.prisma.category.findFirstOrThrow({
+      where: { userId: target.userId, parentId: null },
+    });
+    await app.prisma.transaction.create({
+      data: {
+        userId: target.userId,
+        type: 'expense',
+        description: 'purge-tx',
+        occurredAt: new Date(),
+        categoryId: category.id,
+        entries: {
+          create: {
+            userId: target.userId,
+            accountId: account.id,
+            amount: -10,
+            currency: 'CNY',
+          },
+        },
+      },
+    });
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}?permanent=true`,
+      headers: auth(superToken),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().data.disposition).toBe('permanent');
+
+    expect(await app.prisma.user.findUnique({ where: { id: target.userId } })).toBeNull();
+    expect(await app.prisma.account.count({ where: { userId: target.userId } })).toBe(0);
+    expect(await app.prisma.transaction.count({ where: { userId: target.userId } })).toBe(0);
+    expect(await app.prisma.category.count({ where: { userId: target.userId } })).toBe(0);
+    expect(await app.prisma.transactionEntry.count({ where: { userId: target.userId } })).toBe(0);
+
+    // 审计必须留下：账号行没了，只能靠这条定位被清除的对象
+    const log = await app.prisma.auditLog.findFirst({
+      where: { action: 'admin.user_purged', targetId: target.userId },
+    });
+    expect(log).not.toBeNull();
+    expect(log!.metadata).toMatchObject({ disposition: 'permanent', targetEmail: target.email });
+  });
+
+  it('永久删除仅超管可执行', async () => {
+    const target = await createUser(app, DOMAIN, 'purge-admin');
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}?permanent=true`,
+      headers: auth(adminToken),
+    });
+
+    expect(res.statusCode).toBe(403);
+    // 被拒后账号必须还在
+    expect(await app.prisma.user.findUnique({ where: { id: target.userId } })).not.toBeNull();
+  });
+
+  it('永久删除已软删除的账号是允许的，软删除则不能重复', async () => {
+    const target = await createUser(app, DOMAIN, 'purge-twice');
+
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+    });
+
+    const softAgain = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}`,
+      headers: auth(adminToken),
+    });
+    expect(softAgain.statusCode).toBe(409);
+
+    // 先软删、观察后再彻底清掉，这是预期的两步用法
+    const purge = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}?permanent=true`,
+      headers: auth(superToken),
+    });
+    expect(purge.statusCode).toBe(200);
+    expect(await app.prisma.user.findUnique({ where: { id: target.userId } })).toBeNull();
+  });
+
+  it('不能永久删除自己', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${superId}?permanent=true`,
+      headers: auth(superToken),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('ADMIN_SELF_MODIFICATION');
+  });
+
+  it('permanent 只接受 true/false，其他值返回 400', async () => {
+    const target = await createUser(app, DOMAIN, 'purge-param');
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: `/api/admin/users/${target.userId}?permanent=1`,
+      headers: auth(superToken),
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(await app.prisma.user.findUnique({ where: { id: target.userId } })).not.toBeNull();
+  });
+
   it('撤销会话后旧 token 失效', async () => {
     const target = await createUser(app, DOMAIN, 'session');
 

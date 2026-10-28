@@ -1,7 +1,8 @@
 import UserCreateDialog, { type UserCreateInput } from '@/components/admin/UserCreateDialog';
 import UserDetailDrawer, { type UserAction } from '@/components/admin/UserDetailDrawer';
+import UserEditDialog, { type UserEditInput } from '@/components/admin/UserEditDialog';
 import UserStats from '@/components/admin/UserStats';
-import UserTable from '@/components/admin/UserTable';
+import UserTable, { type RowAction } from '@/components/admin/UserTable';
 import { deletionFilterOf } from '@/components/admin/UserBadges';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
@@ -45,7 +46,10 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [openUserId, setOpenUserId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
   const [confirm, setConfirm] = useState<{ action: UserAction; user: AdminUser } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [permanent, setPermanent] = useState(false);
 
   function patchParams(patch: Record<string, string | null>, resetPage = true) {
     const next = new URLSearchParams(params);
@@ -143,6 +147,33 @@ export default function AdminUsersPage() {
     onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UserEditInput }) =>
+      adminApi.updateUser(id, input),
+    onSuccess: (result) => {
+      setEditing(null);
+      toastSuccess(t('users.edit_success', { email: result.user.email }));
+      void queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+    onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
+  });
+
+  const remove = useMutation({
+    mutationFn: ({ id, permanent }: { id: string; permanent: boolean }) =>
+      adminApi.deleteUser(id, permanent ? { permanent: true } : {}),
+    onSuccess: (_result, variables) => {
+      setDeleteTarget(null);
+      setPermanent(false);
+      toastSuccess(variables.permanent ? t('users.delete_permanent_success') : t('users.delete_success'));
+      void queryClient.invalidateQueries({ queryKey: ['admin'] });
+    },
+    onError: (err) => {
+      setDeleteTarget(null);
+      setPermanent(false);
+      toastError(err instanceof ApiError ? translateError(err, t) : String(err));
+    },
+  });
+
   const activeFilters = useMemo(() => {
     const chips: { key: string; label: string; onClear: () => void }[] = [];
     if (search) chips.push({ key: 'search', label: search, onClear: () => setSearchInput('') });
@@ -179,6 +210,19 @@ export default function AdminUsersPage() {
       return;
     }
     setConfirm({ action, user });
+  }
+
+  /** 行内操作：修改直接开弹窗，删除二次确认，启停沿用详情抽屉的确认口径 */
+  function requestRowAction(action: RowAction, user: AdminUser) {
+    if (action === 'edit') {
+      setEditing(user);
+      return;
+    }
+    if (action === 'delete') {
+      setDeleteTarget(user);
+      return;
+    }
+    requestAction(user.status === 'active' ? 'disable' : 'enable', user);
   }
 
   const confirmCopy = confirm
@@ -338,7 +382,14 @@ export default function AdminUsersPage() {
         />
       )}
 
-      {list.length > 0 && <UserTable users={list} onOpen={(user) => setOpenUserId(user.id)} />}
+      {list.length > 0 && (
+        <UserTable
+          users={list}
+          onOpen={(user) => setOpenUserId(user.id)}
+          onAction={requestRowAction}
+          busyUserId={act.isPending || remove.isPending ? (act.variables?.id ?? deleteTarget?.id ?? null) : null}
+        />
+      )}
 
       {pagination && pagination.total > 0 && (
         <Pagination
@@ -368,6 +419,102 @@ export default function AdminUsersPage() {
         onClose={() => setCreating(false)}
         onSubmit={(input) => create.mutate(input)}
       />
+
+      <UserEditDialog
+        user={editing}
+        saving={update.isPending}
+        onClose={() => setEditing(null)}
+        onSubmit={(input) => editing && update.mutate({ id: editing.id, input })}
+      />
+
+      <Modal
+        open={deleteTarget !== null}
+        size="md"
+        title={t('users.delete')}
+        busy={remove.isPending}
+        onClose={() => {
+          setDeleteTarget(null);
+          setPermanent(false);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteTarget(null);
+                setPermanent(false);
+              }}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
+            >
+              {t('common:actions.cancel')}
+            </button>
+            <button
+              type="button"
+              disabled={remove.isPending}
+              onClick={() => deleteTarget && remove.mutate({ id: deleteTarget.id, permanent })}
+              className="rounded-lg bg-[var(--color-negative)] px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {permanent ? t('users.delete_permanent_submit') : t('users.delete')}
+            </button>
+          </>
+        }
+      >
+        {deleteTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-[var(--color-content-muted)]">
+              {deleteTarget.nickname} · {deleteTarget.email}
+            </p>
+
+            {/*
+              两个选项互斥且默认软删除：永久删除不可恢复，
+              不能让它在一次误点里被执行，所以必须先明确勾选。
+            */}
+            <div className="space-y-2">
+              <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--color-border-subtle)] p-3">
+                <input
+                  type="radio"
+                  name="delete-mode"
+                  className="mt-0.5"
+                  checked={!permanent}
+                  onChange={() => setPermanent(false)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{t('users.delete_soft')}</span>
+                  <span className="mt-0.5 block text-xs text-[var(--color-content-muted)]">
+                    {t('users.delete_soft_hint')}
+                  </span>
+                </span>
+              </label>
+
+              <label
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 ${
+                  permanent ? 'border-[var(--color-negative)]/50 bg-[var(--color-negative)]/5' : 'border-[var(--color-border-subtle)]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="delete-mode"
+                  className="mt-0.5"
+                  checked={permanent}
+                  onChange={() => setPermanent(true)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{t('users.delete_permanent')}</span>
+                  <span className="mt-0.5 block text-xs text-[var(--color-content-muted)]">
+                    {t('users.delete_permanent_hint')}
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {permanent && (
+              <p className="rounded-lg bg-[var(--color-negative)]/10 px-3 py-2 text-xs text-[var(--color-negative)]">
+                {t('users.delete_permanent_warning')}
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={confirm !== null}

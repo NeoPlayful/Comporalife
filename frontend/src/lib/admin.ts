@@ -229,6 +229,16 @@ export const adminApi = {
       `/api/admin/users/search?query=${encodeURIComponent(query)}`,
     ),
   user: (id: string) => api.get<{ user: AdminUser }>(`/api/admin/users/${id}`),
+  /** 只改昵称、邮箱、语言；密码与角色各有独立接口 */
+  updateUser: (
+    id: string,
+    body: { nickname?: string; email?: string; language?: string },
+  ) => api.patch<{ user: AdminUser }>(`/api/admin/users/${id}`, body),
+  /** 默认软删除；permanent 时连同该用户全部财务数据物理清除，不可恢复（仅超管） */
+  deleteUser: (id: string, options: { permanent?: boolean } = {}) =>
+    api.delete<{ id: string; deleted: boolean; disposition: 'soft_deleted' | 'permanent' }>(
+      `/api/admin/users/${id}${options.permanent ? '?permanent=true' : ''}`,
+    ),
   disableUser: (id: string) => api.post<{ id: string; status: string }>(`/api/admin/users/${id}/disable`, {}),
   enableUser: (id: string) => api.post<{ id: string; status: string }>(`/api/admin/users/${id}/enable`, {}),
   revokeSessions: (id: string) => api.post<{ id: string; revoked: number }>(`/api/admin/users/${id}/revoke-sessions`, {}),

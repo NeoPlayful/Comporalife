@@ -31,6 +31,8 @@ import {
   adminUserIdSchema,
   adminUserListSchema,
   adminUserSearchSchema,
+  adminUserDeleteQuerySchema,
+  adminUserUpdateSchema,
 } from './admin.schema.js';
 import {
   assertRoleChangeAllowed,
@@ -195,6 +197,159 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { id } = adminUserIdSchema.parse(request.params);
 
     return ok({ user: await getUserDetail(app.prisma, id) }, request.id);
+  });
+
+  /**
+   * 后台修改账号资料。
+   *
+   * 只开放昵称、邮箱、语言三项：密码走重置邮件，角色走 grant/revoke，状态走 disable/enable，
+   * 这三条路径都各有自己的审计与安全前提，不能塞进一个「顺手全改」的接口里。
+   * 改邮箱必须同时标记已验证——新地址没有走过验证流程，留着未验证状态只会让账号卡在提示里，
+   * 而登录本身又不校验这一点，等于形同虚设。
+   */
+  app.patch('/admin/users/:id', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const { id } = adminUserIdSchema.parse(request.params);
+    const body = adminUserUpdateSchema.parse(request.body ?? {});
+
+    const target = await app.prisma.user.findUnique({
+      where: { id },
+      select: { email: true, nickname: true, deletedAt: true },
+    });
+    if (!target) throw errors.notFound('用户不存在');
+    if (target.deletedAt) throw errors.conflict('该账号已注销，不能修改', { reason: 'account_deleted' });
+
+    if (body.email && body.email !== target.email) {
+      const taken = await app.prisma.user.findUnique({ where: { email: body.email }, select: { id: true } });
+      if (taken) throw errors.emailExists();
+    }
+
+    const profilePatch = {
+      ...(body.nickname !== undefined && body.nickname !== target.nickname ? { nickname: body.nickname } : {}),
+      ...(body.email !== undefined && body.email !== target.email
+        ? { email: body.email, emailVerifiedAt: new Date() }
+        : {}),
+    };
+    const languagePatch = body.language !== undefined;
+
+    if (Object.keys(profilePatch).length === 0 && !languagePatch) {
+      // 与库中值完全相同：不写库也不写审计，避免审计里堆满「改了但没变」的记录
+      return ok({ user: await getUserDetail(app.prisma, id) }, request.id);
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      if (Object.keys(profilePatch).length > 0) {
+        await tx.user.update({ where: { id }, data: profilePatch });
+      }
+      if (languagePatch) {
+        // 语言偏好存在 settings 里；账号可能因历史原因没有 settings 行，用 upsert 兜住
+        await tx.userSettings.upsert({
+          where: { userId: id },
+          create: { userId: id, language: body.language! },
+          update: { language: body.language! },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'admin.user_updated',
+          targetType: 'user',
+          targetId: id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          // 只记改过哪些字段，不记具体值：审计日志的读取方不需要昵称与邮箱原文。
+          // 这里必须写成逗号分隔的字符串——metadata 白名单只保留标量，数组会被整段丢弃。
+          metadata: {
+            changedFields: [...Object.keys(profilePatch), ...(languagePatch ? ['language'] : [])].join(','),
+          },
+        },
+      });
+    });
+
+    return ok({ user: await getUserDetail(app.prisma, id) }, request.id);
+  });
+
+  /**
+   * 后台删除账号。
+   *
+   * 默认软删除：置 deletedAt、禁用、撤会话，数据保留，可留待审计或恢复。
+   * `?permanent=true` 改为物理删除，连同该用户的全部财务数据一并清除，不可恢复。
+   *
+   * 两条路径都不要求用户先发起注销申请，因此冷却期规则不适用——这是管理员的直接处置。
+   * 但仍禁止删自己和删最后一个活跃超管，否则会把系统锁死。
+   *
+   * 永久删除的审计记录在删除之前写：用户行一旦消失，外键 SetNull 会让
+   * 审计里的 actor 之外的信息更难追溯，所以把邮箱留在 metadata 里，
+   * 事后仍能查出「谁的账号被彻底清掉了」。
+   */
+  app.delete('/admin/users/:id', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const { id } = adminUserIdSchema.parse(request.params);
+    const query = adminUserDeleteQuerySchema.parse(request.query ?? {});
+    const permanent = query.permanent === 'true';
+
+    await assertRoleChangeAllowed(app.prisma, { actorId: actor.userId, targetId: id, action: 'disable' });
+
+    const target = await app.prisma.user.findUnique({
+      where: { id },
+      select: { email: true, role: true, deletedAt: true },
+    });
+    if (!target) throw errors.notFound('用户不存在');
+    // 永久删除允许对已软删除的账号再执行一次，这正是「先软删、观察后再彻底清掉」的用法；
+    // 软删除则不能重复执行
+    if (!permanent && target.deletedAt) {
+      throw errors.conflict('该账号已注销', { reason: 'account_deleted' });
+    }
+
+    if (permanent) {
+      // 永久删除必须是超管：它会绕过注销冷却期，直接销毁用户全部财务数据
+      requireSuperAdmin(request);
+
+      await app.prisma.$transaction(async (tx) => {
+        await tx.auditLog.create({
+          data: {
+            userId: actor.userId,
+            action: 'admin.user_purged',
+            targetType: 'user',
+            targetId: id,
+            ip: request.ip,
+            userAgent: request.headers['user-agent'],
+            metadata: { disposition: 'permanent', targetEmail: target.email, targetRole: target.role },
+          },
+        });
+        // 关联数据全部 onDelete: Cascade；审计日志的 userId 是 SetNull，会保留下来
+        await tx.user.delete({ where: { id } });
+      });
+
+      return ok({ id, deleted: true, disposition: 'permanent' }, request.id);
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: {
+          status: 'disabled',
+          deletedAt: new Date(),
+          deletionReviewedAt: new Date(),
+          sessionVersion: { increment: 1 },
+        },
+      });
+      await tx.userSession.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await tx.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'admin.user_deleted',
+          targetType: 'user',
+          targetId: id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: { disposition: 'soft_deleted' },
+        },
+      });
+    });
+
+    return ok({ id, deleted: true, disposition: 'soft_deleted' }, request.id);
   });
 
   app.post('/admin/users/:id/disable', { preHandler: app.authenticate }, async (request) => {

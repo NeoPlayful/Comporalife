@@ -47,9 +47,35 @@ export const adminUserCreateSchema = z.object({
   language: z.enum(SUPPORTED_LANGUAGES).optional(),
 });
 
+/**
+ * 后台修改账号资料。
+ *
+ * 只允许改昵称、邮箱与语言：密码走独立的重置邮件流程，角色属于提权由 grant/revoke 负责，
+ * 状态由 disable/enable 负责。全字段可选但至少要改一项，避免空请求写一条无变化的审计。
+ */
+export const adminUserUpdateSchema = z
+  .object({
+    nickname: z.string().trim().min(1, '昵称不能为空').max(50, '昵称最多 50 个字符').optional(),
+    email: z.string().trim().toLowerCase().email('邮箱格式不正确').max(255).optional(),
+    language: z.enum(SUPPORTED_LANGUAGES).optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: '至少需要修改一项',
+  });
+
 export const deletionReviewSchema = z.object({
   decision: z.enum(['approve', 'reject']),
   note: z.string().trim().max(200).optional(),
+});
+
+/**
+ * 删除账号的查询参数。
+ *
+ * 默认软删除；`permanent=true` 才物理清除。刻意不用 z.coerce.boolean()：
+ * 那会把字符串 "false" 也解析成 true，反而让「不传或传 false」两种写法都变成永久删除。
+ */
+export const adminUserDeleteQuerySchema = z.object({
+  permanent: z.enum(['true', 'false']).optional(),
 });
 
 export const adminLoginLogSchema = z.object({
