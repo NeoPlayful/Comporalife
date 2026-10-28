@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
-import { Prisma, type PrismaClient } from '@prisma/client';
-import { eachDayOfInterval, eachMonthOfInterval, endOfMonth, format, startOfMonth } from 'date-fns';
+import { Prisma } from '@prisma/client';
+import { addDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -15,7 +15,7 @@ import { convertMany } from '../currencies/currency.service.js';
 import { computeGoalProgress } from '../goals/goal.service.js';
 import { findStaleValuations } from '../quality/quality.service.js';
 import { computeCashflow } from './cashflow.service.js';
-import { computeNetWorth } from './networth.service.js';
+import { buildNetWorthSamples, buildNetWorthSeries, computeNetWorth } from './networth.service.js';
 
 const LIABILITY_TYPES = new Set<string>(LIABILITY_ACCOUNT_TYPES);
 
@@ -148,33 +148,44 @@ export default async function dashboardRoutes(app: FastifyInstance) {
     const settings = await getUserContext(app, userId);
     const query = rangeSchema.parse(request.query);
 
-    const defaultFrom = new Date();
-    defaultFrom.setMonth(defaultFrom.getMonth() - 11);
-    const from = query.from ?? startOfMonth(defaultFrom);
-    const to = query.to ?? new Date();
+    const now = new Date();
+    const to = query.to ?? now;
+    // 默认看最近 30 天：这个图回答的是「最近怎么样」，一年的默认值反而看不出变化
+    const from = query.from ?? addDays(to, -29);
 
     if (from > to) throw errors.validation('起始日期不能晚于结束日期');
 
-    const spanDays = (to.getTime() - from.getTime()) / 86_400_000;
-    const granularity = spanDays <= 90 ? 'day' : 'month';
+    const requestedGranularity: 'day' | 'month' =
+      (to.getTime() - from.getTime()) / 86_400_000 <= 90 ? 'day' : 'month';
 
-    const [series, granularityUsed] = await buildNetWorthSeries(app.prisma, {
-      userId,
-      baseCurrency: settings.baseCurrency,
+    const samples = buildNetWorthSamples({
       from,
       to,
-      granularity,
+      granularity: requestedGranularity,
+      timezone: settings.timezone,
+      now,
+    });
+
+    const { series, usedRateFallback } = await buildNetWorthSeries(app.prisma, {
+      userId,
+      baseCurrency: settings.baseCurrency,
+      samples,
     });
 
     return ok(
       {
         series: series.map((point) => ({ period: point.period, netWorth: moneyToString(point.value) })),
-        granularity: granularityUsed,
+        granularity: requestedGranularity,
         baseCurrency: settings.baseCurrency,
+        rateFallback: usedRateFallback,
         basis: {
           from: from.toISOString(),
           to: to.toISOString(),
-          note: '按日按分录重算，区间超过 90 天自动转为按月',
+          timezone: settings.timezone,
+          note:
+            requestedGranularity === 'day'
+              ? '按日按分录累计，每个点含当日全部已入账流水'
+              : '按月采样，每个点含当月全部已入账流水',
         },
       },
       request.id,
@@ -571,53 +582,4 @@ export default async function dashboardRoutes(app: FastifyInstance) {
       request.id,
     );
   });
-}
-
-/**
- * 净资产趋势：对每个采样点按分录重算，不依赖余额快照表。
- * 采样点过多时降级为月度，避免大量聚合查询。
- */
-async function buildNetWorthSeries(
-  prisma: PrismaClient,
-  params: { userId: string; baseCurrency: string; from: Date; to: Date; granularity: 'day' | 'month' },
-): Promise<[Array<{ period: string; value: Decimal }>, 'day' | 'month']> {
-  const periods =
-    params.granularity === 'day'
-      ? eachDayOfInterval({ start: params.from, end: params.to }).map((d) => ({
-          key: format(d, 'yyyy-MM-dd'),
-          asOf: d,
-        }))
-      : eachMonthOfInterval({ start: params.from, end: params.to }).map((d) => ({
-          key: format(d, 'yyyy-MM'),
-          asOf: endOfMonth(d),
-        }));
-
-  const accountCount = await prisma.account.count({
-    where: { userId: params.userId, status: { in: ['active', 'archived'] } },
-  });
-
-  // 每个采样点都要做一次折算与聚合，规模过大时降级
-  const estimatedWork = periods.length * Math.max(accountCount, 1);
-  const granularity: 'day' | 'month' = estimatedWork > 200_000 ? 'month' : params.granularity;
-
-  const finalPeriods =
-    granularity === params.granularity
-      ? periods
-      : eachMonthOfInterval({ start: params.from, end: params.to }).map((d) => ({
-          key: format(d, 'yyyy-MM'),
-          asOf: endOfMonth(d),
-        }));
-
-  const series: Array<{ period: string; value: Decimal }> = [];
-
-  for (const period of finalPeriods) {
-    const result = await computeNetWorth(prisma, {
-      userId: params.userId,
-      baseCurrency: params.baseCurrency,
-      asOf: period.asOf,
-    });
-    series.push({ period: period.key, value: result.netWorth });
-  }
-
-  return [series, granularity];
 }

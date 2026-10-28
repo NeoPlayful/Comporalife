@@ -96,7 +96,9 @@ export interface NetWorthTrend {
   series: Array<{ period: string; netWorth: string }>;
   granularity: 'day' | 'month';
   baseCurrency: string;
-  basis: { from: string; to: string; note: string };
+  /** 区间早于首个汇率时，用的是最早可得的汇率折算 */
+  rateFallback?: boolean;
+  basis: { from: string; to: string; timezone?: string; note: string };
 }
 
 export interface AccountBalance {

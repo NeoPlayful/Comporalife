@@ -219,6 +219,96 @@ describe('净资产', () => {
     expect(data.series.length).toBe(31);
     // 期初之后无流水，净值恒定期初资产减负债
     expect(data.series[0].netWorth).toBe('9000.000000');
+    expect(data.series[30].netWorth).toBe('9000.000000');
+  });
+
+  it('单日区间只返回一个点且包含当日流水', async () => {
+    await addTransaction('income', '500', '2026-02-10T02:00:00Z');
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/net-worth-trend?from=2026-02-10&to=2026-02-10',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    expect(data.series).toHaveLength(1);
+    expect(data.series[0].period).toBe('2026-02-10');
+    // 9000 期初 + 500 收入；点取当日结束时刻，所以当天流水必须已计入
+    expect(data.series[0].netWorth).toBe('9500.000000');
+  });
+
+  it('趋势末点与总览净资产口径一致', async () => {
+    await addTransaction('income', '1200', '2026-03-05T02:00:00Z');
+    await addTransaction('expense', '300', '2026-03-06T02:00:00Z');
+
+    // 区间覆盖今天，末点才代表「现在」
+    const today = new Date();
+    const from = `${today.getFullYear()}-01-01`;
+    const to = `${today.getFullYear()}-12-31`;
+
+    const [trend, overview] = await Promise.all([
+      app.inject({
+        method: 'GET',
+        url: `/api/dashboard/net-worth-trend?from=${from}&to=${to}`,
+        headers: auth(token),
+      }),
+      app.inject({ method: 'GET', url: '/api/dashboard/overview', headers: auth(token) }),
+    ]);
+
+    const series = trend.json().data.series;
+    expect(series[series.length - 1].netWorth).toBe(overview.json().data.netWorth);
+  });
+
+  it('区间超过 90 天自动降为按月', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/net-worth-trend?from=2025-01-01&to=2025-12-31',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    expect(data.granularity).toBe('month');
+    expect(data.series).toHaveLength(12);
+    expect(data.series[0].period).toBe('2025-01');
+  });
+
+  it('区间早于首个汇率时回退到最早汇率而不是算成 0', async () => {
+    // 基准币种改成 USD，让 CNY 余额必须折算；汇率只写在中段，
+    // 早期采样点必然落在首条汇率之前
+    const bank = await app.prisma.account.findFirstOrThrow({ where: { id: bankId }, select: { userId: true } });
+    await app.prisma.userSettings.update({
+      where: { userId: bank.userId },
+      data: { baseCurrency: 'USD' },
+    });
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/admin/exchange-rates',
+      headers: auth(adminToken),
+      payload: { baseCurrency: 'CNY', quoteCurrency: 'USD', rate: '0.14', rateDate: '2026-06-15' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/net-worth-trend?from=2026-01-01&to=2026-01-05',
+      headers: auth(token),
+    });
+
+    const data = res.json().data;
+    expect(data.rateFallback).toBe(true);
+    // 10000+1000-2000 = 9000 CNY × 0.14 = 1260 USD，而不是 0
+    expect(Number(data.series[0].netWorth)).toBeCloseTo(1260, 2);
+  });
+
+  it('起始日期晚于结束日期时报错', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/dashboard/net-worth-trend?from=2026-02-01&to=2026-01-01',
+      headers: auth(token),
+    });
+
+    expect(res.statusCode).toBeGreaterThanOrEqual(400);
   });
 });
 
@@ -624,10 +714,11 @@ describe('多币种与汇率', () => {
       url: '/api/admin/exchange-rates?page=1&pageSize=10',
       headers: auth(adminToken),
     });
-    const data = first.json().data;
-    expect(data.exchangeRates).toHaveLength(10);
-    expect(data.pagination.total).toBe(12);
-    expect(data.pagination.totalPages).toBe(2);
+    // 分页信息在 meta 里：与前端 api.getPaged 的读法保持一致
+    const payload = first.json();
+    expect(payload.data.exchangeRates).toHaveLength(10);
+    expect(payload.meta.pagination.total).toBe(12);
+    expect(payload.meta.pagination.totalPages).toBe(2);
 
     const second = await app.inject({
       method: 'GET',
