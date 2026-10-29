@@ -541,12 +541,13 @@ function toBody(scenario: Scenario): ScenarioBody {
 
 function StatusBadge({ status }: { status: RunStatus }) {
   const { t } = useTranslation('monte-carlo');
+  // 文字色要分主题：-300 系只在深色底上够亮，浅色下会淡到 1.2:1 看不见
   const tone: Record<RunStatus, string> = {
-    queued: 'bg-slate-500/15 text-slate-300',
-    running: 'bg-sky-500/15 text-sky-300',
-    succeeded: 'bg-emerald-500/15 text-emerald-300',
-    failed: 'bg-rose-500/15 text-rose-300',
-    cancelled: 'bg-amber-500/15 text-amber-300',
+    queued: 'bg-slate-500/15 text-slate-800 dark:text-slate-300',
+    running: 'bg-sky-500/15 text-sky-800 dark:text-sky-300',
+    succeeded: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+    failed: 'bg-rose-500/15 text-rose-800 dark:text-rose-300',
+    cancelled: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
   };
 
   return (

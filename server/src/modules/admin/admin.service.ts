@@ -278,6 +278,9 @@ const AUDIT_METADATA_ALLOWED_KEYS = new Set([
   'kind',
   'fields',
   'changedFields',
+  // 永久删除会连同用户行一起消失，事后只能靠这条审计定位被清除的是哪个账号
+  'targetEmail',
+  'targetRole',
 ]);
 
 function pickAuditMetadata(metadata: Prisma.JsonValue | null): Record<string, unknown> | null {
