@@ -80,7 +80,7 @@ describe('账户', () => {
     expect(res.json().data.accounts).toHaveLength(0);
   });
 
-  it('删除无流水账户时归档', async () => {
+  it('删除无关联数据的账户为物理删除并写审计', async () => {
     const account = await createAccount();
 
     const del = await app.inject({
@@ -89,16 +89,87 @@ describe('账户', () => {
       headers: auth(token),
     });
     expect(del.statusCode).toBe(200);
-
-    const list = await app.inject({ method: 'GET', url: '/api/accounts', headers: auth(token) });
-    expect(list.json().data.accounts).toHaveLength(0);
+    expect(del.json().data.deleted).toBe(true);
 
     const all = await app.inject({
       method: 'GET',
       url: '/api/accounts?status=all',
       headers: auth(token),
     });
-    expect(all.json().data.accounts[0].status).toBe('archived');
+    expect(all.json().data.accounts).toHaveLength(0);
+
+    // 账户行已经不在了，审计里必须留下名字，否则事后无法确认删的是哪个账户
+    const audit = await app.prisma.auditLog.findFirst({
+      where: { userId, action: 'account.deleted', targetId: account.id },
+    });
+    expect(audit?.metadata).toMatchObject({ name: '储蓄账户' });
+  });
+
+  it('有关联数据的账户拒绝删除', async () => {
+    const account = await createAccount();
+
+    await app.prisma.transaction.create({
+      data: {
+        userId,
+        type: 'expense',
+        occurredAt: new Date('2026-02-01T10:00:00Z'),
+        description: '午餐',
+        entries: {
+          create: { userId, accountId: account.id, amount: '-100.00', currency: 'CNY' },
+        },
+      },
+    });
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/accounts/${account.id}`,
+      headers: auth(token),
+    });
+
+    expect(del.statusCode).toBe(409);
+    expect(del.json().error.code).toBe('ACCOUNT_HAS_RELATED_DATA');
+    expect(del.json().error.params).toMatchObject({ transactions: 1 });
+
+    // 拒绝后账户必须原样保留
+    const record = await app.prisma.account.findUnique({ where: { id: account.id } });
+    expect(record).not.toBeNull();
+  });
+
+  it('只有对账记录的账户同样拒绝删除', async () => {
+    const account = await createAccount();
+
+    await app.prisma.accountReconciliation.create({
+      data: {
+        userId,
+        accountId: account.id,
+        statementBalance: '10000.00',
+        computedBalance: '10000.00',
+        difference: '0',
+        reconciledAt: new Date('2026-02-01'),
+      },
+    });
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/accounts/${account.id}`,
+      headers: auth(token),
+    });
+
+    expect(del.statusCode).toBe(409);
+    expect(del.json().error.params).toMatchObject({ reconciliations: 1 });
+  });
+
+  it('不能删除他人账户', async () => {
+    const account = await createAccount();
+    const other = await createUser(app, DOMAIN, 'other');
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/accounts/${account.id}`,
+      headers: auth(other.token),
+    });
+
+    expect(del.statusCode).toBe(404);
   });
 
   it('期初余额修改走乐观锁并写审计', async () => {

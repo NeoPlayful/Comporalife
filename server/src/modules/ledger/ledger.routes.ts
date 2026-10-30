@@ -10,6 +10,7 @@ import {
   bulkUpdateSchema,
   createTransactionSchema,
   createTransferSchema,
+  deleteTransactionQuerySchema,
   listTransactionsSchema,
   transactionIdSchema,
   updateTransactionSchema,
@@ -260,27 +261,83 @@ export default async function ledgerRoutes(app: FastifyInstance) {
     return ok({ transaction: toTransactionDto(updated) }, request.id);
   });
 
-  // DELETE 语义为冲正：分录保留，历史可追溯
+  /**
+   * 删除交易。
+   *
+   * 默认语义是冲正：分录保留，历史可追溯。但冲正后的分录仍占据账户，
+   * 导致「有流水的账户永远删不掉」，所以另给 permanent=true 做物理删除。
+   *
+   * 物理删除只放行不会造成结构性损坏的交易。以下两类一律拒绝并说明出路，
+   * 而不是让数据库外键抛一句看不懂的约束名：
+   * - 组合交易/现金流引用：transactionId 是裸列无外键，硬删会留下悬空成交
+   * - 导入生成的交易：删掉后对应导入行重新变为可导入，会出现重复入账
+   *
+   * 转账匹配相关的不拦：原始流水、转账与解除匹配生成的流水之间只有备注文本互相提及
+   * id，没有外键，删掉其中任意一条都不会留下悬空引用，余额也只由未冲正分录汇总。
+   */
   app.delete('/transactions/:id', { preHandler: app.authenticate }, async (request) => {
     const { userId } = requireAuth(request);
     const { id } = transactionIdSchema.parse(request.params);
+    const query = deleteTransactionQuerySchema.parse(request.query ?? {});
+    const permanent = query.permanent === 'true';
 
-    const existing = await app.prisma.transaction.findFirst({ where: { id, userId } });
+    const existing = await app.prisma.transaction.findFirst({
+      where: { id, userId },
+      select: {
+        id: true,
+        status: true,
+        type: true,
+        description: true,
+        source: true,
+        importBatchId: true,
+      },
+    });
     if (!existing) throw errors.notFound('交易不存在');
-    if (existing.status === 'voided') throw errors.conflict('交易已冲正');
+    if (!permanent && existing.status === 'voided') throw errors.conflict('交易已冲正');
 
-    await app.prisma.$transaction(async (tx) => {
-      await tx.transaction.update({
-        where: { id },
-        data: { status: 'voided', voidedAt: new Date(), version: { increment: 1 } },
+    if (!permanent) {
+      await app.prisma.$transaction(async (tx) => {
+        await tx.transaction.update({
+          where: { id },
+          data: { status: 'voided', voidedAt: new Date(), version: { increment: 1 } },
+        });
+
+        await tx.auditLog.create({
+          data: { userId, action: 'transaction.void', targetType: 'transaction', targetId: id },
+        });
       });
 
+      return ok({ voided: true }, request.id);
+    }
+
+    if (existing.source === 'import' || existing.importBatchId) {
+      throw errors.transactionFromImport();
+    }
+
+    const [tradeCount, cashflowCount] = await Promise.all([
+      app.prisma.portfolioTrade.count({ where: { transactionId: id, userId } }),
+      app.prisma.portfolioCashflow.count({ where: { transactionId: id, userId } }),
+    ]);
+    if (tradeCount > 0 || cashflowCount > 0) throw errors.transactionHasPortfolioLink();
+
+    await app.prisma.$transaction(async (tx) => {
+      // 分录与标签都是 Cascade，随交易一起消失
+      await tx.transaction.delete({ where: { id } });
       await tx.auditLog.create({
-        data: { userId, action: 'transaction.void', targetType: 'transaction', targetId: id },
+        data: {
+          userId,
+          action: 'transaction.deleted',
+          targetType: 'transaction',
+          targetId: id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          // 交易行删掉后摘要就查不到了，留下它才能事后判断删的是哪一笔
+          metadata: { disposition: 'permanent', description: existing.description, type: existing.type },
+        },
       });
     });
 
-    return ok({ voided: true }, request.id);
+    return ok({ deleted: true, disposition: 'permanent' }, request.id);
   });
 
   app.get('/transactions/:id/entries', { preHandler: app.authenticate }, async (request) => {

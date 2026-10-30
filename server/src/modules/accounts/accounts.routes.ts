@@ -219,24 +219,56 @@ export default async function accountsRoutes(app: FastifyInstance) {
     );
   });
 
+  /**
+   * 物理删除账户。
+   *
+   * 只删除「从建立到现在没有任何痕迹」的账户，撞到关联数据一律拒绝并要求改用归档：
+   * 分录与组合的 accountId 是 onDelete: Restrict，数据库本身会挡住删除，但那样只会
+   * 抛出一条德语式的约束错误，用户看不懂。这里先数清楚依赖，给出可执行的动作。
+   *
+   * 导入批次名义上是 Cascade，但它同时持有加密原文件的 storageKey——级联删掉数据库行
+   * 会把磁盘上的密文变成永久孤儿，所以有导入批次同样按「有关联数据」拒绝。
+   */
   app.delete('/accounts/:id', { preHandler: app.authenticate }, async (request) => {
     const { userId } = requireAuth(request);
     const { id } = accountIdSchema.parse(request.params);
 
-    const account = await app.prisma.account.findFirst({ where: { id, userId } });
+    const account = await app.prisma.account.findFirst({
+      where: { id, userId },
+      select: { id: true, name: true },
+    });
     if (!account) throw errors.notFound('账户不存在');
 
-    const entryCount = await app.prisma.transactionEntry.count({ where: { accountId: id, userId } });
-    if (entryCount > 0) {
-      throw errors.accountHasTransactions();
+    const [transactions, reconciliations, portfolios, imports, goals] = await Promise.all([
+      app.prisma.transactionEntry.count({ where: { accountId: id, userId } }),
+      app.prisma.accountReconciliation.count({ where: { accountId: id, userId } }),
+      app.prisma.portfolio.count({ where: { accountId: id, userId } }),
+      app.prisma.importBatch.count({ where: { accountId: id, userId } }),
+      app.prisma.financialGoal.count({ where: { accountId: id, userId } }),
+    ]);
+
+    const counts = { transactions, reconciliations, portfolios, imports, goals };
+    if (Object.values(counts).some((count) => count > 0)) {
+      throw errors.accountHasRelatedData(counts);
     }
 
-    await app.prisma.account.update({
-      where: { id },
-      data: { status: 'archived', archivedAt: new Date() },
+    await app.prisma.$transaction(async (tx) => {
+      await tx.account.delete({ where: { id } });
+      // 账户一删就查不到名字了，审计里带上，事后能定位被删的是哪个账户
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'account.deleted',
+          targetType: 'account',
+          targetId: id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: { name: account.name },
+        },
+      });
     });
 
-    return ok({ archived: true }, request.id);
+    return ok({ deleted: true }, request.id);
   });
 
   app.post('/accounts/:id/archive', { preHandler: app.authenticate }, async (request) => {

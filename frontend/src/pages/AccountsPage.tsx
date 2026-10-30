@@ -6,15 +6,16 @@ import {
 } from '@/lib/accounts';
 import { ACCOUNT_TYPES, useEnumLabels } from '@/lib/enum-labels';
 import { translateError } from '@/lib/error-message';
-import { toastSuccess } from '@/lib/toast';
+import { toastError, toastSuccess } from '@/lib/toast';
 import CurrencySelect from '@/components/finance/CurrencySelect';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Modal from '@/components/ui/Modal';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, Plus, RotateCcw } from 'lucide-react';
+import { Archive, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -44,6 +45,20 @@ export default function AccountsPage() {
       toastSuccess(t('common:feedback.unarchived'));
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => accountsApi.remove(id),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
+      // 账户余额同时出现在仪表盘与净资产里，删干净后这些统计都要重取
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    },
+    // 有关联数据时后端拒绝删除：把「请改为归档」原样透出，不然用户只看到一句冲突
+    onError: (err) => toastError(translateError(err, t)),
   });
 
   const { assets, liabilities } = useMemo(() => {
@@ -159,6 +174,8 @@ export default function AccountsPage() {
           accounts={showArchived ? accounts : activeAccounts}
           onArchive={(id) => archiveMutation.mutate(id)}
           onUnarchive={(id) => unarchiveMutation.mutate(id)}
+          onDelete={(id) => deleteMutation.mutate(id)}
+          deletingId={deleteMutation.isPending ? deleteMutation.variables ?? null : null}
         />
       )}
 
@@ -184,13 +201,29 @@ function AccountList({
   accounts,
   onArchive,
   onUnarchive,
+  onDelete,
+  deletingId,
 }: {
   accounts: Account[];
   onArchive: (id: string) => void;
   onUnarchive: (id: string) => void;
+  onDelete: (id: string) => void;
+  deletingId: string | null;
 }) {
   const { t } = useTranslation();
   const { accountType } = useEnumLabels();
+  const confirm = useConfirm();
+
+  async function confirmDelete(account: Account) {
+    const ok = await confirm({
+      title: t('accounts:delete_title'),
+      // 后端会校验关联数据，但用户点了删除就该先知道「这一下会真的消失」
+      message: t('accounts:delete_confirm', { name: account.name }),
+      confirmLabel: t('accounts:delete'),
+      tone: 'danger',
+    });
+    if (ok) onDelete(account.id);
+  }
 
   return (
     <div className="card divide-y divide-[var(--color-border-subtle)]">
@@ -232,6 +265,16 @@ function AccountList({
               ) : (
                 <RotateCcw className="size-4" />
               )}
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmDelete(account)}
+              disabled={deletingId === account.id}
+              className="grid size-8 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-[var(--color-negative)]/10 hover:text-[var(--color-negative)] disabled:opacity-50"
+              aria-label={t('accounts:delete')}
+              title={t('accounts:delete')}
+            >
+              <Trash2 className="size-4" />
             </button>
           </div>
         </div>

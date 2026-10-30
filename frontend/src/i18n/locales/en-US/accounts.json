@@ -15,6 +15,9 @@
   "no_institution": "No institution",
   "archive": "Archive account",
   "unarchive": "Restore account",
+  "delete": "Delete account",
+  "delete_title": "Delete account",
+  "delete_confirm": "\"{{name}}\" will be permanently deleted. Only accounts with no transactions, reconciliations, portfolios, imports or goals can be deleted; archive the rest instead.",
   "dialog": {
     "title": "New account",
     "name": "Account name",

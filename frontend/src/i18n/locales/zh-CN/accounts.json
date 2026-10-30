@@ -15,6 +15,9 @@
   "no_institution": "未填写机构",
   "archive": "归档账户",
   "unarchive": "恢复账户",
+  "delete": "删除账户",
+  "delete_title": "删除账户",
+  "delete_confirm": "将永久删除「{{name}}」。只有从未产生过流水、对账、投资组合、导入记录或财富目标的账户才能删除；其余账户请改用归档。",
   "dialog": {
     "title": "新建账户",
     "name": "账户名称",
