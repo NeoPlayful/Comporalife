@@ -43,6 +43,16 @@ export const updateTransactionSchema = z
     '至少需要修改一项字段',
   );
 
+/**
+ * 删除交易的查询参数。
+ *
+ * 默认冲正；`permanent=true` 才物理删除。与账号删除同理，不用 z.coerce.boolean()：
+ * 那会把字符串 "false" 也解析成 true，等于让「明确说不」变成永久删除。
+ */
+export const deleteTransactionQuerySchema = z.object({
+  permanent: z.enum(['true', 'false']).optional(),
+});
+
 export const listTransactionsSchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),

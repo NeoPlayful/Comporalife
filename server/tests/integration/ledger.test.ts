@@ -206,7 +206,9 @@ describe('交易分录', () => {
     });
 
     expect(res.statusCode).toBe(409);
-    expect(res.json().error.code).toBe('ACCOUNT_HAS_TRANSACTIONS');
+    // 删除接口会连同对账、组合、导入与目标一起检查，所以返回的是更宽的那个错误码
+    expect(res.json().error.code).toBe('ACCOUNT_HAS_RELATED_DATA');
+    expect(res.json().error.params.transactions).toBeGreaterThan(0);
   });
 });
 
@@ -419,6 +421,215 @@ describe('修改与冲正', () => {
     expect(audit).not.toBeNull();
     // 审计不得记录金额
     expect(JSON.stringify(audit?.metadata ?? {})).not.toContain('100');
+  });
+
+  it('permanent=true 物理删除交易与分录，账户随之可删', async () => {
+    const created = await createExpense('100.00');
+    const id = created.json().data.transaction.id as string;
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}?permanent=true`,
+      headers: auth(token),
+    });
+
+    expect(del.statusCode).toBe(200);
+    expect(del.json().data.deleted).toBe(true);
+    expect(del.json().data.disposition).toBe('permanent');
+
+    expect(await app.prisma.transaction.findUnique({ where: { id } })).toBeNull();
+    expect(await app.prisma.transactionEntry.count({ where: { transactionId: id } })).toBe(0);
+    // 余额回到期初
+    expect(await getBalance(cashAccountId)).toBe('1000.000000');
+
+    // 分录清空后账户才能删除，这正是这个功能的目的
+    const accountDel = await app.inject({
+      method: 'DELETE',
+      url: `/api/accounts/${cashAccountId}`,
+      headers: auth(token),
+    });
+    expect(accountDel.statusCode).toBe(200);
+
+    // 原始审计行保留摘要供取证；读模型（audit-logs 接口）按白名单过滤，不会把流水内容透给前端
+    const audit = await app.prisma.auditLog.findFirst({
+      where: { userId, action: 'transaction.deleted', targetId: id },
+    });
+    expect(audit?.metadata).toMatchObject({ description: '午餐', disposition: 'permanent' });
+  });
+
+  it('永久删除已冲正的交易同样允许', async () => {
+    const created = await createExpense();
+    const id = created.json().data.transaction.id as string;
+
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}`,
+      headers: auth(token),
+    });
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}?permanent=true`,
+      headers: auth(token),
+    });
+    expect(del.statusCode).toBe(200);
+    expect(await app.prisma.transaction.findUnique({ where: { id } })).toBeNull();
+  });
+
+  it('导入来源的交易不能物理删除', async () => {
+    const created = await createExpense();
+    const id = created.json().data.transaction.id as string;
+    await app.prisma.transaction.update({
+      where: { id },
+      data: { source: 'import' },
+    });
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}?permanent=true`,
+      headers: auth(token),
+    });
+
+    expect(del.statusCode).toBe(409);
+    expect(del.json().error.code).toBe('TRANSACTION_FROM_IMPORT');
+  });
+
+  it('备注里含匹配字样的交易仍可物理删除', async () => {
+    // 匹配关系只存在于备注文本，没有外键，所以这类交易不该被拦
+    const created = await createExpense();
+    const id = created.json().data.transaction.id as string;
+    await app.prisma.transaction.update({
+      where: { id },
+      data: { note: '已匹配为转账 00000000-0000-0000-0000-000000000000' },
+    });
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}?permanent=true`,
+      headers: auth(token),
+    });
+
+    expect(del.statusCode).toBe(200);
+    expect(await app.prisma.transaction.findUnique({ where: { id } })).toBeNull();
+    expect(await app.prisma.transactionEntry.count({ where: { transactionId: id } })).toBe(0);
+  });
+
+  it('解除匹配后删除原始流水不影响重建的流水与余额', async () => {
+    // 造一条真实的匹配-解除链路：两条原始流水合并为转账，再解除
+    const outCreated = await app.inject({
+      method: 'POST',
+      url: '/api/transactions',
+      headers: auth(token),
+      payload: {
+        type: 'expense',
+        accountId: bankAccountId,
+        categoryId: otherExpenseId,
+        amount: '300.00',
+        occurredAt: '2026-03-01T02:00:00Z',
+        description: '转出到现金',
+      },
+    });
+    const outId = outCreated.json().data.transaction.id as string;
+
+    const inCreated = await app.inject({
+      method: 'POST',
+      url: '/api/transactions',
+      headers: auth(token),
+      payload: {
+        type: 'income',
+        accountId: cashAccountId,
+        categoryId: incomeCategoryId,
+        amount: '300.00',
+        occurredAt: '2026-03-01T02:00:00Z',
+        description: '从工资卡转入',
+      },
+    });
+    const inId = inCreated.json().data.transaction.id as string;
+
+    const matched = await app.inject({
+      method: 'POST',
+      url: '/api/transfers/match',
+      headers: auth(token),
+      payload: { transactionIdA: outId, transactionIdB: inId },
+    });
+    expect(matched.statusCode).toBe(201);
+    const transferId = matched.json().data.transferId as string;
+
+    const unmatched = await app.inject({
+      method: 'POST',
+      url: `/api/transfers/${transferId}/unmatch`,
+      headers: auth(token),
+    });
+    expect(unmatched.statusCode).toBe(200);
+    const rebuilt = unmatched.json().data.created as string[];
+    expect(rebuilt).toHaveLength(2);
+
+    const beforeBank = await getBalance(bankAccountId);
+    const beforeCash = await getBalance(cashAccountId);
+
+    // 原始流水在解除匹配后仍占着账户，这正是「账户删不掉」的症结，现在必须能删
+    for (const originalId of [outId, inId]) {
+      const del = await app.inject({
+        method: 'DELETE',
+        url: `/api/transactions/${originalId}?permanent=true`,
+        headers: auth(token),
+      });
+      expect(del.statusCode).toBe(200);
+    }
+
+    // 重建的两条流水仍在，余额不变
+    expect(await app.prisma.transaction.count({ where: { id: { in: rebuilt } } })).toBe(2);
+    expect(await getBalance(bankAccountId)).toBe(beforeBank);
+    expect(await getBalance(cashAccountId)).toBe(beforeCash);
+  });
+
+  it('被投资组合引用的交易不能物理删除', async () => {
+    const created = await createExpense();
+    const id = created.json().data.transaction.id as string;
+
+    const portfolio = await app.prisma.portfolio.create({
+      data: {
+        userId,
+        accountId: cashAccountId,
+        name: '测试组合',
+        currency: 'CNY',
+      },
+      select: { id: true },
+    });
+    await app.prisma.portfolioCashflow.create({
+      data: {
+        userId,
+        portfolioId: portfolio.id,
+        kind: 'deposit',
+        flowDate: new Date('2026-02-01'),
+        amount: '100.00',
+        transactionId: id,
+      },
+    });
+
+    const del = await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}?permanent=true`,
+      headers: auth(token),
+    });
+
+    expect(del.statusCode).toBe(409);
+    expect(del.json().error.code).toBe('TRANSACTION_HAS_PORTFOLIO_LINK');
+  });
+
+  it('permanent 只接受 true/false，其他值返回 400', async () => {
+    const created = await createExpense();
+    const id = created.json().data.transaction.id as string;
+
+    const bad = await app.inject({
+      method: 'DELETE',
+      url: `/api/transactions/${id}?permanent=1`,
+      headers: auth(token),
+    });
+
+    expect(bad.statusCode).toBe(400);
+    // 参数校验失败时不应有任何副作用
+    expect(await app.prisma.transaction.findUnique({ where: { id } })).not.toBeNull();
   });
 });
 

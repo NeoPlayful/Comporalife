@@ -1,7 +1,8 @@
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
 import { useEnumLabels, TRANSACTION_TYPE_KEYS } from '@/lib/enum-labels';
-import { toastSuccess } from '@/lib/toast';
+import { translateError } from '@/lib/error-message';
+import { toastError, toastSuccess } from '@/lib/toast';
 import { formatDate } from '@/lib/format';
 import {
   transactionsApi,
@@ -11,19 +12,21 @@ import {
 } from '@/lib/transactions';
 import MoneyDisplay from '@/components/finance/MoneyDisplay';
 import TransactionForm from '@/components/finance/TransactionForm';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import EmptyState from '@/components/ui/EmptyState';
 import Modal from '@/components/ui/Modal';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
 import Pagination from '@/components/ui/Pagination';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, RotateCcw, Search } from 'lucide-react';
+import { Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 export default function TransactionsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { t } = useTranslation();
   const { transactionType } = useEnumLabels();
   const [formOpen, setFormOpen] = useState(false);
@@ -78,6 +81,22 @@ export default function TransactionsPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => transactionsApi.remove(id),
+    onSuccess: () => {
+      toastSuccess(t('common:feedback.deleted'));
+      setDetail(null);
+      // 余额、仪表盘与统计都由分录汇总而来，删除后必须一起重取
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    },
+    // 导入/匹配/组合生成的交易不能删，后端会说明该走哪个入口
+    onError: (err) => toastError(translateError(err, t)),
+  });
+
   const bulkCategorize = useMutation({
     mutationFn: (categoryId: string) =>
       transactionsApi.bulkCategorize([...selected], categoryId || null),
@@ -90,6 +109,17 @@ export default function TransactionsPage() {
 
   const transactions = listQuery.data?.transactions ?? [];
   const pagination = listQuery.data?.pagination;
+
+  async function confirmRowDelete(tx: Transaction) {
+    const ok = await confirm({
+      title: t('transactions:detail.delete'),
+      // 两段并成一条：确认框只渲染 message，分段会丢失；\n 在 <p> 里不换行，所以用空格接
+      message: `${t('transactions:detail.delete_confirm', { description: tx.description })} ${t('transactions:detail.delete_hint')}`,
+      confirmLabel: t('transactions:detail.delete'),
+      tone: 'danger',
+    });
+    if (ok) deleteMutation.mutate(tx.id);
+  }
   const allChecked = transactions.length > 0 && transactions.every((tx) => selected.has(tx.id));
 
   function toggleAll() {
@@ -264,6 +294,7 @@ export default function TransactionsPage() {
                   <th className="px-3 py-2">{t('transactions:table.category')}</th>
                   <th className="px-3 py-2">{t('transactions:table.account')}</th>
                   <th className="px-3 py-2 text-right">{t('transactions:table.amount')}</th>
+                  <th className="w-16 px-3 py-2 text-right">{t('transactions:table.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--color-border-subtle)]">
@@ -316,6 +347,19 @@ export default function TransactionsPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right">
                       <MoneyDisplay amount={tx.amount} currency={tx.currency} colorize />
+                    </td>
+                    <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                      {/* 行内删除按钮不打开详情：删除是独立动作，不该先被抽屉打断 */}
+                      <button
+                        type="button"
+                        onClick={() => void confirmRowDelete(tx)}
+                        disabled={deleteMutation.isPending && deleteMutation.variables === tx.id}
+                        className="grid size-7 place-items-center rounded-lg text-[var(--color-content-muted)] hover:bg-[var(--color-negative)]/10 hover:text-[var(--color-negative)] disabled:opacity-50"
+                        aria-label={t('transactions:table.delete_row', { description: tx.description })}
+                        title={t('transactions:detail.delete')}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -389,6 +433,7 @@ function TransactionDetail({
           >
             {t('common:actions.close')}
           </button>
+          {/* 删除只放在列表的操作列：详情里改变数量会让人以为还有第二个入口 */}
           {transaction.status === 'posted' &&
             (confirmVoid ? (
               <button

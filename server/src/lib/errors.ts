@@ -10,6 +10,9 @@ export const ErrorCode = {
   USER_DISABLED: 'USER_DISABLED',
   ACCOUNT_ARCHIVED: 'ACCOUNT_ARCHIVED',
   ACCOUNT_HAS_TRANSACTIONS: 'ACCOUNT_HAS_TRANSACTIONS',
+  ACCOUNT_HAS_RELATED_DATA: 'ACCOUNT_HAS_RELATED_DATA',
+  TRANSACTION_HAS_PORTFOLIO_LINK: 'TRANSACTION_HAS_PORTFOLIO_LINK',
+  TRANSACTION_FROM_IMPORT: 'TRANSACTION_FROM_IMPORT',
   LEDGER_UNBALANCED: 'LEDGER_UNBALANCED',
   CATEGORY_KIND_MISMATCH: 'CATEGORY_KIND_MISMATCH',
   CROSS_CURRENCY_TRANSFER_UNSUPPORTED: 'CROSS_CURRENCY_TRANSFER_UNSUPPORTED',
@@ -155,6 +158,9 @@ export const ERROR_STATUS: Record<ErrorCodeValue, number> = {
   USER_DISABLED: 403,
   ACCOUNT_ARCHIVED: 409,
   ACCOUNT_HAS_TRANSACTIONS: 409,
+  ACCOUNT_HAS_RELATED_DATA: 409,
+  TRANSACTION_HAS_PORTFOLIO_LINK: 409,
+  TRANSACTION_FROM_IMPORT: 409,
   LEDGER_UNBALANCED: 422,
   CATEGORY_KIND_MISMATCH: 422,
   CROSS_CURRENCY_TRANSFER_UNSUPPORTED: 422,
@@ -314,6 +320,46 @@ export const errors = {
   accountArchived: () => new AppError(ErrorCode.ACCOUNT_ARCHIVED, '账户已归档，无法记账'),
   accountHasTransactions: () =>
     new AppError(ErrorCode.ACCOUNT_HAS_TRANSACTIONS, '账户存在历史流水，请改为归档'),
+  /**
+   * 物理删除前的依赖检查。
+   *
+   * 与 ACCOUNT_HAS_TRANSACTIONS 分开：那边是「有流水不能删」，这里连对账、组合、
+   * 导入批次与财富目标一起算——单独看流水会漏掉「只有导入批次、还没入账」的账户。
+   */
+  accountHasRelatedData: (counts: {
+    transactions: number;
+    reconciliations: number;
+    portfolios: number;
+    imports: number;
+    goals: number;
+  }) =>
+    new AppError(
+      ErrorCode.ACCOUNT_HAS_RELATED_DATA,
+      '账户仍有关联数据，请改为归档',
+      undefined,
+      { ...counts },
+    ),
+  /**
+   * 交易物理删除前的依赖检查。
+   *
+   * 只有真会造成结构性损坏的两类需要拦：
+   * - 组合交易/现金流的 transactionId 是裸列，没有外键约束，硬删交易只会留下指向
+   *   不存在交易的行，持仓重放会把它当成有效成交。
+   * - 导入交易与导入行共享指纹，撤掉交易会让该行重新变成可导入，出现重复入账。
+   *
+   * 转账匹配相关的不在此列：原始流水、转账与解除匹配生成的流水之间只靠备注文本
+   * 互相提及 id，没有任何外键，删除其中任意一条都不会留下悬空引用。
+   */
+  transactionHasPortfolioLink: () =>
+    new AppError(
+      ErrorCode.TRANSACTION_HAS_PORTFOLIO_LINK,
+      '该交易由投资组合的交易或现金流生成，请到投资组合中处理',
+    ),
+  transactionFromImport: () =>
+    new AppError(
+      ErrorCode.TRANSACTION_FROM_IMPORT,
+      '该交易来自账单导入，请先撤销对应导入批次',
+    ),
   ledgerUnbalanced: (message = '交易分录不平衡') => new AppError(ErrorCode.LEDGER_UNBALANCED, message),
   categoryKindMismatch: () =>
     new AppError(ErrorCode.CATEGORY_KIND_MISMATCH, '分类类型与交易类型不匹配'),

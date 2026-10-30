@@ -89,7 +89,8 @@ export const accountsApi = {
 
   unarchive: (id: string) => api.post<{ archived: boolean }>(`/api/accounts/${id}/unarchive`),
 
-  remove: (id: string) => api.delete<{ archived: boolean }>(`/api/accounts/${id}`),
+  /** 物理删除；有关联数据时后端返回 ACCOUNT_HAS_RELATED_DATA，应引导用户改为归档 */
+  remove: (id: string) => api.delete<{ deleted: boolean }>(`/api/accounts/${id}`),
 
   balance: (id: string) => api.get<BalanceInfo>(`/api/accounts/${id}/balance`),
 

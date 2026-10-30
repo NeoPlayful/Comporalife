@@ -73,6 +73,10 @@ export const transactionsApi = {
 
   void: (id: string) => api.delete<{ voided: boolean }>(`/api/transactions/${id}`),
 
+  /** 物理删除；导入、转账匹配与投资组合生成的交易会被后端拒绝，需走各自的撤销入口 */
+  remove: (id: string) =>
+    api.delete<{ deleted: boolean; disposition: 'permanent' }>(`/api/transactions/${id}?permanent=true`),
+
   entries: (id: string) =>
     api.get<{
       entries: Array<{

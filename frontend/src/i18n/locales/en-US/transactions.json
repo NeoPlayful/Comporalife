@@ -33,6 +33,8 @@
     "category": "Category",
     "account": "Account",
     "amount": "Amount",
+    "actions": "Actions",
+    "delete_row": "Delete {{description}}",
     "source_import": "Import",
     "source_manual": "Manual",
     "uncategorized": "Uncategorized"
@@ -49,7 +51,11 @@
     "void": "Reverse",
     "voiding": "Reversing…",
     "confirm_void": "Confirm reversal",
-    "void_hint": "Reversing keeps the record but removes its effect on balances, so history stays auditable."
+    "void_hint": "Reversing keeps the record but removes its effect on balances, so history stays auditable.",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "delete_confirm": "\"{{description}}\" and its entries will be permanently deleted. This cannot be undone. Use reversal instead if you only want to cancel its effect on balances.",
+    "delete_hint": "Deleting also removes the entries, which is required before the account itself can be deleted. Transactions from imports, transfer matches or portfolios should be undone on their own pages."
   },
   "form": {
     "title": "New transaction",

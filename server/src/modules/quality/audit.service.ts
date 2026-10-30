@@ -34,6 +34,8 @@ const METADATA_ALLOWED_KEYS = new Set([
   'priceDate',
   'valuationDate',
   'accountId',
+  // 账户删除后只能靠这条审计认出是哪个账户；账户名是账号元数据，不是流水内容
+  'name',
   'costBasisMethod',
   'periodType',
   'year',
