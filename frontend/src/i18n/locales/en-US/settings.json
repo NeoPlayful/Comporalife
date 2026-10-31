@@ -49,7 +49,46 @@
       "required_badge": "Needed",
       "empty_title": "Your list is empty",
       "empty_description": "Add the pairs you want to follow. By default this shows the rates between your foreign-currency holdings and your base currency.",
-      "missing_hint": "Pairs marked \"No data\" need an admin to record a rate, or are waiting for the next auto-sync."
+      "missing_hint": "Pairs marked \"No data\" need an admin to record a rate, or are waiting for the next auto-sync.",
+      "view_trend": "View {{from}}→{{to}} trend"
+    },
+    "history": {
+      "title": "Rate trend",
+      "description": "{{fromName}} to {{toName}}. Open to view daily, weekly, monthly, quarterly and yearly trends.",
+      "inverted_hint": "This chart is the reciprocal of the inverse rate {{from}}→{{to}}.",
+      "granularity_label": "Interval",
+      "granularity": {
+        "day": "Day",
+        "week": "Week",
+        "month": "Month",
+        "quarter": "Quarter",
+        "year": "Year"
+      },
+      "range_30d": "Last 30 days",
+      "range_90d": "Last 90 days",
+      "range_1y": "Last year",
+      "range_26w": "Last 26 weeks",
+      "range_3y": "Last 3 years",
+      "range_12m": "Last 12 months",
+      "range_5y": "Last 5 years",
+      "range_10y": "Last 10 years",
+      "range_2y": "Last 2 years",
+      "range_20y": "Last 20 years",
+      "range_50y": "Last 50 years",
+      "current": "Current rate",
+      "change_vs_prev": "Vs previous {{unit}}",
+      "prev_value": "Previous {{rate}}",
+      "change_in_range": "Change in range",
+      "to_now": "to now",
+      "period": "Period",
+      "samples": "Samples",
+      "samples_value": "{{count}} days",
+      "detail_total": "{{total}} periods",
+      "prev": "Previous",
+      "next": "Next",
+      "single_point": "Only one period of data so far ({{date}}). History builds up as rates sync over time.",
+      "empty_title": "No history at this interval yet",
+      "empty_description": "Rate history accumulates day by day from when syncing started. There is no data at this interval yet."
     }
   },
   "security": {

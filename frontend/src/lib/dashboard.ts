@@ -206,6 +206,29 @@ export interface WatchlistView {
   candidates: WatchlistCandidate[];
 }
 
+/** 走势粒度：日/周/月/季/年 */
+export type RateGranularity = 'day' | 'week' | 'month' | 'quarter' | 'year';
+
+export interface RateHistoryPoint {
+  /** 桶的起点日期（周期第一天），yyyy-MM-dd */
+  periodStart: string;
+  /** 该桶内最后一个可用日的汇率，1 from = rate to */
+  rate: string;
+  /** 该桶内实际样本数；粗粒度下大于 1 表示是由多个日度点聚合而来 */
+  samples: number;
+}
+
+export interface RateHistory {
+  from: string;
+  to: string;
+  granularity: RateGranularity;
+  /** 实际生效的桶数（超上限会被收窄） */
+  buckets: number;
+  /** 整段序列是否由反向汇率的倒数求得 */
+  inverted: boolean;
+  points: RateHistoryPoint[];
+}
+
 /**
  * 汇率只读 + 自选。
  *
@@ -219,4 +242,18 @@ export const exchangeRatesApi = {
   removePair: (body: { from: string; to: string }) =>
     api.delete<WatchlistView>('/api/exchange-rates/watchlist', { body }),
   resetWatchlist: () => api.post<WatchlistView>('/api/exchange-rates/watchlist/reset'),
+  history: (params: {
+    from: string;
+    to: string;
+    granularity: RateGranularity;
+    buckets?: number;
+  }) => {
+    const search = new URLSearchParams({
+      from: params.from,
+      to: params.to,
+      granularity: params.granularity,
+    });
+    if (params.buckets) search.set('buckets', String(params.buckets));
+    return api.get<RateHistory>(`/api/exchange-rates/history?${search.toString()}`);
+  },
 };

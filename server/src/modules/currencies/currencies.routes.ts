@@ -7,6 +7,11 @@ import { rateToString } from '../../lib/money.js';
 import { requireAuth } from '../../plugins/auth.js';
 import { resolveRate } from './currency.service.js';
 import {
+  getRateHistory,
+  RATE_GRANULARITIES,
+  RATE_GRANULARITY_LIMITS,
+} from './rate-history.service.js';
+import {
   addToWatchlist,
   getWatchlist,
   removeFromWatchlist,
@@ -24,6 +29,13 @@ const pairSchema = z
     to: currencySchema,
   })
   .refine((value) => value.from !== value.to, { message: '两个币种不能相同' });
+
+const historyQuerySchema = z.object({
+  from: currencySchema,
+  to: currencySchema,
+  granularity: z.enum(RATE_GRANULARITIES).default('day'),
+  buckets: z.coerce.number().int().positive().optional(),
+});
 
 function rethrowWatchlistError(err: unknown): never {
   if (err instanceof WatchlistError) {
@@ -111,5 +123,28 @@ export default async function currenciesRoutes(app: FastifyInstance) {
   app.post('/exchange-rates/watchlist/reset', { preHandler: app.authenticate }, async (request) => {
     const { userId } = requireAuth(request);
     return ok(await resetWatchlist(app.prisma, userId), request.id);
+  });
+
+  /**
+   * 单个币种对的走势（日/周/月/季/年）。
+   *
+   * 汇率是全局公开的市场数据，不含任何用户私有信息，因此登录用户即可读取历史，
+   * 无需管理员权限、也不写审计。数值口径与自选列表保持一致（优先正向、
+   * 无正向才取反向倒数），保证图上最后一个点能和列表卡片的当前值对上。
+   */
+  app.get('/exchange-rates/history', { preHandler: app.authenticate }, async (request) => {
+    const query = historyQuerySchema.parse(request.query);
+    if (query.from === query.to) {
+      throw errors.validation('两个币种不能相同');
+    }
+
+    const result = await getRateHistory(app.prisma, {
+      from: query.from,
+      to: query.to,
+      granularity: query.granularity,
+      buckets: query.buckets ?? RATE_GRANULARITY_LIMITS[query.granularity].default,
+    });
+
+    return ok(result, request.id);
   });
 }
