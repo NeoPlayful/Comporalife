@@ -403,12 +403,12 @@ export async function getSystemMetrics(prisma: PrismaClient, appVersion: string)
 }
 
 /**
- * 角色变更的保护规则集中在这里，避免每个路由各写一遍。
- * 最后一个超级管理员一旦被降级，系统就永久失去管理入口。
+ * 启用/禁用账号的保护规则集中在这里，避免每个路由各写一遍。
+ * 最后一个超级管理员一旦被禁用，系统就永久失去管理入口。
  */
 export async function assertRoleChangeAllowed(
   prisma: PrismaClient,
-  params: { actorId: string; targetId: string; action: 'grant' | 'revoke' | 'disable' },
+  params: { actorId: string; targetId: string; action: 'disable' },
 ): Promise<void> {
   if (params.actorId === params.targetId) {
     throw errors.adminSelfModification('不能修改自己的角色或状态');
@@ -421,12 +421,7 @@ export async function assertRoleChangeAllowed(
 
   if (!target) throw errors.notFound('用户不存在');
 
-  // 撤销权限对 admin 与 super_admin 都适用：后者是降级回普通用户
-  if (params.action === 'revoke' && target.role === 'user') {
-    throw errors.validation('目标用户不是管理员');
-  }
-
-  // 降级或禁用最后一个活跃超级管理员：直接拒绝
+  // 禁用最后一个活跃超级管理员：直接拒绝
   if (target.role === 'super_admin') {
     const activeSuperAdmins = await prisma.user.count({
       where: { role: 'super_admin', status: 'active' },

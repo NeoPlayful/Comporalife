@@ -223,17 +223,18 @@ export const adminApi = {
     role?: AdminRole;
     language?: string;
   }) => api.post<{ user: AdminUser }>('/api/admin/users', body),
-  /** 授予管理员前的候选账号检索（按邮箱或 ID） */
-  searchUsers: (query: string) =>
-    api.get<{ users: Array<{ id: string; email: string; nickname: string; role: AdminRole; status: string }> }>(
-      `/api/admin/users/search?query=${encodeURIComponent(query)}`,
-    ),
   user: (id: string) => api.get<{ user: AdminUser }>(`/api/admin/users/${id}`),
   /** 只改昵称、邮箱、语言；密码与角色各有独立接口 */
   updateUser: (
     id: string,
     body: { nickname?: string; email?: string; language?: string },
   ) => api.patch<{ user: AdminUser }>(`/api/admin/users/${id}`, body),
+  /** 改角色（仅超管）；服务端会校验不能改自己、不能降级最后一个超管 */
+  updateUserRole: (id: string, role: AdminRole) =>
+    api.patch<{ user: AdminUser }>(`/api/admin/users/${id}/role`, { role }),
+  /** 直接设置新密码：改后该用户全部会话失效 */
+  setUserPassword: (id: string, password: string) =>
+    api.post<{ id: string; updated: boolean }>(`/api/admin/users/${id}/password`, { password }),
   /** 默认软删除；permanent 时连同该用户全部财务数据物理清除，不可恢复（仅超管） */
   deleteUser: (id: string, options: { permanent?: boolean } = {}) =>
     api.delete<{ id: string; deleted: boolean; disposition: 'soft_deleted' | 'permanent' }>(
@@ -260,12 +261,6 @@ export const adminApi = {
   retryJob: (id: string) =>
     api.post<{ id: string; status: string; attempts: number }>(`/api/admin/jobs/${id}/retry`, {}),
 
-  admins: () =>
-    api.get<{ admins: Array<{ id: string; email: string; nickname: string; role: AdminRole; status: string; createdAt: string }> }>(
-      '/api/admin/admins',
-    ),
-  grant: (id: string) => api.post<{ id: string; role: string }>(`/api/admin/admins/${id}/grant`, {}),
-  revoke: (id: string) => api.post<{ id: string; role: string }>(`/api/admin/admins/${id}/revoke`, {}),
   permissions: () => api.get<AdminPermissions>('/api/admin/permissions/me'),
 
   auditLogs: (filters: AdminAuditFilters = {}) => {

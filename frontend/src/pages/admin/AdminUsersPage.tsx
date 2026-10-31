@@ -1,5 +1,5 @@
 import UserCreateDialog, { type UserCreateInput } from '@/components/admin/UserCreateDialog';
-import UserDetailDrawer, { type UserAction } from '@/components/admin/UserDetailDrawer';
+import type { UserAction } from '@/components/admin/UserDetailPanel';
 import UserEditDialog, { type UserEditInput } from '@/components/admin/UserEditDialog';
 import UserStats from '@/components/admin/UserStats';
 import UserTable, { type RowAction } from '@/components/admin/UserTable';
@@ -97,8 +97,6 @@ export default function AdminUsersPage() {
     queryFn: () => adminApi.settingsOverview(),
   });
 
-  const openUser = usersQuery.data?.data.users.find((item) => item.id === openUserId) ?? null;
-
   const detailQuery = useQuery({
     queryKey: ['admin', 'user', openUserId],
     queryFn: () => adminApi.user(openUserId!),
@@ -147,12 +145,28 @@ export default function AdminUsersPage() {
     onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
   });
 
+  // 编辑弹窗一次提交可能要打到三个接口：资料、角色、密码。
+  // 顺序执行而非并行：任一步失败都应让整次编辑可见地失败，而不是静默半成功。
   const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UserEditInput }) =>
-      adminApi.updateUser(id, input),
-    onSuccess: (result) => {
+    mutationFn: async ({ id, input }: { id: string; input: UserEditInput }) => {
+      const { role, password, ...profile } = input;
+      let email = '';
+      if (Object.keys(profile).length > 0) {
+        const res = await adminApi.updateUser(id, profile);
+        email = res.user.email;
+      }
+      if (role) {
+        const res = await adminApi.updateUserRole(id, role);
+        email = res.user.email;
+      }
+      if (password) {
+        await adminApi.setUserPassword(id, password);
+      }
+      return { email };
+    },
+    onSuccess: ({ email }) => {
       setEditing(null);
-      toastSuccess(t('users.edit_success', { email: result.user.email }));
+      toastSuccess(t('users.edit_success', { email }));
       void queryClient.invalidateQueries({ queryKey: ['admin'] });
     },
     onError: (err) => toastError(err instanceof ApiError ? translateError(err, t) : String(err)),
@@ -385,8 +399,15 @@ export default function AdminUsersPage() {
       {list.length > 0 && (
         <UserTable
           users={list}
-          onOpen={(user) => setOpenUserId(user.id)}
+          openUserId={openUserId}
+          openDetail={detailQuery.data?.user ?? null}
+          detailPending={detailQuery.isFetching && !detailQuery.data}
+          actionPending={act.isPending}
+          onToggleDetail={(user) =>
+            setOpenUserId((current) => (current === user.id ? null : user.id))
+          }
           onAction={requestRowAction}
+          onDetailAction={requestAction}
           busyUserId={act.isPending || remove.isPending ? (act.variables?.id ?? deleteTarget?.id ?? null) : null}
         />
       )}
@@ -403,15 +424,6 @@ export default function AdminUsersPage() {
         />
       )}
 
-      <UserDetailDrawer
-        user={openUser}
-        detail={detailQuery.data?.user ?? null}
-        pending={detailQuery.isFetching && !detailQuery.data}
-        actionPending={act.isPending}
-        onClose={() => setOpenUserId(null)}
-        onAction={requestAction}
-      />
-
       <UserCreateDialog
         open={creating}
         canAssignRole={canManageAdmins}
@@ -423,6 +435,7 @@ export default function AdminUsersPage() {
       <UserEditDialog
         user={editing}
         saving={update.isPending}
+        canManageRole={canManageAdmins}
         onClose={() => setEditing(null)}
         onSubmit={(input) => editing && update.mutate({ id: editing.id, input })}
       />

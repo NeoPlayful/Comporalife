@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Settings,
   ShieldCheck,
-  UserCog,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -16,7 +15,6 @@ import type { NavItem } from './Sidebar';
 const ADMIN_NAV_KEYS: { to: string; key: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/admin', key: 'dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/users', key: 'users', icon: Users },
-  { to: '/admin/admins', key: 'admins', icon: UserCog },
   { to: '/admin/audit', key: 'audit', icon: History },
   { to: '/admin/exchange-rates', key: 'exchangeRates', icon: ArrowLeftRight },
   { to: '/admin/settings', key: 'settings', icon: Settings },

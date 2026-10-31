@@ -19,7 +19,8 @@
   "admin_actions": {
     "user_disabled": "An administrator disabled your account.",
     "user_enabled": "An administrator re-enabled your account.",
-    "deletion_rejected": "An administrator rejected your deletion request."
+    "deletion_rejected": "An administrator rejected your deletion request.",
+    "password_set": "An administrator reset your password. Please sign in again with the new password."
   },
   "empty": {
     "title": "No notifications",

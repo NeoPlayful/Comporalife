@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import argon2 from 'argon2';
 import { fromZonedTime } from 'date-fns-tz';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -30,9 +31,10 @@ import {
   adminUserCreateToggleSchema,
   adminUserIdSchema,
   adminUserListSchema,
-  adminUserSearchSchema,
   adminUserDeleteQuerySchema,
   adminUserUpdateSchema,
+  adminUserRoleSchema,
+  adminUserPasswordSchema,
 } from './admin.schema.js';
 import {
   assertRoleChangeAllowed,
@@ -119,39 +121,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     return ok({ users: result.items }, request.id, {
       pagination: buildPagination(page.page, page.pageSize, result.total),
     });
-  });
-
-  /**
-   * 授予管理员前的账号检索。
-   * 返回完整邮箱：管理员看不到明文就无法确认自己在给谁提权。
-   * 每次检索都写审计，避免被当成批量枚举用户邮箱的通道。
-   */
-  app.get('/admin/users/search', { preHandler: app.authenticate }, async (request) => {
-    const actor = requireSuperAdmin(request);
-    const { query } = adminUserSearchSchema.parse(request.query);
-
-    const rows = await app.prisma.user.findMany({
-      where: {
-        OR: [
-          { email: { contains: query, mode: 'insensitive' } },
-          ...(/^[0-9a-f-]{36}$/i.test(query) ? [{ id: query }] : []),
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      select: { id: true, email: true, nickname: true, role: true, status: true },
-    });
-
-    await app.prisma.auditLog.create({
-      data: {
-        userId: actor.userId,
-        action: 'admin.user_searched',
-        targetType: 'user',
-        ip: request.ip,
-      },
-    });
-
-    return ok({ users: rows }, request.id);
   });
 
   /**
@@ -407,6 +376,109 @@ export default async function adminRoutes(app: FastifyInstance) {
     return ok({ id, status: 'active' }, request.id);
   });
 
+  /**
+   * 修改角色（仅超管）。
+   *
+   * 角色是提权操作：普通 admin 若能改角色，就能把自己提成超管，
+   * 因此这里必须走 requireSuperAdmin，而不是 requireAdmin。
+   * 两条硬约束：不能改自己（避免自锁或自我提权），不能把最后一个活跃超管降级
+   * （否则系统永久失去管理入口）。改动会递增 sessionVersion，旧令牌立即失效。
+   */
+  app.patch('/admin/users/:id/role', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireSuperAdmin(request);
+    const { id } = adminUserIdSchema.parse(request.params);
+    const { role } = adminUserRoleSchema.parse(request.body);
+
+    if (actor.userId === id) throw errors.adminSelfModification('不能修改自己的角色');
+
+    const target = await app.prisma.user.findUnique({ where: { id }, select: { role: true } });
+    if (!target) throw errors.notFound('用户不存在');
+
+    if (target.role === role) {
+      // 角色未变：不写库也不写审计，避免堆满「改了但没变」的记录
+      return ok({ user: await getUserDetail(app.prisma, id) }, request.id);
+    }
+
+    // 降级最后一个活跃超管会让系统失去管理入口，直接拒绝
+    if (target.role === 'super_admin') {
+      const activeSuperAdmins = await app.prisma.user.count({
+        where: { role: 'super_admin', status: 'active' },
+      });
+      if (activeSuperAdmins <= 1) {
+        throw errors.adminLastSuperAdmin();
+      }
+    }
+
+    await app.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: { role, sessionVersion: { increment: 1 } },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'admin.role_changed',
+          targetType: 'user',
+          targetId: id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+          metadata: { from: target.role, to: role },
+        },
+      });
+    });
+
+    return ok({ user: await getUserDetail(app.prisma, id) }, request.id);
+  });
+
+  /**
+   * 直接设置新密码。
+   *
+   * 管理员无需知道旧密码：这是「账号被锁、用户联系不上」时的处置手段。
+   * 改密会递增 sessionVersion 并撤销该用户全部会话——否则旧令牌仍能继续使用，
+   * 等于改了密码却没把人踢下线。审计只记「改过密码」，绝不记录密码本身。
+   */
+  app.post('/admin/users/:id/password', { preHandler: app.authenticate }, async (request) => {
+    const actor = requireAdmin(request);
+    const { id } = adminUserIdSchema.parse(request.params);
+    const { password } = adminUserPasswordSchema.parse(request.body);
+
+    const target = await app.prisma.user.findUnique({
+      where: { id },
+      select: { deletedAt: true },
+    });
+    if (!target) throw errors.notFound('用户不存在');
+    if (target.deletedAt) throw errors.conflict('该账号已注销，不能修改密码', { reason: 'account_deleted' });
+
+    const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+
+    await app.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+      });
+      await tx.userSession.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } });
+      await tx.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'admin.password_set',
+          targetType: 'user',
+          targetId: id,
+          ip: request.ip,
+          userAgent: request.headers['user-agent'],
+        },
+      });
+    });
+
+    await createNotification(app.prisma, {
+      userId: id,
+      kind: 'admin_action',
+      metadata: { action: 'password_set' },
+      link: null,
+    });
+
+    return ok({ id, updated: true }, request.id);
+  });
+
   app.post('/admin/users/:id/revoke-sessions', { preHandler: app.authenticate }, async (request) => {
     const actor = requireAdmin(request);
     const { id } = adminUserIdSchema.parse(request.params);
@@ -599,76 +671,6 @@ export default async function adminRoutes(app: FastifyInstance) {
     });
 
     return ok({ id, decision: 'approve', status: 'disabled', disposition: 'soft_deleted' }, request.id);
-  });
-
-  // ===== 管理员权限（仅 super_admin） =====
-  app.get('/admin/admins', { preHandler: app.authenticate }, async (request) => {
-    requireSuperAdmin(request);
-
-    const rows = await app.prisma.user.findMany({
-      where: { role: { in: ['admin', 'super_admin'] } },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, email: true, nickname: true, role: true, status: true, createdAt: true },
-    });
-
-    return ok(
-      {
-        admins: rows.map((row) => ({
-          id: row.id,
-          email: row.email.replace(/(.).*(@.*)/, '$1***$2'),
-          nickname: row.nickname,
-          role: row.role,
-          status: row.status,
-          createdAt: row.createdAt.toISOString(),
-        })),
-      },
-      request.id,
-    );
-  });
-
-  app.post('/admin/admins/:id/grant', { preHandler: app.authenticate }, async (request) => {
-    const actor = requireSuperAdmin(request);
-    const { id } = adminUserIdSchema.parse(request.params);
-
-    if (actor.userId === id) throw errors.adminSelfModification('不能给自己授予管理员权限');
-
-    const target = await app.prisma.user.findUnique({ where: { id }, select: { role: true } });
-    if (!target) throw errors.notFound('用户不存在');
-    if (target.role === 'super_admin') throw errors.validation('目标用户已是超级管理员');
-
-    await app.prisma.$transaction(async (tx) => {
-      // 提权必须让现有会话失效：否则旧令牌仍带 user 角色
-      await tx.user.update({
-        where: { id },
-        data: { role: 'admin', sessionVersion: { increment: 1 } },
-      });
-      await tx.auditLog.create({
-        data: { userId: actor.userId, action: 'admin.role_granted', targetType: 'user', targetId: id },
-      });
-    });
-
-    return ok({ id, role: 'admin' }, request.id);
-  });
-
-  app.post('/admin/admins/:id/revoke', { preHandler: app.authenticate }, async (request) => {
-    const actor = requireSuperAdmin(request);
-    const { id } = adminUserIdSchema.parse(request.params);
-
-    if (actor.userId === id) throw errors.adminSelfModification('不能撤销自己的管理员权限');
-
-    await assertRoleChangeAllowed(app.prisma, { actorId: actor.userId, targetId: id, action: 'revoke' });
-
-    await app.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id },
-        data: { role: 'user', sessionVersion: { increment: 1 } },
-      });
-      await tx.auditLog.create({
-        data: { userId: actor.userId, action: 'admin.role_revoked', targetType: 'user', targetId: id },
-      });
-    });
-
-    return ok({ id, role: 'user' }, request.id);
   });
 
   app.get('/admin/permissions/me', { preHandler: app.authenticate }, async (request) => {

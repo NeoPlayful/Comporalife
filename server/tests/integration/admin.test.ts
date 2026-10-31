@@ -85,13 +85,12 @@ describe('访问控制', () => {
     expect(res.json().error.code).toBe('ADMIN_FORBIDDEN');
   });
 
-  it('普通用户看不到管理员列表', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/admin/admins', headers: auth(userToken) });
-    expect(res.statusCode).toBe(403);
-  });
-
   it('admin 访问仅限 super_admin 的接口返回 403', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/admin/admins', headers: auth(adminToken) });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/admin/settings/user-creation',
+      headers: auth(adminToken),
+    });
     expect(res.statusCode).toBe(403);
   });
 
@@ -698,27 +697,6 @@ describe('权限保护', () => {
     expect(res.json().error.code).toBe('ADMIN_SELF_MODIFICATION');
   });
 
-  it('不能给自己授予管理员权限', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/admin/admins/${superId}/grant`,
-      headers: auth(superToken),
-    });
-
-    expect(res.statusCode).toBe(422);
-    expect(res.json().error.code).toBe('ADMIN_SELF_MODIFICATION');
-  });
-
-  it('不能撤销自己的权限', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/admin/admins/${superId}/revoke`,
-      headers: auth(superToken),
-    });
-
-    expect(res.statusCode).toBe(422);
-  });
-
   it('管理员不能禁用唯一的超级管理员', async () => {
     // 开发库里可能存在真实超管，降级范围必须可回滚，否则跑测试会破坏本地账号
     const others = await app.prisma.user.findMany({
@@ -749,83 +727,124 @@ describe('权限保护', () => {
     }
   });
 
-  it('存在多个超管时可以正常降级其中一个', async () => {
-    const second = await createUser(app, DOMAIN, 'second-super');
-    await app.prisma.user.update({ where: { id: second.userId }, data: { role: 'super_admin' } });
-
+  it('超管可以把普通用户提升为管理员', async () => {
     const res = await app.inject({
-      method: 'POST',
-      url: `/api/admin/admins/${second.userId}/revoke`,
+      method: 'PATCH',
+      url: `/api/admin/users/${userId}/role`,
       headers: auth(superToken),
+      payload: { role: 'admin' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect((await app.prisma.user.findUniqueOrThrow({ where: { id: userId } })).role).toBe('admin');
+  });
+
+  it('普通管理员不能改角色（仅超管）', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${userId}/role`,
+      headers: auth(adminToken),
+      payload: { role: 'admin' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expect((await app.prisma.user.findUniqueOrThrow({ where: { id: userId } })).role).toBe('user');
+  });
+
+  it('不能修改自己的角色', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${superId}/role`,
+      headers: auth(superToken),
+      payload: { role: 'admin' },
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json().error.code).toBe('ADMIN_SELF_MODIFICATION');
+  });
+
+  it('存在多个超管时可以降级其中一个', async () => {
+    const second = await createUser(app, DOMAIN, 'second-super');
+    await promote(second.userId, 'super_admin');
+
+    // 此时至少有两个活跃超管，降级其一不会锁死系统
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${second.userId}/role`,
+      headers: auth(superToken),
+      payload: { role: 'user' },
     });
 
     expect(res.statusCode).toBe(200);
     expect((await app.prisma.user.findUniqueOrThrow({ where: { id: second.userId } })).role).toBe('user');
   });
 
-  it('授予管理员后旧 token 因 sessionVersion 递增而失效', async () => {
-    const target = await createUser(app, DOMAIN, 'become-admin');
+  it('改角色后旧 token 因 sessionVersion 递增而失效', async () => {
+    const target = await createUser(app, DOMAIN, 'role-change');
 
     const res = await app.inject({
-      method: 'POST',
-      url: `/api/admin/admins/${target.userId}/grant`,
+      method: 'PATCH',
+      url: `/api/admin/users/${target.userId}/role`,
       headers: auth(superToken),
+      payload: { role: 'admin' },
     });
     expect(res.statusCode).toBe(200);
 
     const me = await app.inject({ method: 'GET', url: '/api/profile', headers: auth(target.token) });
     expect(me.statusCode).toBe(401);
   });
-});
 
-describe('管理员检索', () => {
-  it('按邮箱片段检索候选账号并返回完整邮箱', async () => {
+  it('管理员可以设置新密码，且撤销该用户所有会话', async () => {
+    const target = await createUser(app, DOMAIN, 'pwd-target');
+
     const res = await app.inject({
-      method: 'GET',
-      url: '/api/admin/users/search?query=plain',
-      headers: auth(superToken),
+      method: 'POST',
+      url: `/api/admin/users/${target.userId}/password`,
+      headers: auth(adminToken),
+      payload: { password: 'NewPass456' },
     });
-
     expect(res.statusCode).toBe(200);
-    const users = res.json().data.users as Array<{ email: string }>;
-    expect(users.length).toBeGreaterThan(0);
-    // 提权前必须能确认对象是谁，因此这里不脱敏
-    expect(users.some((item) => item.email.includes('@') && !item.email.includes('***'))).toBe(true);
+
+    // 旧 token 失效
+    const me = await app.inject({ method: 'GET', url: '/api/profile', headers: auth(target.token) });
+    expect(me.statusCode).toBe(401);
+
+    // 旧密码登录失败，新密码可登录
+    const oldLogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: target.email, password: 'TestPass123' },
+    });
+    expect(oldLogin.statusCode).toBe(401);
+
+    const newLogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: target.email, password: 'NewPass456' },
+    });
+    expect(newLogin.statusCode).toBe(200);
   });
 
-  it('检索写审计，且审计里不记录检索词', async () => {
+  it('改密码弱口令被拒绝，且审计不含密码', async () => {
+    const weak = await app.inject({
+      method: 'POST',
+      url: `/api/admin/users/${userId}/password`,
+      headers: auth(adminToken),
+      payload: { password: 'short' },
+    });
+    expect(weak.statusCode).toBe(400);
+
     await app.inject({
-      method: 'GET',
-      url: '/api/admin/users/search?query=plain',
-      headers: auth(superToken),
+      method: 'POST',
+      url: `/api/admin/users/${userId}/password`,
+      headers: auth(adminToken),
+      payload: { password: 'Strong789' },
     });
 
     const log = await app.prisma.auditLog.findFirstOrThrow({
-      where: { userId: superId, action: 'admin.user_searched' },
+      where: { targetId: userId, action: 'admin.password_set' },
     });
-    // 检索词本身可能包含邮箱片段，不落库
-    expect(JSON.stringify(log.metadata ?? {})).not.toContain('plain');
-  });
-
-  it('检索词过短返回 400', async () => {
-    const res = await app.inject({
-      method: 'GET',
-      url: '/api/admin/users/search?query=a',
-      headers: auth(superToken),
-    });
-
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('普通管理员不能调用账号检索（仅超管）', async () => {
-    const res = await app.inject({
-      method: 'GET',
-      url: '/api/admin/users/search?query=plain',
-      headers: auth(adminToken),
-    });
-
-    // 本用例里 adminToken 是 admin 角色，应被拒
-    expect(res.statusCode).toBe(403);
+    expect(JSON.stringify(log.metadata ?? {})).not.toContain('Strong789');
   });
 });
 

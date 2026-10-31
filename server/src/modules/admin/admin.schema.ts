@@ -50,7 +50,7 @@ export const adminUserCreateSchema = z.object({
 /**
  * 后台修改账号资料。
  *
- * 只允许改昵称、邮箱与语言：密码走独立的重置邮件流程，角色属于提权由 grant/revoke 负责，
+ * 只允许改昵称、邮箱与语言：密码走独立的设置接口，角色走独立的改角色接口，
  * 状态由 disable/enable 负责。全字段可选但至少要改一项，避免空请求写一条无变化的审计。
  */
 export const adminUserUpdateSchema = z
@@ -62,6 +62,19 @@ export const adminUserUpdateSchema = z
   .refine((value) => Object.values(value).some((field) => field !== undefined), {
     message: '至少需要修改一项',
   });
+
+/** 后台修改角色：三档枚举，越权（非超管）判断在路由层做 */
+export const adminUserRoleSchema = z.object({
+  role: z.enum(['super_admin', 'admin', 'user']),
+});
+
+/**
+ * 后台直接设置新密码。
+ * 与注册、自助改密共用同一套 passwordSchema，避免出现「后台能设弱密码」的旁路。
+ */
+export const adminUserPasswordSchema = z.object({
+  password: passwordSchema,
+});
 
 export const deletionReviewSchema = z.object({
   decision: z.enum(['approve', 'reject']),
@@ -107,7 +120,3 @@ export const adminAuditQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-/** 管理员授予前的账号搜索：按邮箱或 ID 定位候选用户 */
-export const adminUserSearchSchema = z.object({
-  query: z.string().trim().min(2, '至少输入 2 个字符').max(120),
-});

@@ -19,7 +19,8 @@
   "admin_actions": {
     "user_disabled": "管理员停用了你的账号。",
     "user_enabled": "管理员重新启用了你的账号。",
-    "deletion_rejected": "管理员驳回了你的注销申请。"
+    "deletion_rejected": "管理员驳回了你的注销申请。",
+    "password_set": "管理员已重置你的密码，请用新密码重新登录。"
   },
   "empty": {
     "title": "暂无通知",
