@@ -1,5 +1,5 @@
 import Modal from '@/components/ui/Modal';
-import type { AdminUser } from '@/lib/admin';
+import type { AdminRole, AdminUser } from '@/lib/admin';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +7,10 @@ export interface UserEditInput {
   nickname?: string;
   email?: string;
   language?: string;
+  /** 角色变更（仅超管可提交） */
+  role?: AdminRole;
+  /** 新密码；留空表示不改 */
+  password?: string;
 }
 
 const LANGUAGES = [
@@ -15,20 +19,24 @@ const LANGUAGES = [
 ];
 
 /**
- * 修改账号资料。
+ * 修改账号。
  *
- * 只提交真正改动过的字段：为空对象的请求只会写一条「改了但没变」的审计，
- * 而后端也据此判断是否落库。改邮箱会让账号重新标记为已验证（后端处理），
- * 因此这里明确提示新地址立即生效，避免管理员以为还要再走一次验证。
+ * 三件事在这里一起提交，但走的是三个独立接口：
+ * 昵称/邮箱/语言走资料接口，角色走改角色接口（仅超管），新密码走设置密码接口。
+ * 只提交真正改动过的部分——空提交只会产生一条「改了但没变」的审计。
+ * 改邮箱会让账号重新标记为已验证（后端处理），这里的提示要说清楚。
  */
 export default function UserEditDialog({
   user,
   saving,
+  canManageRole,
   onClose,
   onSubmit,
 }: {
   user: AdminUser | null;
   saving: boolean;
+  /** 是否允许修改角色：与后端 requireSuperAdmin 保持一致 */
+  canManageRole: boolean;
   onClose: () => void;
   onSubmit: (input: UserEditInput) => void;
 }) {
@@ -36,6 +44,8 @@ export default function UserEditDialog({
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [language, setLanguage] = useState('zh-CN');
+  const [role, setRole] = useState<AdminRole>('user');
+  const [password, setPassword] = useState('');
 
   // 每次打开都从该账号的当前值重建表单，避免残留上一次编辑的内容
   useEffect(() => {
@@ -43,6 +53,8 @@ export default function UserEditDialog({
     setNickname(user.nickname);
     setEmail(user.email);
     setLanguage('zh-CN');
+    setRole(user.role);
+    setPassword('');
   }, [user]);
 
   if (!user) return null;
@@ -52,13 +64,21 @@ export default function UserEditDialog({
 
   const nicknameChanged = nicknameTrimmed !== user.nickname;
   const emailChanged = emailTrimmed.toLowerCase() !== user.email.toLowerCase();
+  const roleChanged = canManageRole && role !== user.role;
+  const passwordChanged = password !== '';
+
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed);
   const nicknameOk = nicknameTrimmed.length > 0;
+  // 与后端 passwordSchema 对齐：至少 8 位且同时含字母与数字
+  const passwordOk = password.length >= 8 && /[a-zA-Z]/.test(password) && /\d/.test(password);
+
+  const profileChanged = nicknameChanged || emailChanged;
 
   const canSubmit =
     nicknameOk &&
     (!emailChanged || emailOk) &&
-    (nicknameChanged || emailChanged) &&
+    (!passwordChanged || passwordOk) &&
+    (profileChanged || roleChanged || passwordChanged) &&
     !saving;
 
   function submit() {
@@ -67,6 +87,8 @@ export default function UserEditDialog({
       ...(nicknameChanged ? { nickname: nicknameTrimmed } : {}),
       ...(emailChanged ? { email: emailTrimmed } : {}),
       ...(language !== 'zh-CN' ? { language } : {}),
+      ...(roleChanged ? { role } : {}),
+      ...(passwordChanged ? { password } : {}),
     });
   }
 
@@ -76,7 +98,7 @@ export default function UserEditDialog({
       size="lg"
       title={t('users.edit_title')}
       description={t('users.edit_description')}
-      dirty={nicknameChanged || emailChanged || language !== 'zh-CN'}
+      dirty={nicknameChanged || emailChanged || language !== 'zh-CN' || roleChanged || passwordChanged}
       busy={saving}
       onClose={onClose}
       footer={
@@ -143,20 +165,63 @@ export default function UserEditDialog({
           )}
         </label>
 
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="mb-1 block text-xs text-[var(--color-content-muted)]">
+              {t('users.create_language')}
+            </span>
+            <select className="input" value={language} onChange={(event) => setLanguage(event.target.value)}>
+              {LANGUAGES.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {canManageRole && (
+            <label className="block text-sm">
+              <span className="mb-1 block text-xs text-[var(--color-content-muted)]">
+                {t('users.role_title')}
+              </span>
+              <select
+                className="input"
+                value={role}
+                onChange={(event) => setRole(event.target.value as AdminRole)}
+              >
+                <option value="user">{t('roles.user')}</option>
+                <option value="admin">{t('roles.admin')}</option>
+                <option value="super_admin">{t('roles.super_admin')}</option>
+              </select>
+            </label>
+          )}
+        </div>
+
+        {canManageRole && roleChanged && (
+          <p className="text-xs text-[var(--color-content-muted)]">{t('users.role_hint')}</p>
+        )}
+
         <label className="block text-sm">
           <span className="mb-1 block text-xs text-[var(--color-content-muted)]">
-            {t('users.create_language')}
+            {t('users.password_new')}
           </span>
-          <select className="input" value={language} onChange={(event) => setLanguage(event.target.value)}>
-            {LANGUAGES.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          <input
+            className="input"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          {passwordChanged && !passwordOk ? (
+            <span className="mt-1 block text-xs text-[var(--color-negative)]">
+              {t('users.create_password_hint')}
+            </span>
+          ) : (
+            <span className="mt-1 block text-xs text-[var(--color-content-muted)]">
+              {t('users.password_note')}
+            </span>
+          )}
         </label>
-
-        <p className="text-xs text-[var(--color-content-muted)]">{t('users.edit_password_note')}</p>
       </div>
     </Modal>
   );

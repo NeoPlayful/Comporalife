@@ -1,4 +1,3 @@
-import Modal from '@/components/ui/Modal';
 import Pagination from '@/components/ui/Pagination';
 import { adminApi, type AdminUser } from '@/lib/admin';
 import { formatDateTime } from '@/lib/format';
@@ -97,13 +96,13 @@ function ActivityList({
 }
 
 /**
- * 账号详情抽屉。
+ * 账号详情面板（内联折叠）。
  *
- * 行内展开会把操作按钮和列表挤在一起，且一次只能看一个账号的细节；
- * 改成抽屉后列表保持可扫读，操作与记录集中在一处。
- * 破坏性操作交给页面的 ConfirmDialog，确认框会压在抽屉之上，只有它响应 Esc。
+ * 点击列表行后在该行下方就地展开，而不是从侧边推出抽屉：详情与列表共享同一
+ * 上下文，滚回列表也不会丢失定位。破坏性操作交给页面的 ConfirmDialog。
+ * 一次只展开一个账号，由外层控制哪个 id 处于展开态。
  */
-export default function UserDetailDrawer({
+export default function UserDetailPanel({
   user,
   detail,
   pending,
@@ -111,7 +110,7 @@ export default function UserDetailDrawer({
   onClose,
   onAction,
 }: {
-  user: AdminUser | null;
+  user: AdminUser;
   /** 详情接口返回的完整数据，含会话数；未取到前先用列表行兜底 */
   detail: AdminUser | null;
   pending: boolean;
@@ -122,8 +121,6 @@ export default function UserDetailDrawer({
   const { t } = useTranslation('admin');
   const [tab, setTab] = useState<'logins' | 'audit'>('logins');
   const [page, setPage] = useState(1);
-
-  if (!user) return null;
 
   const data = detail ?? user;
   const deleted = Boolean(data.deletedAt);
@@ -136,56 +133,9 @@ export default function UserDetailDrawer({
   }
 
   return (
-    <Modal
-      open
-      variant="drawer"
-      size="lg"
-      title={t('users.selected_user')}
-      onClose={onClose}
-      footer={
-        <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm"
-          >
-            {t('common:actions.close')}
-          </button>
-          {!deleted &&
-            (disabled ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onAction('enable', user)}
-                className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
-              >
-                {t('users.enable')}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onAction('disable', user)}
-                className="rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-600 disabled:opacity-50 dark:text-red-400"
-              >
-                {t('users.disable')}
-              </button>
-            ))}
-          {!deleted && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onAction('reset-mail', user)}
-              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
-            >
-              {t('users.reset_mail')}
-            </button>
-          )}
-        </>
-      }
-    >
-      <div className="space-y-5">
-        <div className="flex items-start gap-3">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <span
             aria-hidden
             className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)]/12 text-lg font-semibold text-[var(--color-accent)]"
@@ -202,45 +152,54 @@ export default function UserDetailDrawer({
             </div>
           </div>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs text-[var(--color-content-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+        >
+          {t('users.collapse_detail')}
+        </button>
+      </div>
 
-        {data.deletionRequestedAt && (
-          <div className="rounded-lg border border-[var(--color-border-subtle)] p-3">
-            <p className="mb-1 text-xs font-medium text-[var(--color-content-muted)]">
-              {t('users.detail_deletion_title')}
-            </p>
-            <p className="text-sm">
-              {data.deletedAt
-                ? t('users.detail_deleted_at', { time: formatDateTime(data.deletedAt) })
-                : data.coolingOffElapsed
-                  ? t('users.detail_cooling_done')
-                  : t('users.deletion_cooling', {
-                      time: formatDateTime(data.deletionRequestedAt),
-                    })}
-            </p>
-            {!data.deletedAt && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={busy || !data.coolingOffElapsed}
-                  title={data.coolingOffElapsed ? undefined : t('users.cooling_off_pending')}
-                  onClick={() => onAction('deletion', user)}
-                  className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-xs text-red-600 disabled:opacity-40 dark:text-red-400"
-                >
-                  {t('users.approve_deletion')}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onAction('reject-deletion', user)}
-                  className="rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs disabled:opacity-50"
-                >
-                  {t('users.reject_deletion')}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+      {data.deletionRequestedAt && (
+        <div className="rounded-lg border border-[var(--color-border-subtle)] p-3">
+          <p className="mb-1 text-xs font-medium text-[var(--color-content-muted)]">
+            {t('users.detail_deletion_title')}
+          </p>
+          <p className="text-sm">
+            {data.deletedAt
+              ? t('users.detail_deleted_at', { time: formatDateTime(data.deletedAt) })
+              : data.coolingOffElapsed
+                ? t('users.detail_cooling_done')
+                : t('users.deletion_cooling', {
+                    time: formatDateTime(data.deletionRequestedAt),
+                  })}
+          </p>
+          {!data.deletedAt && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy || !data.coolingOffElapsed}
+                title={data.coolingOffElapsed ? undefined : t('users.cooling_off_pending')}
+                onClick={() => onAction('deletion', user)}
+                className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-xs text-red-600 disabled:opacity-40 dark:text-red-400"
+              >
+                {t('users.approve_deletion')}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onAction('reject-deletion', user)}
+                className="rounded-lg border border-[var(--color-border-subtle)] px-2.5 py-1.5 text-xs disabled:opacity-50"
+              >
+                {t('users.reject_deletion')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
+      <div className="grid gap-5 md:grid-cols-2">
         <section>
           <h3 className="mb-1 text-sm font-semibold">{t('users.detail_account')}</h3>
           <InfoRow label={t('users.col_joined')} value={formatDateTime(data.createdAt)} />
@@ -288,9 +247,7 @@ export default function UserDetailDrawer({
                   onClick={() => switchTab(value)}
                   aria-pressed={tab === value}
                   className={`rounded-md px-2.5 py-1 ${
-                    tab === value
-                      ? 'btn-action'
-                      : 'hover:bg-black/5 dark:hover:bg-white/5'
+                    tab === value ? 'btn-action' : 'hover:bg-black/5 dark:hover:bg-white/5'
                   }`}
                 >
                   {value === 'logins' ? t('users.login_logs') : t('users.audit_logs')}
@@ -300,18 +257,50 @@ export default function UserDetailDrawer({
           </div>
           <ActivityList tab={tab} userId={user.id} page={page} onPageChange={setPage} />
         </section>
+      </div>
 
+      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--color-border-subtle)] pt-3">
+        {!deleted &&
+          (disabled ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onAction('enable', user)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {t('users.enable')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onAction('disable', user)}
+              className="rounded-lg border border-red-500/40 px-3 py-2 text-sm text-red-600 disabled:opacity-50 dark:text-red-400"
+            >
+              {t('users.disable')}
+            </button>
+          ))}
         {!deleted && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onAction('revoke', user)}
-            className="w-full rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {t('users.revoke_sessions')}
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onAction('reset-mail', user)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {t('users.reset_mail')}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onAction('revoke', user)}
+              className="rounded-lg border border-[var(--color-border-subtle)] px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {t('users.revoke_sessions')}
+            </button>
+          </>
         )}
       </div>
-    </Modal>
+    </div>
   );
 }

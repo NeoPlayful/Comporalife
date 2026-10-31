@@ -117,7 +117,10 @@
     "edit_nickname_required": "Nickname is required",
     "edit_email_invalid": "Invalid email address",
     "edit_email_note": "The new email takes effect immediately and is treated as verified.",
-    "edit_password_note": "To reset the password, send a reset email from the account details.",
+    "role_title": "Role",
+    "role_hint": "Changing the role immediately invalidates this user's existing sessions. Only super admins can change roles, and they cannot change their own.",
+    "password_new": "New password",
+    "password_note": "Leave blank to keep the current password. After setting one, all of this user's sessions end immediately and they must sign in with the new password. Deliver it through a secure channel.",
     "delete_confirm": "The account will be disabled and marked as deleted. Data is retained but sign-in is blocked. This cannot be undone.",
     "delete_success": "Account deleted",
     "delete_soft": "Soft delete (keep data)",
@@ -128,6 +131,7 @@
     "delete_permanent_submit": "Delete permanently",
     "delete_permanent_success": "Account permanently deleted",
     "selected_user": "Account details",
+    "collapse_detail": "Collapse",
     "detail_account": "Account",
     "detail_activity": "Activity",
     "detail_sessions": "{{count}} active session(s)",
@@ -152,23 +156,6 @@
     "col_email": "Email",
     "col_sessions": "Sessions",
     "email_verified": "Verified"
-  },
-  "admins": {
-    "title": "Admins",
-    "empty": "No admins",
-    "current": "Current admins",
-    "candidates": "Matching accounts",
-    "search": "Search",
-    "no_candidates": "No matching accounts",
-    "already_admin": "Already an admin",
-    "grant": "Grant admin",
-    "revoke": "Revoke admin",
-    "grant_hint": "Search by email or user ID",
-    "grant_placeholder": "Email or user ID",
-    "grant_confirm": "Grant admin rights to {{email}}? Their sessions end immediately.",
-    "revoke_confirm": "Revoke admin rights from {{email}}?",
-    "self_protection": "You cannot change your own role",
-    "last_super_admin": "The last super admin cannot be demoted or disabled"
   },
   "audit": {
     "title": "Audit log",
@@ -202,15 +189,12 @@
       "admin.user_enabled": "Enabled an account",
       "admin.sessions_revoked": "Revoked all sessions",
       "admin.password_reset_triggered": "Triggered password reset",
-      "admin.role_granted": "Granted admin",
-      "admin.role_revoked": "Revoked admin",
       "admin.deletion_approved": "Approved deletion",
       "admin.deletion_rejected": "Rejected deletion",
       "admin.registration_toggled": "Toggled registration",
       "admin.email_verification_toggled": "Toggled email verification",
       "admin.job_retried": "Retried a job",
-      "admin.user_revealed": "Viewed full account",
-      "admin.user_searched": "Searched accounts"
+      "admin.user_revealed": "Viewed full account"
     }
   },
   "auditActions": {
@@ -224,8 +208,6 @@
     "admin.user_purged": "Permanently deleted account",
     "admin.sessions_revoked": "Revoked all sessions",
     "admin.password_reset_triggered": "Triggered password reset",
-    "admin.role_granted": "Granted admin",
-    "admin.role_revoked": "Revoked admin",
     "admin.deletion_approved": "Approved deletion",
     "admin.deletion_rejected": "Rejected deletion",
     "admin.user_revealed": "Viewed full account"

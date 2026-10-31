@@ -117,7 +117,10 @@
     "edit_nickname_required": "昵称不能为空",
     "edit_email_invalid": "邮箱格式不正确",
     "edit_email_note": "修改邮箱后立即生效，并视为已验证。",
-    "edit_password_note": "如需重置密码，请在账号详情里发送重置邮件。",
+    "role_title": "角色",
+    "role_hint": "变更角色会立即让该用户的现有登录失效。仅超级管理员可修改角色，且不能修改自己的角色。",
+    "password_new": "新密码",
+    "password_note": "留空表示不改密码。设置后该用户的所有登录会话将立即失效，需用新密码重新登录，请通过安全渠道告知用户。",
     "delete_confirm": "账号将被停用并标记为已注销，数据保留但无法再登录。此操作不能撤回。",
     "delete_success": "账号已注销",
     "delete_soft": "软删除（保留数据）",
@@ -128,6 +131,7 @@
     "delete_permanent_submit": "永久删除",
     "delete_permanent_success": "账号已永久删除",
     "selected_user": "账号详情",
+    "collapse_detail": "收起详情",
     "detail_account": "账号信息",
     "detail_activity": "活动记录",
     "detail_sessions": "{{count}} 个活跃会话",
@@ -152,23 +156,6 @@
     "col_email": "邮箱验证",
     "col_sessions": "会话",
     "email_verified": "已验证"
-  },
-  "admins": {
-    "title": "管理员",
-    "empty": "没有管理员",
-    "current": "当前管理员",
-    "candidates": "候选账号",
-    "search": "搜索",
-    "no_candidates": "没有匹配的账号",
-    "already_admin": "已是管理员",
-    "grant": "授予管理员",
-    "revoke": "撤销管理员",
-    "grant_hint": "输入邮箱或用户 ID 搜索账号",
-    "grant_placeholder": "邮箱或用户 ID",
-    "grant_confirm": "授予 {{email}} 管理员权限？其现有会话会立即失效。",
-    "revoke_confirm": "撤销 {{email}} 的管理员权限？",
-    "self_protection": "不能修改自己的角色",
-    "last_super_admin": "最后一个超级管理员不能被降级或禁用"
   },
   "audit": {
     "title": "审计日志",
@@ -202,15 +189,12 @@
       "admin.user_enabled": "启用账号",
       "admin.sessions_revoked": "撤销全部会话",
       "admin.password_reset_triggered": "触发密码重置",
-      "admin.role_granted": "授予管理员",
-      "admin.role_revoked": "撤销管理员",
       "admin.deletion_approved": "批准注销",
       "admin.deletion_rejected": "驳回注销",
       "admin.registration_toggled": "切换公开注册",
       "admin.email_verification_toggled": "切换邮箱验证",
       "admin.job_retried": "重试后台任务",
-      "admin.user_revealed": "查看完整账号",
-      "admin.user_searched": "检索账号"
+      "admin.user_revealed": "查看完整账号"
     }
   },
   "auditActions": {
@@ -224,8 +208,6 @@
     "admin.user_purged": "永久删除账号",
     "admin.sessions_revoked": "撤销全部会话",
     "admin.password_reset_triggered": "触发密码重置",
-    "admin.role_granted": "授予管理员",
-    "admin.role_revoked": "撤销管理员",
     "admin.deletion_approved": "批准注销",
     "admin.deletion_rejected": "驳回注销",
     "admin.user_revealed": "查看完整账号"
