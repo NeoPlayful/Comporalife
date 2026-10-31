@@ -49,7 +49,46 @@
       "required_badge": "常用",
       "empty_title": "列表还是空的",
       "empty_description": "从上方添加你想关注的币种对。默认会显示你持有的外币与基准币种之间的汇率。",
-      "missing_hint": "标记为「暂无数据」的币种对需要后台补录汇率，或等待自动同步。"
+      "missing_hint": "标记为「暂无数据」的币种对需要后台补录汇率，或等待自动同步。",
+      "view_trend": "查看 {{from}}→{{to}} 走势"
+    },
+    "history": {
+      "title": "汇率走势",
+      "description": "{{fromName}} 兑 {{toName}}，点开即可查看日、周、月、季、年走势。",
+      "inverted_hint": "本图为反向汇率 {{from}}→{{to}} 取倒数后的走势。",
+      "granularity_label": "粒度",
+      "granularity": {
+        "day": "日",
+        "week": "周",
+        "month": "月",
+        "quarter": "季",
+        "year": "年"
+      },
+      "range_30d": "近 30 天",
+      "range_90d": "近 90 天",
+      "range_1y": "近 1 年",
+      "range_26w": "近 26 周",
+      "range_3y": "近 3 年",
+      "range_12m": "近 12 月",
+      "range_5y": "近 5 年",
+      "range_10y": "近 10 年",
+      "range_2y": "近 2 年",
+      "range_20y": "近 20 年",
+      "range_50y": "近 50 年",
+      "current": "当前汇率",
+      "change_vs_prev": "较上一{{unit}}",
+      "prev_value": "上一期 {{rate}}",
+      "change_in_range": "区间涨跌",
+      "to_now": "至今",
+      "period": "周期",
+      "samples": "样本数",
+      "samples_value": "{{count}} 天",
+      "detail_total": "共 {{total}} 期",
+      "prev": "上一页",
+      "next": "下一页",
+      "single_point": "目前仅有一期数据（{{date}}），历史会随汇率同步逐步积累。",
+      "empty_title": "该粒度下暂无历史数据",
+      "empty_description": "汇率历史从系统开始同步的那天起逐日积累，暂时还没有这一粒度下的数据。"
     }
   },
   "security": {

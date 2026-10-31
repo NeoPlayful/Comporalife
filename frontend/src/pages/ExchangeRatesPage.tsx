@@ -1,4 +1,5 @@
 import CurrencyPair from '@/components/finance/CurrencyPair';
+import RateTrendDialog from '@/components/finance/RateTrendDialog';
 import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import LoadingState from '@/components/ui/LoadingState';
@@ -28,6 +29,8 @@ export default function ExchangeRatesPage() {
 
   const [picking, setPicking] = useState(false);
   const [draft, setDraft] = useState({ from: 'USD', to: 'CNY' });
+  // 正在查看走势的币种对；null 表示抽屉关闭
+  const [trendPair, setTrendPair] = useState<{ from: string; to: string } | null>(null);
 
   const queryKey = ['exchange-rates', 'watchlist'];
   const viewQuery = useQuery({
@@ -254,25 +257,51 @@ export default function ExchangeRatesPage() {
           {/* 移动端卡片：自选行数少，逐张可读优于横向滚动表格 */}
           <ul className="space-y-2 sm:hidden">
             {entries.map((entry) => (
-              <li key={`${entry.from}->${entry.to}`} className="card space-y-1 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <CurrencyPair from={entry.from} to={entry.to} className="text-sm" />
-                  <button
-                    type="button"
-                    onClick={() => remove.mutate({ from: entry.from, to: entry.to })}
-                    disabled={busy}
-                    aria-label={t('exchange_rates.page.remove_pair')}
-                    className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)] disabled:opacity-50"
-                  >
-                    <Trash2 className="size-4" aria-hidden />
-                  </button>
-                </div>
-                <p className="font-mono text-lg tabular-nums">{entry.rate ? formatRate(entry.rate) : '—'}</p>
-                <p className="text-xs text-[var(--color-content-muted)]">
-                  {entry.rate
-                    ? `${formatDate(entry.rateDate!)} · ${t(`exchange_rates.page.state.${entry.state}`)}`
-                    : t('exchange_rates.page.state.missing_hint')}
-                </p>
+              <li key={`${entry.from}->${entry.to}`}>
+                <button
+                  type="button"
+                  onClick={() => setTrendPair({ from: entry.from, to: entry.to })}
+                  aria-label={t('exchange_rates.page.view_trend', {
+                    from: entry.from,
+                    to: entry.to,
+                  })}
+                  className="card w-full space-y-1 p-3 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <CurrencyPair from={entry.from} to={entry.to} className="text-sm" />
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => {
+                        // 删除是卡片内的独立操作：阻止冒泡，避免顺带打开走势
+                        event.stopPropagation();
+                        remove.mutate({ from: entry.from, to: entry.to });
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.stopPropagation();
+                          event.preventDefault();
+                          remove.mutate({ from: entry.from, to: entry.to });
+                        }
+                      }}
+                      aria-label={t('exchange_rates.page.remove_pair')}
+                      aria-disabled={busy || undefined}
+                      className={`text-[var(--color-content-muted)] hover:text-[var(--color-negative)] ${
+                        busy ? 'pointer-events-none opacity-50' : ''
+                      }`}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </span>
+                  </div>
+                  <p className="font-mono text-lg tabular-nums">
+                    {entry.rate ? formatRate(entry.rate) : '—'}
+                  </p>
+                  <p className="text-xs text-[var(--color-content-muted)]">
+                    {entry.rate
+                      ? `${formatDate(entry.rateDate!)} · ${t(`exchange_rates.page.state.${entry.state}`)}`
+                      : t('exchange_rates.page.state.missing_hint')}
+                  </p>
+                </button>
               </li>
             ))}
           </ul>
@@ -291,9 +320,22 @@ export default function ExchangeRatesPage() {
               </thead>
               <tbody className="divide-y divide-[var(--color-border-subtle)]">
                 {entries.map((entry: WatchlistEntry) => (
-                  <tr key={`${entry.from}->${entry.to}`} className="hover:bg-black/5 dark:hover:bg-white/5">
+                  <tr
+                    key={`${entry.from}->${entry.to}`}
+                    onClick={() => setTrendPair({ from: entry.from, to: entry.to })}
+                    className="cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                  >
                     <td className="whitespace-nowrap px-3 py-2">
-                      <CurrencyPair from={entry.from} to={entry.to} />
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setTrendPair({ from: entry.from, to: entry.to });
+                        }}
+                        className="text-left"
+                      >
+                        <CurrencyPair from={entry.from} to={entry.to} />
+                      </button>
                       {entry.required && (
                         <span className="ml-2 text-xs text-[var(--color-accent)]">
                           {t('exchange_rates.page.required_badge')}
@@ -327,7 +369,11 @@ export default function ExchangeRatesPage() {
                     <td className="whitespace-nowrap px-3 py-2 text-right text-xs">
                       <button
                         type="button"
-                        onClick={() => remove.mutate({ from: entry.from, to: entry.to })}
+                        onClick={(event) => {
+                          // 行本身可点开走势，删除按钮要挡住冒泡
+                          event.stopPropagation();
+                          remove.mutate({ from: entry.from, to: entry.to });
+                        }}
                         disabled={busy}
                         className="text-[var(--color-content-muted)] hover:text-[var(--color-negative)] disabled:opacity-50"
                         aria-label={t('exchange_rates.page.remove_pair')}
@@ -348,6 +394,8 @@ export default function ExchangeRatesPage() {
           {t('exchange_rates.page.missing_hint')}
         </p>
       )}
+
+      <RateTrendDialog pair={trendPair} onClose={() => setTrendPair(null)} />
     </div>
   );
 }
