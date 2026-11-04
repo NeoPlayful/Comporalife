@@ -4,7 +4,7 @@ import ErrorState from '@/components/ui/ErrorState';
 import Modal from '@/components/ui/Modal';
 import '@/components/charts/echarts';
 import { useChartTheme } from '@/theme/chart-theme';
-import { SERIES_PRIMARY } from '@/theme/palette';
+import { SERIES_NEGATIVE, SERIES_POSITIVE, SERIES_PRIMARY } from '@/theme/palette';
 import {
   exchangeRatesApi,
   type RateGranularity,
@@ -144,6 +144,10 @@ export default function RateTrendDialog({
   const safePage = Math.min(page, totalPages);
   const detailRows = ordered.slice((safePage - 1) * DETAIL_PAGE_SIZE, safePage * DETAIL_PAGE_SIZE);
 
+  // 日线每天只有一条数据，open=high=low=close，蜡烛为平线，因此日线保持折线；
+  // 周线及以上粒度切换为蜡烛图，展示桶内开高低收四档值。
+  const useCandlestick = granularity !== 'day';
+
   const option = {
     grid: { left: 8, right: 16, top: 24, bottom: 8, containLabel: true },
     tooltip: {
@@ -156,7 +160,8 @@ export default function RateTrendDialog({
     xAxis: {
       type: 'category',
       data: points.map((point) => point.periodStart),
-      boundaryGap: false,
+      // 蜡烛图需要边距，避免首尾柱子贴边；折线图沿用原边界
+      boundaryGap: useCandlestick,
       axisLine: { lineStyle: { color: chartTheme.axisLine } },
       axisLabel: {
         color: chartTheme.axisLabel,
@@ -176,17 +181,36 @@ export default function RateTrendDialog({
         formatter: (value: number) => formatRate(value),
       },
     },
-    series: [
-      {
-        type: 'line',
-        data: points.map((point) => Number(point.rate)),
-        smooth: false,
-        showSymbol: points.length <= 14,
-        lineStyle: { width: 2, color: SERIES_PRIMARY },
-        itemStyle: { color: SERIES_PRIMARY },
-        areaStyle: { opacity: 0.12, color: SERIES_PRIMARY },
-      },
-    ],
+    series: useCandlestick
+      ? [
+          {
+            type: 'candlestick',
+            // ECharts candlestick 数据顺序：[open, close, low, high]
+            data: points.map((point) => [
+              Number(point.open),
+              Number(point.rate),
+              Number(point.low),
+              Number(point.high),
+            ]),
+            itemStyle: {
+              color: SERIES_POSITIVE,
+              color0: SERIES_NEGATIVE,
+              borderColor: SERIES_POSITIVE,
+              borderColor0: SERIES_NEGATIVE,
+            },
+          },
+        ]
+      : [
+          {
+            type: 'line',
+            data: points.map((point) => Number(point.rate)),
+            smooth: false,
+            showSymbol: points.length <= 14,
+            lineStyle: { width: 2, color: SERIES_PRIMARY },
+            itemStyle: { color: SERIES_PRIMARY },
+            areaStyle: { opacity: 0.12, color: SERIES_PRIMARY },
+          },
+        ],
   };
 
   const headerTitle = (
@@ -343,7 +367,17 @@ export default function RateTrendDialog({
                 <thead className="border-b border-[var(--color-border-subtle)] text-left text-xs text-[var(--color-content-muted)]">
                   <tr>
                     <th className="px-2 py-1.5">{t('exchange_rates.history.period')}</th>
-                    <th className="px-2 py-1.5 text-right">{t('exchange_rates.rate')}</th>
+                    {useCandlestick && (
+                      <>
+                        <th className="px-2 py-1.5 text-right">{t('exchange_rates.history.open')}</th>
+                        <th className="px-2 py-1.5 text-right">{t('exchange_rates.history.high')}</th>
+                        <th className="px-2 py-1.5 text-right">{t('exchange_rates.history.low')}</th>
+                        <th className="px-2 py-1.5 text-right">{t('exchange_rates.history.close')}</th>
+                      </>
+                    )}
+                    {!useCandlestick && (
+                      <th className="px-2 py-1.5 text-right">{t('exchange_rates.rate')}</th>
+                    )}
                     <th className="px-2 py-1.5 text-right">
                       {t('exchange_rates.history.samples')}
                     </th>
@@ -355,9 +389,27 @@ export default function RateTrendDialog({
                       <td className="px-2 py-1.5 font-mono text-xs text-[var(--color-content-muted)]">
                         {formatDate(point.periodStart)}
                       </td>
-                      <td className="px-2 py-1.5 text-right font-mono tabular-nums">
-                        {formatRate(point.rate)}
-                      </td>
+                      {useCandlestick && (
+                        <>
+                          <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                            {formatRate(point.open)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                            {formatRate(point.high)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                            {formatRate(point.low)}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                            {formatRate(point.rate)}
+                          </td>
+                        </>
+                      )}
+                      {!useCandlestick && (
+                        <td className="px-2 py-1.5 text-right font-mono tabular-nums">
+                          {formatRate(point.rate)}
+                        </td>
+                      )}
                       <td className="px-2 py-1.5 text-right text-xs text-[var(--color-content-muted)]">
                         {granularity === 'day'
                           ? '—'

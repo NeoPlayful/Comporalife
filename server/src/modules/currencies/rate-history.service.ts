@@ -29,7 +29,13 @@ const ROW_LIMIT = 20_000;
 export interface RateHistoryPoint {
   /** 桶的起点日期（周期第一天），yyyy-MM-dd */
   periodStart: string;
-  /** 该桶内最后一个可用日的汇率，表达为 1 from = rate to */
+  /** 桶内第一个可用日的汇率（开盘） */
+  open: string;
+  /** 桶内最高汇率 */
+  high: string;
+  /** 桶内最低汇率 */
+  low: string;
+  /** 桶内最后一个可用日的汇率（收盘），与折算口径一致 */
   rate: string;
   /** 该桶内实际有数据的日度点数 */
   samples: number;
@@ -158,18 +164,20 @@ export async function getRateHistory(
           select,
         });
 
-  // 按周期桶归并：行已按日期升序，后写覆盖前写即得「桶内最后一个可用日」
-  const bucketsByKey = new Map<string, { rate: Decimal; samples: number }>();
+  // 按周期桶归并：行已按日期升序，后写覆盖 close；首条写 open；逐行维护 high/low
+  const bucketsByKey = new Map<string, { open: Decimal; high: Decimal; low: Decimal; close: Decimal; samples: number }>();
   for (const row of rows) {
     const raw = toDecimal(row.rate.toString());
     const value = inverted ? new Decimal(1).div(raw) : raw;
     const key = dayKey(periodStart(row.rateDate, params.granularity));
     const bucket = bucketsByKey.get(key);
     if (bucket) {
-      bucket.rate = value;
+      bucket.close = value;
+      if (value.gt(bucket.high)) bucket.high = value;
+      if (value.lt(bucket.low)) bucket.low = value;
       bucket.samples += 1;
     } else {
-      bucketsByKey.set(key, { rate: value, samples: 1 });
+      bucketsByKey.set(key, { open: value, high: value, low: value, close: value, samples: 1 });
     }
   }
 
@@ -177,7 +185,10 @@ export async function getRateHistory(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([periodStartKey, bucket]) => ({
       periodStart: periodStartKey,
-      rate: rateToString(bucket.rate),
+      open: rateToString(bucket.open),
+      high: rateToString(bucket.high),
+      low: rateToString(bucket.low),
+      rate: rateToString(bucket.close),
       samples: bucket.samples,
     }));
 
