@@ -111,8 +111,9 @@ function shiftPeriods(start: Date, granularity: RateGranularity, n: number): Dat
  * 折算逻辑「取最近一条 rateDate <= asOf」语义一致，也让图上最后一个点
  * 能和列表卡片的当前值对上（同一天时）。
  *
- * 方向沿用整段序列口径，与自选列表的解析保持一致：窗口内只要有正向记录就
- * 全部用正向，一条都没有才退回反向取倒数，并用 inverted 标出来。
+ * 方向仍然整段统一，但不再「有正向就只认正向」：那样会让 seed 留下的一天正向行
+ * 压过之后每天更新的反向行，图上只剩一个点。这里比较两个方向的最新数据日，
+ * 取更新的一侧（同一天时优先正向），并用 inverted 标出来。
  * 逐日混用正反向虽然数值上等价，却会让「本图来自反向汇率」这类提示失真，
  * 因此不做逐日回退。
  *
@@ -138,31 +139,24 @@ export async function getRateHistory(
   const select = { rate: true, rateDate: true } as const;
   const range = { gte: windowStart, lte: asOf };
 
-  const direct = await prisma.exchangeRate.findMany({
-    where: {
-      baseCurrency: params.from,
-      quoteCurrency: params.to,
-      rateDate: range,
-    },
-    orderBy: { rateDate: 'asc' },
-    take: ROW_LIMIT,
-    select,
-  });
+  const load = (from: string, to: string) =>
+    prisma.exchangeRate.findMany({
+      where: { baseCurrency: from, quoteCurrency: to, rateDate: range },
+      orderBy: { rateDate: 'asc' },
+      take: ROW_LIMIT,
+      select,
+    });
 
-  const inverted = direct.length === 0;
-  const rows =
-    direct.length > 0
-      ? direct
-      : await prisma.exchangeRate.findMany({
-          where: {
-            baseCurrency: params.to,
-            quoteCurrency: params.from,
-            rateDate: range,
-          },
-          orderBy: { rateDate: 'asc' },
-          take: ROW_LIMIT,
-          select,
-        });
+  const [direct, reverse] = await Promise.all([load(params.from, params.to), load(params.to, params.from)]);
+
+  // 取数据更新的一侧：暂停同步后正向会停在旧日期，反向却可能仍在增长，
+  // 只看「有没有正向」会把整段序列钉死在最早那一天。同日数据优先正向。
+  const directLatest = direct[direct.length - 1]?.rateDate.getTime() ?? -Infinity;
+  const reverseLatest = reverse[reverse.length - 1]?.rateDate.getTime() ?? -Infinity;
+  const useReverse = reverse.length > 0 && reverseLatest > directLatest;
+
+  const inverted = useReverse;
+  const rows = useReverse ? reverse : direct;
 
   // 按周期桶归并：行已按日期升序，后写覆盖 close；首条写 open；逐行维护 high/low
   const bucketsByKey = new Map<string, { open: Decimal; high: Decimal; low: Decimal; close: Decimal; samples: number }>();

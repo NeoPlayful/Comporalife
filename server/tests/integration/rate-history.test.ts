@@ -112,6 +112,37 @@ describe('汇率历史：日线', () => {
     const points = data.points as Array<{ rate: string }>;
     expect(points.map((p) => p.rate)).toEqual(['0.5000000000', '0.2500000000']);
   });
+
+  it('反向数据更新时优先反向，不被过期的一天正向数据压住', async () => {
+    // 正向只有一天旧数据，反向最近三天都在更新
+    await createRate(A, B, '2', day(5));
+    await createRate(B, A, '2.5', day(2));
+    await createRate(B, A, '4', day(1));
+    await createRate(B, A, '5', day(0));
+
+    const res = await history(`from=${A}&to=${B}&granularity=day&buckets=30`);
+    const data = res.json().data;
+    expect(data.inverted).toBe(true);
+    expect((data.points as Array<{ periodStart: string }>).map((p) => p.periodStart)).toEqual([
+      day(2),
+      day(1),
+      day(0),
+    ]);
+  });
+
+  it('正向数据更新时优先正向', async () => {
+    await createRate(B, A, '4', day(5));
+    await createRate(A, B, '0.5', day(1));
+    await createRate(A, B, '0.4', day(0));
+
+    const res = await history(`from=${A}&to=${B}&granularity=day&buckets=30`);
+    const data = res.json().data;
+    expect(data.inverted).toBe(false);
+    expect((data.points as Array<{ periodStart: string }>).map((p) => p.periodStart)).toEqual([
+      day(1),
+      day(0),
+    ]);
+  });
 });
 
 describe('汇率历史：周期聚合（期末值）', () => {
@@ -127,14 +158,48 @@ describe('汇率历史：周期聚合（期末值）', () => {
 
     const points = res.json().data.points as Array<{
       periodStart: string;
+      open: string;
+      high: string;
+      low: string;
       rate: string;
       samples: number;
     }>;
     const jan = points.find((p) => p.periodStart === '2026-01-01');
     const feb = points.find((p) => p.periodStart === '2026-02-01');
 
-    expect(jan).toEqual({ periodStart: '2026-01-01', rate: '20.0000000000', samples: 2 });
-    expect(feb).toEqual({ periodStart: '2026-02-01', rate: '30.0000000000', samples: 1 });
+    // open/high/low 用于蜡烛图：1 月首日 10、末日 20，桶内只有一个方向
+    expect(jan).toEqual({
+      periodStart: '2026-01-01',
+      open: '10.0000000000',
+      high: '20.0000000000',
+      low: '10.0000000000',
+      rate: '20.0000000000',
+      samples: 2,
+    });
+    expect(feb).toEqual({
+      periodStart: '2026-02-01',
+      open: '30.0000000000',
+      high: '30.0000000000',
+      low: '30.0000000000',
+      rate: '30.0000000000',
+      samples: 1,
+    });
+  });
+
+  it('桶内高低按真实极值取，而不是只看首尾', async () => {
+    await createRate(A, B, '5', '2026-05-04');
+    await createRate(A, B, '9', '2026-05-10');
+    await createRate(A, B, '7', '2026-05-20');
+
+    const res = await history(`from=${A}&to=${B}&granularity=month&buckets=240`);
+    const may = (res.json().data.points as Array<Record<string, string>>).find(
+      (p) => p.periodStart === '2026-05-01',
+    );
+
+    expect(may?.open).toBe('5.0000000000');
+    expect(may?.high).toBe('9.0000000000');
+    expect(may?.low).toBe('5.0000000000');
+    expect(may?.rate).toBe('7.0000000000');
   });
 
   it('周线以周一为桶起点', async () => {

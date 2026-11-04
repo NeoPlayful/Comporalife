@@ -467,6 +467,15 @@ export const DUPLICATE_WINDOW_DAYS = envInt('DUPLICATE_WINDOW_DAYS', 3);
 /** 汇率滞后的天数阈值 */
 export const RATE_STALE_DAYS = envInt('RATE_STALE_DAYS', 7);
 
+/**
+ * 没有任何外币持仓时，汇率指标页默认预览的币种。
+ *
+ * 页面定位是「自选行情」，若默认集合完全依赖持仓，纯本币用户看到的永远是空列表。
+ * 这里给一组常见币种(各自兑基准币)，并同步纳入每日抓取范围，
+ * 保证首屏就有可看的日线数据。
+ */
+export const DEFAULT_RATE_PREVIEW_CURRENCIES = ['USD', 'EUR', 'JPY', 'HKD'] as const;
+
 /** 汇率同步运行记录的保留天数 */
 export const RATE_SYNC_RUN_RETENTION_DAYS = envInt('RATE_SYNC_RUN_RETENTION_DAYS', 90);
 
