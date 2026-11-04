@@ -101,14 +101,43 @@ beforeEach(async () => {
 });
 
 describe('默认集合', () => {
-  it('没有外币账户时列表为空，且标记为跟随默认', async () => {
+  it('没有外币账户时回退到默认预览币种，且标记为跟随默认', async () => {
     const res = await watchlist();
     expect(res.statusCode).toBe(200);
 
-    const data = res.json().data;
+    const data = res.json().data as {
+      baseCurrency: string;
+      custom: boolean;
+      entries: Array<{ from: string; to: string; required: boolean; state: string }>;
+    };
     expect(data.baseCurrency).toBe(BASE);
     expect(data.custom).toBe(false);
-    expect(data.entries).toEqual([]);
+    // 纯本币用户也应有可看的行情，否则指标页首屏永远是空的
+    expect(data.entries.map((item) => item.from)).toEqual(['USD', 'EUR', 'JPY', 'HKD']);
+    expect(data.entries.every((item) => item.to === BASE)).toBe(true);
+    expect(data.entries.every((item) => item.required === false)).toBe(true);
+    // 预览币种尚无汇率时报 missing，而不是被过滤掉
+    expect(data.entries.every((item) => item.state === 'missing')).toBe(true);
+  });
+
+  it('默认预览不含基准币自身', async () => {
+    // 用独立用户，避免改动本套件共享 token 的基准币设置
+    const usdUser = await createUser(app, DOMAIN, 'usdbase');
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/settings',
+      headers: auth(usdUser.token),
+      payload: { baseCurrency: 'USD' },
+    });
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/exchange-rates/watchlist',
+      headers: auth(usdUser.token),
+    });
+    const data = res.json().data as { entries: Array<{ from: string; to: string }> };
+    expect(data.entries.map((item) => item.from)).toEqual(['EUR', 'JPY', 'HKD']);
+    expect(data.entries.every((item) => item.to === 'USD')).toBe(true);
   });
 
   it('持有外币时默认展示该币种到基准币种', async () => {
@@ -163,6 +192,23 @@ describe('默认集合', () => {
     }>;
     expect(entries[0]!.state).toBe('stale');
     expect(entries[0]!.daysLag).toBeGreaterThanOrEqual(30);
+  });
+
+  it('反向数据更新时优先反向，不被过期的正向行压住', async () => {
+    await createAccount(HELD);
+    // 正向只有旧数据，反向每天在更新：卡片必须显示最新那一天
+    await createAdminRate(HELD, BASE, '9', day(6));
+    await createAdminRate(BASE, HELD, '0.125', day(0));
+
+    const entries = (await watchlist()).json().data.entries as Array<{
+      rate: string;
+      rateDate: string;
+      state: string;
+    }>;
+
+    expect(entries[0]!.rate).toBe('8.0000000000');
+    expect(entries[0]!.rateDate).toBe(day(0));
+    expect(entries[0]!.state).toBe('fresh');
   });
 });
 
@@ -319,9 +365,14 @@ describe('隔离与上限', () => {
       url: '/api/exchange-rates/watchlist',
       headers: auth(other.token),
     });
-    const theirData = theirs.json().data as { custom: boolean; entries: Array<{ rate: string }> };
+    const theirData = theirs.json().data as {
+      custom: boolean;
+      entries: Array<{ from: string; to: string; rate: string }>;
+    };
     expect(theirData.custom).toBe(true);
-    expect(theirData.entries[0]!.rate).toBe('9.0000000000');
+    // 默认集合里还有预览行，按币种对定位而不是取第一行
+    const theirsPair = theirData.entries.find((item) => item.from === HELD && item.to === BASE);
+    expect(theirsPair?.rate).toBe('9.0000000000');
   });
 
   it('超过上限时返回 400', async () => {

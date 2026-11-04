@@ -1,6 +1,10 @@
 import Decimal from 'decimal.js';
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { RATE_STALE_DAYS, SUPPORTED_CURRENCIES } from '../../config/constants.js';
+import {
+  DEFAULT_RATE_PREVIEW_CURRENCIES,
+  RATE_STALE_DAYS,
+  SUPPORTED_CURRENCIES,
+} from '../../config/constants.js';
 import { rateToString, toDecimal } from '../../lib/money.js';
 
 const DAY_MS = 86_400_000;
@@ -53,6 +57,24 @@ export function splitPair(key: string): { from: string; to: string } | null {
 }
 
 /**
+ * 没有外币持仓时展示的预览币种对（各自兑基准币）。
+ *
+ * 只用于展示与抓取范围，不参与任何折算：折算仍按实际持仓推导。
+ */
+export function defaultPreviewPairs(baseCurrency: string): Array<{ from: string; to: string }> {
+  return DEFAULT_RATE_PREVIEW_CURRENCIES.filter(
+    (code) => code !== baseCurrency && SUPPORTED_CURRENCIES.includes(code),
+  ).map((code) => ({ from: code, to: baseCurrency }));
+}
+
+/** 默认自选集合：有外币持仓就看持仓，没有就看预览币种 */
+export function defaultWatchlistKeys(need: RateNeed): string[] {
+  const heldKeys = need.held.map((currency) => pairKey(currency, need.baseCurrency));
+  if (heldKeys.length > 0) return heldKeys;
+  return defaultPreviewPairs(need.baseCurrency).map((pair) => pairKey(pair.from, pair.to));
+}
+
+/**
  * 用户的汇率需求：自己持有的币种 → 基准币种。
  *
  * 折算只需要「外币 → 该用户的基准币」，且分录币种恒等于账户币种、
@@ -79,9 +101,29 @@ export async function collectUserRateNeeds(
   return { baseCurrency: settings.baseCurrency, held: [...held].sort() };
 }
 
-function readStoredPairs(value: Prisma.JsonValue | null): string[] | null {
+export function readStoredPairs(value: Prisma.JsonValue | null): string[] | null {
   if (!Array.isArray(value)) return null;
   return value.filter((item): item is string => typeof item === 'string');
+}
+
+/**
+ * 某个用户的自选币种对（含默认预览）。
+ *
+ * 汇率指标页展示的是自选行情，每日抓取必须覆盖用户实际会看的列表，
+ * 否则没有外币持仓的用户既看不到默认行，图表日线也永远不会增长。
+ */
+export function resolveWatchlistPairs(
+  baseCurrency: string,
+  held: string[],
+  storedPairs: string[] | null,
+): Array<{ from: string; to: string }> {
+  const keys = storedPairs ?? defaultWatchlistKeys({ baseCurrency, held });
+  return keys
+    .map((key) => splitPair(key))
+    .filter(
+      (pair): pair is { from: string; to: string } =>
+        pair !== null && isSupportedPair(pair.from, pair.to),
+    );
 }
 
 function isSupportedPair(from: string, to: string): boolean {
@@ -170,16 +212,21 @@ function buildEntry(
   latest: Map<string, LatestRate>,
   asOf: Date,
 ): WatchlistEntry {
+  // 正向行过旧时不能压住更新的反向行：seed 只写过一天正向，之后同步一直在写反向，
+  // 只看「有没有正向」会让卡片日期永远停在 seed 那天。同日数据优先正向。
   const direct = latest.get(pairKey(from, to));
-  const inverse = direct ? undefined : latest.get(pairKey(to, from));
-  const resolved = direct
-    ? { rate: direct.rate, rateDate: direct.rateDate, source: direct.source }
-    : inverse
-      ? {
-          rate: new Decimal(1).div(inverse.rate),
-          rateDate: inverse.rateDate,
-          source: inverse.source,
-        }
+  const inverse = latest.get(pairKey(to, from));
+  const useInverse =
+    inverse !== undefined && (direct === undefined || inverse.rateDate > direct.rateDate);
+
+  const resolved = useInverse
+    ? {
+        rate: new Decimal(1).div(inverse!.rate),
+        rateDate: inverse!.rateDate,
+        source: inverse!.source,
+      }
+    : direct
+      ? { rate: direct.rate, rateDate: direct.rateDate, source: direct.source }
       : null;
 
   if (!resolved) {
@@ -231,12 +278,9 @@ export async function getWatchlist(
 
   const required = new Set(need.held);
   const stored = readStoredPairs(settings.rateDisplayPairs);
-
-  const defaultKeys = need.held.map((currency) => pairKey(currency, need.baseCurrency));
-  const selectedKeys = (stored ?? defaultKeys).filter((key) => {
-    const pair = splitPair(key);
-    return pair !== null && isSupportedPair(pair.from, pair.to);
-  });
+  const selectedKeys = resolveWatchlistPairs(need.baseCurrency, need.held, stored).map((pair) =>
+    pairKey(pair.from, pair.to),
+  );
 
   const [existing, latest] = await Promise.all([
     loadExistingPairs(prisma),
@@ -325,7 +369,7 @@ export async function addToWatchlist(
   ]);
 
   const stored = readStoredPairs(settings.rateDisplayPairs);
-  const current = stored ?? need.held.map((currency) => pairKey(currency, need.baseCurrency));
+  const current = stored ?? defaultWatchlistKeys(need);
   const key = pairKey(from, to);
 
   // 重复添加是幂等的：按钮点两次不应该报错
@@ -365,7 +409,7 @@ export async function removeFromWatchlist(
   ]);
 
   const stored = readStoredPairs(settings.rateDisplayPairs);
-  const current = stored ?? need.held.map((currency) => pairKey(currency, need.baseCurrency));
+  const current = stored ?? defaultWatchlistKeys(need);
   const key = pairKey(from, to);
 
   // 删除后保存为空数组而不是 null：空列表是用户的明确选择，不能退回默认

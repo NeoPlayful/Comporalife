@@ -200,6 +200,39 @@ describe('同步落库', () => {
     expect(summary.failures.some((item) => item.code === 'RATE_INVALID')).toBe(true);
   });
 
+  it('基准币不是锚定币时也能落库（抓取集合必须包含基准币报价）', async () => {
+    // 用户基准币是 CNY，供应商锚定 USD：换算 GBP→CNY 需要 USD→CNY 作分母。
+    // 供应商只回被请求的币种，因此若抓取集合漏了基准币，整批会被
+    // ANCHOR_TO_BASE_MISSING 拒绝，一行都写不进去。
+    await createAccount('GBP');
+
+    const available = new Map([
+      ['CNY', q('CNY', '7.2')],
+      ['GBP', q('GBP', '0.8')],
+    ]);
+    const requested: string[] = [];
+    const strictProvider: RateProvider = {
+      name: 'fake',
+      anchorCurrency: 'USD',
+      fetch: async (_asOf, quotes) => {
+        requested.push(...quotes);
+        return quotes.flatMap((code) => (available.has(code) ? [available.get(code)!] : []));
+      },
+    };
+
+    const summary = await runRateSync(app.prisma, {
+      trigger: 'manual',
+      provider: strictProvider,
+      now: () => new Date(`${TODAY}T08:00:00.000Z`),
+      demand: demandFor('GBP'),
+    });
+
+    expect(requested).toContain('CNY');
+    expect(summary.status).toBe('succeeded');
+    expect(summary.writtenRows).toBe(1);
+    expect(summary.failures).toEqual([]);
+  });
+
   it('两个用户看到同一个币种对的值与来源', async () => {
     await createAccount('GBP');
     const other = await createUser(app, DOMAIN, 'other');
