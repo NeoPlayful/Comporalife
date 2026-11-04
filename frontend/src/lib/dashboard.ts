@@ -212,7 +212,13 @@ export type RateGranularity = 'day' | 'week' | 'month' | 'quarter' | 'year';
 export interface RateHistoryPoint {
   /** 桶的起点日期（周期第一天），yyyy-MM-dd */
   periodStart: string;
-  /** 该桶内最后一个可用日的汇率，1 from = rate to */
+  /** 桶内第一个可用日的汇率（开盘） */
+  open: string;
+  /** 桶内最高汇率 */
+  high: string;
+  /** 桶内最低汇率 */
+  low: string;
+  /** 桶内最后一个可用日的汇率（收盘），与折算口径一致 */
   rate: string;
   /** 该桶内实际样本数；粗粒度下大于 1 表示是由多个日度点聚合而来 */
   samples: number;
