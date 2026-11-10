@@ -1,9 +1,8 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
-import { SETTING_RATE_SYNC_ENABLED } from '../../config/constants.js';
+import { SETTING_RATE_SYNC_ENABLED, SUPPORTED_CURRENCIES } from '../../config/constants.js';
 import { env } from '../../config/env.js';
 import { toDecimal } from '../../lib/money.js';
-import { readStoredPairs, resolveWatchlistPairs } from '../currencies/rate-watchlist.service.js';
 import {
   createGenericJsonProvider,
   createPresetProvider,
@@ -84,65 +83,22 @@ export async function buildProvider(prisma: PrismaClient): Promise<RateProvider>
 /**
  * 需要抓取与写入的币种需求。
  *
- * 两类来源取并集：
- * - 折算需求：账户/组合/资产/负债的币种。分录币种恒等于账户币种、
- *   跨币种转账已被禁，因此四类实体的币种集合就是完备的。
- * - 展示需求：各用户自选列表里的币种对（含无外币持仓时的默认预览）。
- *   指标页展示的是自选行情，只抓折算需求会让这些行永远停在 seed 那天。
+ * targets 固定为所有支持币种：每次同步都覆盖全量，无论用户是否持有或关注，
+ * 确保任意币种对随时都有最新数据可用。
+ * baseCurrencies 仍按用户设置取，决定落库哪些方向的直接对。
  */
 export async function collectRateDemand(
   prisma: PrismaClient,
 ): Promise<{ targets: string[]; baseCurrencies: string[] }> {
-  const [accounts, portfolios, assets, liabilities, settings] = await Promise.all([
-    prisma.account.findMany({
-      where: { status: 'active' },
-      select: { userId: true, currency: true },
-    }),
-    prisma.portfolio.findMany({
-      where: { status: 'active' },
-      select: { userId: true, currency: true },
-    }),
-    prisma.asset.findMany({ where: { status: 'active' }, select: { userId: true, currency: true } }),
-    prisma.liability.findMany({
-      where: { status: 'active' },
-      select: { userId: true, currency: true },
-    }),
-    prisma.userSettings.findMany({
-      select: { userId: true, baseCurrency: true, rateDisplayPairs: true },
-    }),
-  ]);
+  const settings = await prisma.userSettings.findMany({
+    select: { baseCurrency: true },
+  });
 
-  const baseCurrencies = [...new Set(settings.map((item) => item.baseCurrency))];
-  const targets = new Set<string>();
-  for (const row of [...accounts, ...portfolios, ...assets, ...liabilities]) {
-    targets.add(row.currency);
-  }
-
-  // 自选币种对：展示行需要自己的方向，不能只靠「持仓币种 → 基准币」推导
-  const heldByUser = new Map<string, Set<string>>();
-  for (const row of [...accounts, ...portfolios, ...assets, ...liabilities]) {
-    const set = heldByUser.get(row.userId) ?? new Set<string>();
-    set.add(row.currency);
-    heldByUser.set(row.userId, set);
-  }
-
-  for (const setting of settings) {
-    const held = [...(heldByUser.get(setting.userId) ?? [])]
-      .filter((currency) => currency !== setting.baseCurrency)
-      .sort();
-    for (const pair of resolveWatchlistPairs(
-      setting.baseCurrency,
-      held,
-      readStoredPairs(setting.rateDisplayPairs),
-    )) {
-      targets.add(pair.from);
-      targets.add(pair.to);
-    }
-  }
+  const baseCurrencies = [...new Set(settings.map((item) => item.baseCurrency))].sort();
 
   return {
-    targets: [...targets].sort(),
-    baseCurrencies: baseCurrencies.sort(),
+    targets: [...SUPPORTED_CURRENCIES].sort(),
+    baseCurrencies,
   };
 }
 

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { validateQuotes, convertToBasePairs, preciseRatio } from '@/modules/market-data/rate-validation';
 import { createGenericJsonProvider } from '@/modules/market-data/rate-provider';
 import { collectRateDemand } from '@/modules/market-data/rate-sync.service';
+import { SUPPORTED_CURRENCIES } from '@/config/constants';
 
 function quote(base: string, target: string, rate: string, date = '2026-10-20') {
   return { base, quote: target, rate: new Decimal(rate), date };
@@ -248,81 +249,32 @@ describe('通用 JSON 适配器', () => {
 });
 
 describe('抓取范围推导', () => {
-  function fakePrisma(params: {
-    holdings?: Array<{ userId: string; currency: string }>;
-    settings: Array<{ userId: string; baseCurrency: string; rateDisplayPairs?: unknown }>;
-  }) {
-    const holdings = params.holdings ?? [];
-    const byKind = () => ({
-      findMany: async () => holdings,
-    });
+  function fakePrisma(settings: Array<{ userId: string; baseCurrency: string }>) {
     return {
-      account: byKind(),
-      portfolio: byKind(),
-      asset: byKind(),
-      liability: byKind(),
-      userSettings: { findMany: async () => params.settings },
+      userSettings: { findMany: async () => settings },
     } as never;
   }
 
-  /**
-   * 没有外币持仓时仍要抓默认预览币种。
-   *
-   * 页面展示的是自选行情，若抓取只跟着持仓走，纯本币用户永远看不到日线。
-   * 这条断言放在单元层用假 prisma 验证：集成测试共享全局汇率表，
-   * 并行执行的其他套件随时可能引入外币账户或被批准的币种对。
-   */
-  it('没有外币持仓时按默认预览币种抓取', async () => {
-    const prisma = fakePrisma({
-      settings: [{ userId: 'u1', baseCurrency: 'CNY' }],
-    });
-
-    const { targets, baseCurrencies } = await collectRateDemand(prisma);
-    // 默认预览 USD/EUR/JPY/HKD→CNY，CNY 作为分母币也在集合里
-    expect(targets).toEqual(['CNY', 'EUR', 'HKD', 'JPY', 'USD']);
-    expect(baseCurrencies).toEqual(['CNY']);
-  });
-
-  it('只持有基准币种时同样回退到默认预览币种', async () => {
-    const prisma = fakePrisma({
-      holdings: [{ userId: 'u1', currency: 'CNY' }],
-      settings: [{ userId: 'u1', baseCurrency: 'CNY' }],
-    });
-
+  it('targets 固定为所有支持币种', async () => {
+    const prisma = fakePrisma([{ userId: 'u1', baseCurrency: 'CNY' }]);
     const { targets } = await collectRateDemand(prisma);
-    // 账户币种本身仍算需求；runRateSync 会在构造抓取集合时把锚定币排除
-    expect(targets).toEqual(['CNY', 'EUR', 'HKD', 'JPY', 'USD']);
+    expect(targets).toEqual([...SUPPORTED_CURRENCIES].sort());
   });
 
-  it('多用户不同基准币种时合并去重，且忽略已是基准币的预览币种', async () => {
-    const prisma = fakePrisma({
-      holdings: [
-        { userId: 'u1', currency: 'USD' },
-        { userId: 'u1', currency: 'USD' },
-        { userId: 'u1', currency: 'EUR' },
-        { userId: 'u1', currency: 'USD' },
-      ],
-      settings: [
-        { userId: 'u1', baseCurrency: 'CNY' },
-        { userId: 'u2', baseCurrency: 'EUR' },
-      ],
-    });
-
-    const { targets, baseCurrencies } = await collectRateDemand(prisma);
-    // u1 持有 USD/EUR，默认集合就是 EUR→CNY、USD→CNY；
-    // u2 没有外币持仓，回退到 USD/JPY/HKD→EUR（EUR 自身被排除）
-    expect(targets).toEqual(['CNY', 'EUR', 'HKD', 'JPY', 'USD']);
+  it('baseCurrencies 从用户设置取，多用户去重排序', async () => {
+    const prisma = fakePrisma([
+      { userId: 'u1', baseCurrency: 'CNY' },
+      { userId: 'u2', baseCurrency: 'EUR' },
+      { userId: 'u3', baseCurrency: 'CNY' },
+    ]);
+    const { baseCurrencies } = await collectRateDemand(prisma);
     expect(baseCurrencies).toEqual(['CNY', 'EUR']);
   });
 
-  it('用户自定义自选后按自定义列表抓取', async () => {
-    const prisma = fakePrisma({
-      settings: [
-        { userId: 'u1', baseCurrency: 'CNY', rateDisplayPairs: ['GBP->CNY', 'AUD->CNY'] },
-      ],
-    });
-
-    const { targets } = await collectRateDemand(prisma);
-    expect(targets).toEqual(['AUD', 'CNY', 'GBP']);
+  it('没有任何用户时 baseCurrencies 为空，targets 仍是全量', async () => {
+    const prisma = fakePrisma([]);
+    const { targets, baseCurrencies } = await collectRateDemand(prisma);
+    expect(targets).toEqual([...SUPPORTED_CURRENCIES].sort());
+    expect(baseCurrencies).toEqual([]);
   });
 });
