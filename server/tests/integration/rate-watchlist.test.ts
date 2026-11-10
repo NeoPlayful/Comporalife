@@ -83,7 +83,11 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  await clearExchangeRates(app, [HELD, OTHER, BASE]);
+  // 交叉套算用例会写 USD→HELD / USD→BASE；用 froms/tos 精确匹配只删这几组
+  await clearExchangeRates(app, {
+    froms: ['USD', HELD, OTHER, BASE],
+    tos: ['USD', HELD, OTHER, BASE],
+  });
 
   const user = await createUser(app, DOMAIN);
   token = user.token;
@@ -194,9 +198,9 @@ describe('默认集合', () => {
     expect(entries[0]!.daysLag).toBeGreaterThanOrEqual(30);
   });
 
-  it('反向数据更新时优先反向，不被过期的正向行压住', async () => {
+  it('直接行优先于反向行，人工直接值即使更旧也是权威值', async () => {
     await createAccount(HELD);
-    // 正向只有旧数据，反向每天在更新：卡片必须显示最新那一天
+    // 直接行是人工录入的权威值：即使反向行更晚，也从直接行取值
     await createAdminRate(HELD, BASE, '9', day(6));
     await createAdminRate(BASE, HELD, '0.125', day(0));
 
@@ -206,9 +210,27 @@ describe('默认集合', () => {
       state: string;
     }>;
 
-    expect(entries[0]!.rate).toBe('8.0000000000');
-    expect(entries[0]!.rateDate).toBe(day(0));
+    expect(entries[0]!.rate).toBe('9.0000000000');
+    expect(entries[0]!.rateDate).toBe(day(6));
     expect(entries[0]!.state).toBe('fresh');
+  });
+
+  it('只有两条 USD 腿时用套算值展示交叉对', async () => {
+    await createAccount(HELD);
+    // 直接对与反向都没有；写入 USD→HELD 与 USD→BASE，套算 HELD→BASE
+    await createAdminRate('USD', HELD, '8', day(0));
+    await createAdminRate('USD', BASE, '4', day(0));
+
+    const entries = (await watchlist()).json().data.entries as Array<{
+      from: string;
+      to: string;
+      rate: string;
+      state: string;
+    }>;
+
+    const entry = entries.find((item) => item.from === HELD && item.to === BASE);
+    expect(entry?.rate).toBe('0.5000000000');
+    expect(entry?.state).toBe('fresh');
   });
 });
 

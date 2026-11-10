@@ -1,8 +1,8 @@
 import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
-import { SETTING_RATE_SYNC_ENABLED, SUPPORTED_CURRENCIES } from '../../config/constants.js';
+import { SETTING_RATE_SYNC_ENABLED, STORAGE_ANCHOR, SUPPORTED_CURRENCIES } from '../../config/constants.js';
 import { env } from '../../config/env.js';
-import { toDecimal } from '../../lib/money.js';
+import { roundRate, toDecimal } from '../../lib/money.js';
 import {
   createGenericJsonProvider,
   createPresetProvider,
@@ -15,7 +15,12 @@ import {
   isProviderUsable,
   isRateProviderAvailable,
 } from './rate-provider-config.service.js';
-import { convertToBasePairs, pairKey, validateQuotes, type RateRejectCode } from './rate-validation.js';
+import {
+  pairKey,
+  preciseRatio,
+  validateQuotes,
+  type RateRejectCode,
+} from './rate-validation.js';
 import type { Redis } from 'ioredis';
 
 export interface SyncFailure {
@@ -84,22 +89,13 @@ export async function buildProvider(prisma: PrismaClient): Promise<RateProvider>
  * 需要抓取与写入的币种需求。
  *
  * targets 固定为所有支持币种：每次同步都覆盖全量，无论用户是否持有或关注，
- * 确保任意币种对随时都有最新数据可用。
- * baseCurrencies 仍按用户设置取，决定落库哪些方向的直接对。
+ * 确保任意币种对随时都有最新数据可用。存储只落 USD→X 单一方向，因此
+ * 不再需要按用户基准币推导写入集合。
  */
 export async function collectRateDemand(
-  prisma: PrismaClient,
-): Promise<{ targets: string[]; baseCurrencies: string[] }> {
-  const settings = await prisma.userSettings.findMany({
-    select: { baseCurrency: true },
-  });
-
-  const baseCurrencies = [...new Set(settings.map((item) => item.baseCurrency))].sort();
-
-  return {
-    targets: [...SUPPORTED_CURRENCIES].sort(),
-    baseCurrencies,
-  };
+  _prisma: PrismaClient,
+): Promise<{ targets: string[] }> {
+  return { targets: [...SUPPORTED_CURRENCIES].sort() };
 }
 
 /** 上一次同步后连续失败次数，用于自动停用判定 */
@@ -146,7 +142,7 @@ export interface RunSyncOptions {
    * 生产环境的范围是全站并集，但集成测试共享同一个数据库，其他套件的币种
    * 会让「写入了几行」无法稳定断言。注入后只按给定集合执行。
    */
-  demand?: { targets: string[]; baseCurrencies: string[] };
+  demand?: { targets: string[] };
 }
 
 /**
@@ -197,22 +193,18 @@ export async function runRateSync(
     select: { id: true },
   });
 
-  const { targets, baseCurrencies } = options.demand ?? (await collectRateDemand(prisma));
+  const { targets } = options.demand ?? (await collectRateDemand(prisma));
 
-  // 没有任何外币实体时不需要外部调用，也不该产生一次「失败」
-  const baseSet = new Set(
-    baseCurrencies.length > 0 ? baseCurrencies : [provider.anchorCurrency],
-  );
-
-  // 必须同时要到「目标币」与「基准币」的锚定报价：换算每一个 target→base 都要
-  // 用 anchor→base 作分母，缺了它整批都会被 ANCHOR_TO_BASE_MISSING 拒绝。
-  // 此前只为 target 过滤，基准币全集里不含锚定币时会一条都落不了库。
+  // 存储只保留 USD→X 单一方向。provider 的锚定币可配，因此抓取集合始终带上
+  // 锚定币自身（作为换算分母）与 USD（作为落库目标），保证能把 anchor→X
+  // 转成 USD→X。
   const quoteNeed = new Set<string>();
   for (const target of targets) {
     if (target !== provider.anchorCurrency) quoteNeed.add(target);
   }
-  for (const base of baseSet) {
-    if (base !== provider.anchorCurrency) quoteNeed.add(base);
+  // 锚定币不是 USD 时，需要 anchor→USD 才能把报价换算到美元口径
+  if (provider.anchorCurrency !== STORAGE_ANCHOR) {
+    quoteNeed.add(STORAGE_ANCHOR);
   }
   const quotesToFetch = [...quoteNeed].sort();
 
@@ -273,15 +265,16 @@ export async function runRateSync(
     };
   }
 
-  // 偏离护栏要比较的对象是「供应商口径的锚定币对」，即 anchor->x，
-  // 因为校验发生在换算之前。已有数据里可能只有 x->base，因此两种方向都收进来。
+  // 偏离护栏比较的是「供应商口径的锚定币对」，即 anchor→x，因为校验发生在换算之前。
+  // 只比较同一锚定币的行，避免切换锚定币后拿旧锚点的数据当基线。
   const previousRows = await prisma.exchangeRate.findMany({
-    select: { baseCurrency: true, quoteCurrency: true, rate: true },
-    orderBy: [{ baseCurrency: 'asc' }, { quoteCurrency: 'asc' }, { rateDate: 'desc' }],
+    where: { baseCurrency: provider.anchorCurrency },
+    select: { quoteCurrency: true, rate: true },
+    orderBy: [{ quoteCurrency: 'asc' }, { rateDate: 'desc' }],
   });
   const previous = new Map<string, Decimal>();
   for (const row of previousRows) {
-    const key = pairKey(row.baseCurrency, row.quoteCurrency);
+    const key = pairKey(provider.anchorCurrency, row.quoteCurrency);
     if (!previous.has(key)) previous.set(key, toDecimal(row.rate.toString()));
   }
 
@@ -297,54 +290,95 @@ export async function runRateSync(
   let writtenRows = 0;
   let skippedManual = 0;
 
-  for (const baseCurrency of baseSet) {
-    const converted = convertToBasePairs({
-      quotes: validated.accepted,
-      anchor: provider.anchorCurrency,
-      baseCurrency,
-      targets: quotesToFetch,
+  // 把「供应商口径」报价换算成「USD→X」存储口径。
+  // anchor === USD 时一对一直接落库；否则需要 anchor→USD 作分母。
+  const rateByQuote = new Map(validated.accepted.map((item) => [item.quote, item]));
+  const anchorToUsd =
+    provider.anchorCurrency === STORAGE_ANCHOR ? null : rateByQuote.get(STORAGE_ANCHOR);
+
+  if (provider.anchorCurrency !== STORAGE_ANCHOR && !anchorToUsd) {
+    // 缺锚定币→USD 的报价，整批无法换算到美元口径
+    const message = `缺少 ${provider.anchorCurrency}→${STORAGE_ANCHOR} 报价，无法换算到存储口径`;
+    await prisma.rateSyncRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'failed',
+        finishedAt: now(),
+        errorCode: 'ANCHOR_TO_STORAGE_MISSING',
+        errorMessage: message,
+      },
     });
-    failures.push(...converted.rejected.map((item) => ({ pair: item.pair, code: item.code })));
+    return {
+      provider: provider.name,
+      anchorCurrency: provider.anchorCurrency,
+      status: 'failed',
+      fetchedPairs: validated.accepted.length,
+      writtenRows: 0,
+      skippedManual: 0,
+      failures,
+      errorCode: 'ANCHOR_TO_STORAGE_MISSING',
+      errorMessage: message,
+      startedAt: startedAt.toISOString(),
+      finishedAt: now().toISOString(),
+    };
+  }
 
-    for (const pair of converted.pairs) {
-      const rateDate = new Date(`${pair.date}T00:00:00.000Z`);
-      const existing = await prisma.exchangeRate.findUnique({
-        where: {
-          baseCurrency_quoteCurrency_rateDate: {
-            baseCurrency: pair.base,
-            quoteCurrency: pair.quote,
-            rateDate,
-          },
-        },
-        select: { id: true, source: true },
-      });
+  // 只落 demand 范围内的币种：anchor→USD 只是换算分母，不当成待写币种；
+  // 供应商可能顺带返回未被请求的币种，也不写入。
+  const targetSet = new Set(targets);
+  const storagePairs = validated.accepted
+    .filter(
+      (item) =>
+        targetSet.has(item.quote) &&
+        item.quote !== provider.anchorCurrency &&
+        item.quote !== STORAGE_ANCHOR,
+    )
+    .map((item) => {
+      const rate =
+        provider.anchorCurrency === STORAGE_ANCHOR
+          ? item.rate
+          : preciseRatio(item.rate, anchorToUsd!.rate);
+      return { quote: item.quote, rate, date: item.date };
+    });
 
-      // 人工录入是权威值：同一天同一个键绝不覆盖
-      if (existing?.source === 'manual') {
-        skippedManual += 1;
-        continue;
-      }
-
-      await prisma.exchangeRate.upsert({
-        where: {
-          baseCurrency_quoteCurrency_rateDate: {
-            baseCurrency: pair.base,
-            quoteCurrency: pair.quote,
-            rateDate,
-          },
-        },
-        create: {
-          baseCurrency: pair.base,
+  for (const pair of storagePairs) {
+    const rateDate = new Date(`${pair.date}T00:00:00.000Z`);
+    const existing = await prisma.exchangeRate.findUnique({
+      where: {
+        baseCurrency_quoteCurrency_rateDate: {
+          baseCurrency: STORAGE_ANCHOR,
           quoteCurrency: pair.quote,
-          rate: pair.rate,
           rateDate,
-          source: 'provider',
         },
-        // 同源重抓允许刷新自己写入的行
-        update: { rate: pair.rate },
-      });
-      writtenRows += 1;
+      },
+      select: { id: true, source: true },
+    });
+
+    // 人工录入是权威值：同一天同一个键绝不覆盖
+    if (existing?.source === 'manual') {
+      skippedManual += 1;
+      continue;
     }
+
+    await prisma.exchangeRate.upsert({
+      where: {
+        baseCurrency_quoteCurrency_rateDate: {
+          baseCurrency: STORAGE_ANCHOR,
+          quoteCurrency: pair.quote,
+          rateDate,
+        },
+      },
+      create: {
+        baseCurrency: STORAGE_ANCHOR,
+        quoteCurrency: pair.quote,
+        rate: roundRate(pair.rate),
+        rateDate,
+        source: 'provider',
+      },
+      // 同源重抓允许刷新自己写入的行
+      update: { rate: roundRate(pair.rate) },
+    });
+    writtenRows += 1;
   }
 
   const status: SyncSummary['status'] =

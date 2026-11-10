@@ -367,6 +367,7 @@
       "close": "Close",
       "range_days": "{{count}} days",
       "inverted_hint": "No direct records exist for this direction, so the chart shows the inverse rate.",
+      "cross_hint": "No direct records exist for this pair, so the chart is derived from the two USD legs.",
       "loading": "Loading…",
       "load_failed": "Failed to load rate history",
       "empty_title": "No history yet",

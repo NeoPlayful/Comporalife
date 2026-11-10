@@ -59,7 +59,12 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  await clearExchangeRates(app, [A, B, C]);
+  // 交叉套算用例会写 USD→A / USD→B。用 froms/tos 精确匹配，只删这几组
+  // 币对之间的行，避免误删其他并行套件的 USD→CNY 等数据。
+  await clearExchangeRates(app, {
+    froms: ['USD', A, B, C],
+    tos: ['USD', A, B, C],
+  });
 
   const admin = await createUser(app, DOMAIN, 'admin');
   adminToken = await promoteToAdmin(app, admin.userId);
@@ -113,35 +118,42 @@ describe('汇率历史：日线', () => {
     expect(points.map((p) => p.rate)).toEqual(['0.5000000000', '0.2500000000']);
   });
 
-  it('反向数据更新时优先反向，不被过期的一天正向数据压住', async () => {
-    // 正向只有一天旧数据，反向最近三天都在更新
+  it('存在直接行时优先直接行，不再比较正反方向的数据新旧', async () => {
+    // 直接行是人工权威值：即使反向行更新，也从直接行出图（新模型不再「谁新用谁」）
     await createRate(A, B, '2', day(5));
-    await createRate(B, A, '2.5', day(2));
+    await createRate(B, A, '4', day(0));
+
+    const res = await history(`from=${A}&to=${B}&granularity=day&buckets=30`);
+    const data = res.json().data;
+    expect(data.inverted).toBe(false);
+    expect(data.derivation).toBe('direct');
+    expect((data.points as Array<{ periodStart: string }>).map((p) => p.periodStart)).toEqual([
+      day(5),
+    ]);
+  });
+
+  it('只有反向行时取倒数，并标记 inverted / derivation=inverse', async () => {
     await createRate(B, A, '4', day(1));
     await createRate(B, A, '5', day(0));
 
     const res = await history(`from=${A}&to=${B}&granularity=day&buckets=30`);
     const data = res.json().data;
     expect(data.inverted).toBe(true);
-    expect((data.points as Array<{ periodStart: string }>).map((p) => p.periodStart)).toEqual([
-      day(2),
-      day(1),
-      day(0),
-    ]);
+    expect(data.derivation).toBe('inverse');
   });
 
-  it('正向数据更新时优先正向', async () => {
-    await createRate(B, A, '4', day(5));
-    await createRate(A, B, '0.5', day(1));
-    await createRate(A, B, '0.4', day(0));
+  it('两边都不是 USD 且无直接行时用两条 USD 腿套算，derivation=cross', async () => {
+    // A→B 无直接行；写入 USD→A 与 USD→B，套算 (USD→B)/(USD→A)
+    await createRate('USD', A, '8', day(0));
+    await createRate('USD', B, '4', day(0));
 
     const res = await history(`from=${A}&to=${B}&granularity=day&buckets=30`);
     const data = res.json().data;
+    expect(data.derivation).toBe('cross');
     expect(data.inverted).toBe(false);
-    expect((data.points as Array<{ periodStart: string }>).map((p) => p.periodStart)).toEqual([
-      day(1),
-      day(0),
-    ]);
+    const points = data.points as Array<{ rate: string }>;
+    // (USD→B=4)/(USD→A=8) = 0.5
+    expect(points[0]!.rate).toBe('0.5000000000');
   });
 });
 

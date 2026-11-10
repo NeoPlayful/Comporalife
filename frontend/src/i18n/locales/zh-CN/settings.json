@@ -56,6 +56,7 @@
       "title": "汇率走势",
       "description": "{{fromName}} 兑 {{toName}}，点开即可查看日、周、月、季、年走势。",
       "inverted_hint": "本图为反向汇率 {{from}}→{{to}} 取倒数后的走势。",
+      "cross_hint": "本图由 {{fromName}} 与 {{toName}} 各自兑 USD 的汇率套算而来。",
       "granularity_label": "粒度",
       "granularity": {
         "day": "日",

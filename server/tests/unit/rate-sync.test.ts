@@ -1,6 +1,6 @@
 import Decimal from 'decimal.js';
 import { describe, expect, it } from 'vitest';
-import { validateQuotes, convertToBasePairs, preciseRatio } from '@/modules/market-data/rate-validation';
+import { validateQuotes, preciseRatio } from '@/modules/market-data/rate-validation';
 import { createGenericJsonProvider } from '@/modules/market-data/rate-provider';
 import { collectRateDemand } from '@/modules/market-data/rate-sync.service';
 import { SUPPORTED_CURRENCIES } from '@/config/constants';
@@ -84,62 +84,8 @@ describe('报价校验', () => {
   });
 });
 
-describe('锚定币换算', () => {
-  const quotes = [
-    quote('USD', 'CNY', '7.2'),
-    quote('USD', 'EUR', '0.9'),
-    quote('USD', 'JPY', '150'),
-  ];
-
-  it('锚定币兑基准币直接取报价', () => {
-    const { pairs } = convertToBasePairs({
-      quotes,
-      anchor: 'USD',
-      baseCurrency: 'CNY',
-      targets: ['USD'],
-    });
-    expect(pairs).toHaveLength(1);
-    expect(pairs[0]!.rate.toString()).toBe('7.2');
-  });
-
-  it('基准币即锚定币时取倒数', () => {
-    const { pairs } = convertToBasePairs({
-      quotes,
-      anchor: 'USD',
-      baseCurrency: 'USD',
-      targets: ['EUR'],
-    });
-    expect(pairs[0]!.base).toBe('EUR');
-    expect(pairs[0]!.quote).toBe('USD');
-    // 1 / 0.9，按 10 位落库
-    expect(pairs[0]!.rate.toFixed(10)).toBe('1.1111111111');
-  });
-
-  it('第三种情形按 R(anchor→base)/R(anchor→target) 换算', () => {
-    const { pairs } = convertToBasePairs({
-      quotes,
-      anchor: 'USD',
-      baseCurrency: 'CNY',
-      targets: ['EUR'],
-    });
-    expect(pairs[0]!.base).toBe('EUR');
-    expect(pairs[0]!.quote).toBe('CNY');
-    // 7.2 / 0.9 = 8
-    expect(pairs[0]!.rate.toString()).toBe('8');
-  });
-
-  it('缺锚定币兑基准币时不下发任何派生对', () => {
-    const { pairs, rejected } = convertToBasePairs({
-      quotes: [quote('USD', 'EUR', '0.9')],
-      anchor: 'USD',
-      baseCurrency: 'CNY',
-      targets: ['EUR'],
-    });
-    expect(pairs).toHaveLength(0);
-    expect(rejected[0]!.code).toBe('ANCHOR_TO_BASE_MISSING');
-  });
-
-  it('中间精度高于 10 位：先舍入再相除会丢精度', () => {
+describe('中间精度', () => {
+  it('preciseRatio 中间精度高于 10 位：先舍入再相除会丢精度', () => {
     // 构造一个两次除法后第 11 位会变化的用例：8.00000000019 / 1.00000000001
     // 低精度路径先各自截到 10 位再除，结果偏离真实值
     const numerator = new Decimal('8.00000000019');
@@ -156,17 +102,6 @@ describe('锚定币换算', () => {
     expect(high.minus(numerator.div(denominator)).abs().lt(low.minus(numerator.div(denominator)).abs())).toBe(
       true,
     );
-  });
-
-  it('目标币在报价里缺失时记录原因而不是静默跳过', () => {
-    const { pairs, rejected } = convertToBasePairs({
-      quotes,
-      anchor: 'USD',
-      baseCurrency: 'CNY',
-      targets: ['GBP'],
-    });
-    expect(pairs).toHaveLength(0);
-    expect(rejected[0]!.pair).toBe('GBP->CNY');
   });
 });
 
@@ -249,32 +184,8 @@ describe('通用 JSON 适配器', () => {
 });
 
 describe('抓取范围推导', () => {
-  function fakePrisma(settings: Array<{ userId: string; baseCurrency: string }>) {
-    return {
-      userSettings: { findMany: async () => settings },
-    } as never;
-  }
-
   it('targets 固定为所有支持币种', async () => {
-    const prisma = fakePrisma([{ userId: 'u1', baseCurrency: 'CNY' }]);
-    const { targets } = await collectRateDemand(prisma);
+    const { targets } = await collectRateDemand({} as never);
     expect(targets).toEqual([...SUPPORTED_CURRENCIES].sort());
-  });
-
-  it('baseCurrencies 从用户设置取，多用户去重排序', async () => {
-    const prisma = fakePrisma([
-      { userId: 'u1', baseCurrency: 'CNY' },
-      { userId: 'u2', baseCurrency: 'EUR' },
-      { userId: 'u3', baseCurrency: 'CNY' },
-    ]);
-    const { baseCurrencies } = await collectRateDemand(prisma);
-    expect(baseCurrencies).toEqual(['CNY', 'EUR']);
-  });
-
-  it('没有任何用户时 baseCurrencies 为空，targets 仍是全量', async () => {
-    const prisma = fakePrisma([]);
-    const { targets, baseCurrencies } = await collectRateDemand(prisma);
-    expect(targets).toEqual([...SUPPORTED_CURRENCIES].sort());
-    expect(baseCurrencies).toEqual([]);
   });
 });

@@ -6,8 +6,10 @@ import {
   QUALITY_ITEM_LIMIT,
   QUALITY_LOOKBACK_MONTHS,
   RATE_STALE_DAYS,
+  STORAGE_ANCHOR,
 } from '../../config/constants.js';
 import { moneyToString, roundMoney, toDecimal } from '../../lib/money.js';
+import { lookupRate } from '../currencies/rate-lookup.service.js';
 import { loadAllPortfolioValuations } from '../portfolios/valuation.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -439,31 +441,35 @@ export async function findRateLag(
   }> = [];
 
   for (const currency of currencies) {
-    const latest = await prisma.exchangeRate.findFirst({
-      where: {
-        OR: [
-          { baseCurrency: currency, quoteCurrency: context.baseCurrency },
-          { baseCurrency: context.baseCurrency, quoteCurrency: currency },
-        ],
-      },
-      orderBy: { rateDate: 'desc' },
-      select: { rateDate: true, source: true },
+    // 用统一内核取最新值：它会按「直接 → 反向 → USD 套算」拿到真正的可用汇率，
+    // 避免把「靠两条 USD 腿就能算出来」的交叉对误报成缺失。
+    const resolved = await lookupRate(prisma, {
+      from: currency,
+      to: context.baseCurrency,
+      asOf: new Date(),
     });
 
-    const latestDate = latest ? latest.rateDate.toISOString().slice(0, 10) : null;
-    const daysLag = latest
-      ? Math.floor((Date.now() - latest.rateDate.getTime()) / DAY_MS)
+    const latestDate = resolved ? resolved.rateDate.toISOString().slice(0, 10) : null;
+    const daysLag = resolved
+      ? Math.floor((Date.now() - resolved.rateDate.getTime()) / DAY_MS)
       : null;
 
     if (daysLag === null || daysLag > RATE_STALE_DAYS) {
+      // 同步失败的原因码现在记的是 USD→X 腿，这里两种写法都认，避免判定失配
       const pairText = `${currency}->${context.baseCurrency}`;
-      const state = failedPairs.has(pairText) ? 'sync_failed' : latest ? 'stale' : 'missing';
+      const legText = `${STORAGE_ANCHOR}->${currency}`;
+      const state =
+        failedPairs.has(pairText) || failedPairs.has(legText)
+          ? 'sync_failed'
+          : resolved
+            ? 'stale'
+            : 'missing';
       items.push({
         from: currency,
         to: context.baseCurrency,
         latestDate,
         daysLag,
-        source: latest?.source ?? null,
+        source: resolved?.source ?? null,
         state,
       });
     }

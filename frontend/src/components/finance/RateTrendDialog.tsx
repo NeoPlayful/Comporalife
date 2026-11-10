@@ -123,7 +123,8 @@ export default function RateTrendDialog({
   }
 
   const points: RateHistoryPoint[] = query.data?.points ?? [];
-  const inverted = (query.data?.inverted ?? false) && points.length > 0;
+  const inversion = (query.data?.inverted ?? false) && points.length > 0;
+  const derivation = points.length > 0 ? (query.data?.derivation ?? (inversion ? 'inverse' : 'direct')) : 'direct';
 
   const last = points[points.length - 1] ?? null;
   const prev = points[points.length - 2] ?? null;
@@ -236,15 +237,20 @@ export default function RateTrendDialog({
       size="2xl"
       title={headerTitle}
       description={
-        inverted
-          ? t('exchange_rates.history.inverted_hint', {
-              from: pair.to,
-              to: pair.from,
-            })
-          : t('exchange_rates.history.description', {
+        derivation === 'cross'
+          ? t('exchange_rates.history.cross_hint', {
               fromName: currencyName(pair.from),
               toName: currencyName(pair.to),
             })
+          : derivation === 'inverse'
+            ? t('exchange_rates.history.inverted_hint', {
+                from: pair.to,
+                to: pair.from,
+              })
+            : t('exchange_rates.history.description', {
+                fromName: currencyName(pair.from),
+                toName: currencyName(pair.to),
+              })
       }
       onClose={onClose}
     >

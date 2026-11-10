@@ -18,7 +18,8 @@ import {
 } from './rate-provider-config.service.js';
 import { getRateSyncSchedule } from './rate-sync.scheduler.js';
 import { getRateSyncFrequency } from '../settings/system-settings.service.js';
-import { RATE_STALE_DAYS } from '../../config/constants.js';
+import { RATE_STALE_DAYS, STORAGE_ANCHOR } from '../../config/constants.js';
+import { lookupRate } from '../currencies/rate-lookup.service.js';
 
 function requireAdmin(request: FastifyRequest): AuthContext {
   const auth = requireAuth(request);
@@ -118,39 +119,37 @@ export default async function marketDataRoutes(app: FastifyInstance) {
     const pairs = [];
 
     for (const from of [...required].sort()) {
-      const row = await app.prisma.exchangeRate.findFirst({
-        where: {
-          OR: [
-            { baseCurrency: from, quoteCurrency: baseCurrency },
-            { baseCurrency: baseCurrency, quoteCurrency: from },
-          ],
-          rateDate: { lte: today },
-        },
-        orderBy: { rateDate: 'desc' },
-        select: { rate: true, rateDate: true, source: true },
+      // 用统一内核取最新值：套算交叉对需要两条 USD 腿，直接正/反查会误报缺失
+      const resolved = await lookupRate(app.prisma, {
+        from,
+        to: baseCurrency,
+        asOf: today,
       });
 
-      const daysLag = row
-        ? Math.floor((today.getTime() - row.rateDate.getTime()) / DAY_MS)
+      const daysLag = resolved
+        ? Math.floor((today.getTime() - resolved.rateDate.getTime()) / DAY_MS)
         : null;
 
-      // sync_failed 与 missing 必须分开：前者要管理员看供应商，后者要补录
+      // sync_failed 与 missing 必须分开：前者要管理员看供应商，后者要补录。
+      // 同步失败原因码记的是 USD→X 腿，两种写法都认。
       const pairKeyText = `${from}->${baseCurrency}`;
-      const state = failedPairs.has(pairKeyText)
-        ? 'sync_failed'
-        : !row
-          ? 'missing'
-          : daysLag !== null && daysLag > RATE_STALE_DAYS
-            ? 'stale'
-            : 'fresh';
+      const legText = `${STORAGE_ANCHOR}->${from}`;
+      const state =
+        failedPairs.has(pairKeyText) || failedPairs.has(legText)
+          ? 'sync_failed'
+          : !resolved
+            ? 'missing'
+            : daysLag !== null && daysLag > RATE_STALE_DAYS
+              ? 'stale'
+              : 'fresh';
 
       pairs.push({
         from,
         to: baseCurrency,
         required: true,
-        latestRateDate: row?.rateDate.toISOString().slice(0, 10) ?? null,
+        latestRateDate: resolved?.rateDate.toISOString().slice(0, 10) ?? null,
         daysLag,
-        source: row?.source ?? null,
+        source: resolved?.source ?? null,
         state,
       });
     }

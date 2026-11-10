@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import {
   DEFAULT_RATE_PREVIEW_CURRENCIES,
   RATE_STALE_DAYS,
+  STORAGE_ANCHOR,
   SUPPORTED_CURRENCIES,
 } from '../../config/constants.js';
 import { rateToString, toDecimal } from '../../lib/money.js';
@@ -138,7 +139,11 @@ interface LatestRate {
   source: 'manual' | 'provider';
 }
 
-/** 一次查询取回多个币种对的最新一条汇率，避免逐行查询在 50 行时放大成 50 次往返 */
+/**
+ * 一次查询取回多个币种对的最新一条汇率，避免逐行查询在 50 行时放大成 50 次往返。
+ *
+ * codes 里必须包含存储锚定币（USD），否则套算交叉对时缺少分母/分子腿。
+ */
 async function loadLatestRates(
   prisma: PrismaClient,
   codes: string[],
@@ -196,13 +201,79 @@ async function loadExistingPairs(prisma: PrismaClient): Promise<Set<string>> {
   return new Set(rows.map((row) => pairKey(row.base_currency, row.quote_currency)));
 }
 
+/**
+ * 某币种对能否折算。
+ *
+ * 直接行 / 反向行任一存在即可；两边都不是 USD 时，只要两条 USD 腿齐全
+ * 也能套算出来——迁移后这正是交叉对的常规情形。
+ */
 function isComputable(existing: Set<string>, from: string, to: string): boolean {
-  return existing.has(pairKey(from, to)) || existing.has(pairKey(to, from));
+  if (existing.has(pairKey(from, to)) || existing.has(pairKey(to, from))) return true;
+  if (from === STORAGE_ANCHOR || to === STORAGE_ANCHOR) return false;
+  return (
+    existing.has(pairKey(STORAGE_ANCHOR, from)) && existing.has(pairKey(STORAGE_ANCHOR, to))
+  );
 }
 
 /** 按 UTC 自然日计算日期差，避免时分秒让「今天」被判成 1 天前 */
 function utcDay(date: Date): number {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+interface ResolvedRate {
+  rate: Decimal;
+  rateDate: Date;
+  source: 'manual' | 'provider';
+}
+
+/**
+ * 按「直接 → 反向 → USD 套算」解析一个币种对的最新值。
+ *
+ * 人工直接行（迁移后唯一会出现的非 USD 直接行）优先于任何推算值：管理员
+ * 录入交叉对就是为了覆盖套算结果。没有直接行时，反向行比套算值更贴近
+ * 原始数据，优先取反向。
+ */
+function resolveEntry(
+  from: string,
+  to: string,
+  latest: Map<string, LatestRate>,
+): ResolvedRate | null {
+  const direct = latest.get(pairKey(from, to));
+  if (direct) {
+    return { rate: direct.rate, rateDate: direct.rateDate, source: direct.source };
+  }
+
+  const inverse = latest.get(pairKey(to, from));
+  if (inverse && inverse.rate.gt(0)) {
+    return {
+      rate: new Decimal(1).div(inverse.rate),
+      rateDate: inverse.rateDate,
+      source: inverse.source,
+    };
+  }
+
+  if (from !== STORAGE_ANCHOR && to !== STORAGE_ANCHOR) {
+    const numerator = latest.get(pairKey(STORAGE_ANCHOR, to));
+    const denominator = latest.get(pairKey(STORAGE_ANCHOR, from));
+    if (numerator && denominator && denominator.rate.gt(0)) {
+      return {
+        rate: new Decimal(numerator.rate.toString())
+          .div(new Decimal(denominator.rate.toString()))
+          .toDecimalPlaces(30, Decimal.ROUND_HALF_UP),
+        // 套算值取两腿里较旧的日期：任一条腿过期就说明这个值不够新
+        rateDate:
+          numerator.rateDate.getTime() <= denominator.rateDate.getTime()
+            ? numerator.rateDate
+            : denominator.rateDate,
+        source:
+          numerator.source === 'manual' || denominator.source === 'manual'
+            ? 'manual'
+            : 'provider',
+      };
+    }
+  }
+
+  return null;
 }
 
 function buildEntry(
@@ -212,22 +283,7 @@ function buildEntry(
   latest: Map<string, LatestRate>,
   asOf: Date,
 ): WatchlistEntry {
-  // 正向行过旧时不能压住更新的反向行：seed 只写过一天正向，之后同步一直在写反向，
-  // 只看「有没有正向」会让卡片日期永远停在 seed 那天。同日数据优先正向。
-  const direct = latest.get(pairKey(from, to));
-  const inverse = latest.get(pairKey(to, from));
-  const useInverse =
-    inverse !== undefined && (direct === undefined || inverse.rateDate > direct.rateDate);
-
-  const resolved = useInverse
-    ? {
-        rate: new Decimal(1).div(inverse!.rate),
-        rateDate: inverse!.rateDate,
-        source: inverse!.source,
-      }
-    : direct
-      ? { rate: direct.rate, rateDate: direct.rateDate, source: direct.source }
-      : null;
+  const resolved = resolveEntry(from, to, latest);
 
   if (!resolved) {
     return {
@@ -282,13 +338,13 @@ export async function getWatchlist(
     pairKey(pair.from, pair.to),
   );
 
+  // 载入最新值时把存储锚定币一并带上：套算交叉对需要 USD 两条腿
+  const latestCodes = new Set<string>(selectedKeys.flatMap((key) => key.split('->')));
+  latestCodes.add(STORAGE_ANCHOR);
+
   const [existing, latest] = await Promise.all([
     loadExistingPairs(prisma),
-    loadLatestRates(
-      prisma,
-      [...new Set(selectedKeys.flatMap((key) => key.split('->')))],
-      asOf,
-    ),
+    loadLatestRates(prisma, [...latestCodes], asOf),
   ]);
 
   const entries = selectedKeys.map((key) => {
@@ -309,6 +365,16 @@ export async function getWatchlist(
   }
   for (const currency of need.held) {
     candidateKeys.add(pairKey(currency, need.baseCurrency));
+  }
+
+  // 用户同时持有的多个外币之间的交叉对也作候选：迁移后它们靠两条 USD 腿套算，
+  // 只要 isComputable 认，加进来就能看到值。不枚举全站所有交叉对，否则候选
+  // 会膨胀到近千条，用户根本无从选择。
+  const heldList = need.held.filter((currency) => isComputable(existing, currency, need.baseCurrency));
+  for (const a of heldList) {
+    for (const b of heldList) {
+      if (a !== b) candidateKeys.add(pairKey(a, b));
+    }
   }
 
   const candidates = [...candidateKeys]

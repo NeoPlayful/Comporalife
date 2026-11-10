@@ -232,6 +232,8 @@ export interface RateHistory {
   buckets: number;
   /** 整段序列是否由反向汇率的倒数求得 */
   inverted: boolean;
+  /** 整段序列的推导方式：直接 / 单腿倒数 / 两条 USD 腿套算 */
+  derivation?: 'direct' | 'inverse' | 'cross';
   points: RateHistoryPoint[];
 }
 

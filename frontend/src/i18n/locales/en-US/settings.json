@@ -56,6 +56,7 @@
       "title": "Rate trend",
       "description": "{{fromName}} to {{toName}}. Open to view daily, weekly, monthly, quarterly and yearly trends.",
       "inverted_hint": "This chart is the reciprocal of the inverse rate {{from}}→{{to}}.",
+      "cross_hint": "This chart is derived by crossing {{fromName}} and {{toName}} against USD.",
       "granularity_label": "Interval",
       "granularity": {
         "day": "Day",
