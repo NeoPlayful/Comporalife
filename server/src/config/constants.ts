@@ -468,6 +468,16 @@ export const DUPLICATE_WINDOW_DAYS = envInt('DUPLICATE_WINDOW_DAYS', 3);
 export const RATE_STALE_DAYS = envInt('RATE_STALE_DAYS', 7);
 
 /**
+ * 汇率存储的锚定币。
+ *
+ * 自动化同步只落「USD→X」这一个方向；任意 A→B 由读取侧用
+ * (USD→B)/(USD→A) 现场套算，避免 N×N 个直接对把表撑成冗余矩形。
+ * 与数据源的 anchorCurrency 解耦：供应商请求锚点可配，但落库方向固定为
+ * USD，读取侧永远只需认识这一种存储形态。
+ */
+export const STORAGE_ANCHOR = 'USD';
+
+/**
  * 没有任何外币持仓时，汇率指标页默认预览的币种。
  *
  * 页面定位是「自选行情」，若默认集合完全依赖持仓，纯本币用户看到的永远是空列表。

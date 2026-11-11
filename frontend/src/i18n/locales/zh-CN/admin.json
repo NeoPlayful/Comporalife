@@ -367,6 +367,7 @@
       "close": "关闭",
       "range_days": "{{count}} 天",
       "inverted_hint": "该方向没有直接记录，图为反向汇率的倒数。",
+      "cross_hint": "该币种对没有直接记录，图为两条 USD 腿套算的结果。",
       "loading": "加载中…",
       "load_failed": "汇率历史加载失败",
       "empty_title": "暂无历史数据",

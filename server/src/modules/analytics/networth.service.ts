@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import type { PrismaClient } from '@prisma/client';
 import { addDays, addMonths } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { LIABILITY_ACCOUNT_TYPES } from '../../config/constants.js';
+import { LIABILITY_ACCOUNT_TYPES, STORAGE_ANCHOR } from '../../config/constants.js';
 import { roundMoney, toDecimal } from '../../lib/money.js';
 import { convertMany } from '../currencies/currency.service.js';
 import { computeBalances } from '../accounts/balance.service.js';
@@ -457,20 +457,24 @@ export async function buildNetWorthSeries(
           orderBy: [{ priceDate: 'asc' }],
         });
 
-  // 序列里出现的所有币种一次取齐，采样点不再单独查汇率
-  const currencies = new Set<string>([params.baseCurrency]);
+  // 序列里出现的所有币种一次取齐，采样点不再单独查汇率。
+  // 必须带上存储锚定币：交叉对靠两条 USD 腿套算，缺了 USD 腿整段会算成 0。
+  const currencies = new Set<string>([params.baseCurrency, STORAGE_ANCHOR]);
   for (const account of accounts) currencies.add(account.currency);
   for (const asset of assets) currencies.add(asset.currency);
   for (const liability of liabilities) currencies.add(liability.currency);
   for (const portfolio of portfolios) currencies.add(portfolio.currency);
 
+  const currencyList = [...currencies];
+
   // 刻意不按 lastAsOf 截断：区间早于首条汇率时要回退到最早那条，
   // 加了上限就取不到它，早期采样点会被算成 0。
+  // 取所有以 currencies 成员为任一端的行：这样既覆盖 base↔外币直接对，
+  // 也覆盖 USD↔外币这两条套算腿。
   const rateRows = await prisma.exchangeRate.findMany({
     where: {
       OR: [
-        { baseCurrency: { in: [...currencies] }, quoteCurrency: params.baseCurrency },
-        { baseCurrency: params.baseCurrency, quoteCurrency: { in: [...currencies] } },
+        { baseCurrency: { in: currencyList }, quoteCurrency: { in: currencyList } },
       ],
     },
     select: { baseCurrency: true, quoteCurrency: true, rateDate: true, rate: true },
@@ -544,11 +548,24 @@ export async function buildNetWorthSeries(
   const rateAt = (from: string, to: string, asOf: Date): Decimal | null => {
     if (from === to) return new Decimal(1);
 
+    // 直接行优先（迁移后即人工交叉对）
     const direct = rateForPair(ratesByPair.get(`${from}->${to}`), asOf);
     if (direct) return direct;
 
+    // 反向行取倒数
     const reverse = rateForPair(ratesByPair.get(`${to}->${from}`), asOf);
     if (reverse && !reverse.isZero()) return new Decimal(1).div(reverse);
+
+    // 套算：(USD→to)/(USD→from)
+    if (from !== STORAGE_ANCHOR && to !== STORAGE_ANCHOR) {
+      const numerator = rateForPair(ratesByPair.get(`${STORAGE_ANCHOR}->${to}`), asOf);
+      const denominator = rateForPair(ratesByPair.get(`${STORAGE_ANCHOR}->${from}`), asOf);
+      if (numerator && denominator && !denominator.isZero()) {
+        return new Decimal(numerator.toString())
+          .div(new Decimal(denominator.toString()))
+          .toDecimalPlaces(30, Decimal.ROUND_HALF_UP);
+      }
+    }
 
     return null;
   };

@@ -50,7 +50,12 @@ export default function RateHistoryDialog({
 
   const points: AdminRateHistoryPoint[] = query.data?.points ?? [];
   // 空数据时不提示「图为反向倒数」：没有图可看，提示只会让人以为加载坏了
-  const inverted = (query.data?.inverted ?? false) && points.length > 0;
+  const derivation = query.data?.derivation ?? (query.data?.inverted ? 'inverse' : 'direct');
+  const showHint = points.length > 0 && derivation !== 'direct';
+  const hintKey =
+    derivation === 'cross'
+      ? 'exchangeRates.history.cross_hint'
+      : 'exchangeRates.history.inverted_hint';
 
   // 明细新的在上面：看走势时最关心最近几次改动
   const ordered = [...points].reverse();
@@ -113,7 +118,7 @@ export default function RateHistoryDialog({
           </span>
         </>
       }
-      description={inverted ? t('exchangeRates.history.inverted_hint') : undefined}
+      description={showHint ? t(hintKey) : undefined}
       onClose={onClose}
     >
         <div className="mb-3 flex flex-wrap items-center gap-2">

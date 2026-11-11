@@ -357,6 +357,7 @@ export const adminApi = {
       to: string;
       days: number;
       inverted: boolean;
+      derivation?: 'direct' | 'inverse' | 'cross';
       points: AdminRateHistoryPoint[];
     }>(`/api/admin/exchange-rates/history?${query}`);
   },

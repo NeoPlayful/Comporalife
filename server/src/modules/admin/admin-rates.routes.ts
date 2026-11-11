@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import Decimal from 'decimal.js';
 import { z } from 'zod';
 import {
   CURRENCY_NAMES,
@@ -12,6 +11,7 @@ import { buildPagination, ok, parsePageParams } from '../../lib/api-utils.js';
 import { errors } from '../../lib/errors.js';
 import { rateToString, toDecimal } from '../../lib/money.js';
 import { requireAuth, type AuthContext } from '../../plugins/auth.js';
+import { loadPairSeries } from '../currencies/rate-history.service.js';
 import { isRateSyncEnabled, setRateSyncEnabled } from '../market-data/rate-sync.service.js';
 import { getRateProviderView, saveRateProviderConfig } from '../market-data/rate-provider-config.service.js';
 import { getRateSyncFrequency, setRateSyncFrequency } from '../settings/system-settings.service.js';
@@ -283,40 +283,16 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
     const cutoff = new Date(Date.now() - query.days * 86_400_000);
     const since = new Date(`${cutoff.toISOString().slice(0, 10)}T00:00:00.000Z`);
 
-    const select = { rate: true, rateDate: true, source: true } as const;
-
-    const direct = await app.prisma.exchangeRate.findMany({
-      where: {
-        baseCurrency: query.from,
-        quoteCurrency: query.to,
-        rateDate: { gte: since, lte: new Date() },
-      },
-      orderBy: { rateDate: 'asc' },
-      take: 1000,
-      select,
+    // 与用户侧走势图共用同一套方向推导（直接 / 单腿倒数 / 两条 USD 腿套算），
+    // 避免后台与前台对同一个币种对给出不同口径的数值
+    const series = await loadPairSeries(app.prisma, query.from, query.to, {
+      gte: since,
+      lte: new Date(),
     });
 
-    const inverted = direct.length === 0;
-    const source =
-      direct.length > 0
-        ? direct
-        : await app.prisma.exchangeRate.findMany({
-            where: {
-              baseCurrency: query.to,
-              quoteCurrency: query.from,
-              rateDate: { gte: since, lte: new Date() },
-            },
-            orderBy: { rateDate: 'asc' },
-            take: 1000,
-            select,
-          });
-
-    const points = source.map((row) => ({
-      rate: rateToString(
-        inverted ? new Decimal(1).div(row.rate.toString()) : row.rate.toString(),
-      ),
+    const points = series.rows.map((row) => ({
+      rate: rateToString(row.rate),
       rateDate: row.rateDate.toISOString().slice(0, 10),
-      source: row.source,
     }));
 
     return ok(
@@ -324,7 +300,8 @@ export default async function adminRatesRoutes(app: FastifyInstance) {
         from: query.from,
         to: query.to,
         days: query.days,
-        inverted,
+        inverted: series.inverted,
+        derivation: series.derivation,
         points,
       },
       request.id,

@@ -11,7 +11,7 @@ const DOMAIN = testDomain('rate-sync');
 const TODAY = '2026-10-20';
 // 抓取范围固定为本套件所需币种：集成测试共享数据库，其他套件的币种会改变写入行数
 function demandFor(...targets: string[]) {
-  return { targets, baseCurrencies: ['CNY'] };
+  return { targets };
 }
 
 let app: FastifyInstance;
@@ -68,9 +68,12 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await cleanupUsers(app, DOMAIN);
-  // 用方向精确匹配：本套件只写 GBP/AUD → CNY 方向，而 dashboard 也以 CNY 为
-  // 对手币。双向清理会在对方断言前把它的 USD→CNY 行删掉。
-  await clearExchangeRates(app, { froms: ['GBP', 'AUD', 'CNY'], tos: ['GBP', 'AUD', 'CNY'] });
+  // 同步现在只写 USD→X，清理必须带上 USD。仍按币种精确匹配，避免误删其他
+  // 并行套件的行。
+  await clearExchangeRates(app, {
+    froms: ['USD', 'GBP', 'AUD', 'CNY'],
+    tos: ['USD', 'GBP', 'AUD', 'CNY'],
+  });
   await app.prisma.rateSyncRun.deleteMany({});
 
   const user = await createUser(app, DOMAIN);
@@ -79,7 +82,7 @@ beforeEach(async () => {
 });
 
 describe('同步落库', () => {
-  it('按需换算成直接币种对并写入全局表', async () => {
+  it('只写 USD→X 单一方向', async () => {
     await createAccount('GBP');
 
     const summary = await runRateSync(app.prisma, {
@@ -94,20 +97,26 @@ describe('同步落库', () => {
     expect(summary.writtenRows).toBe(1);
 
     const row = await app.prisma.exchangeRate.findFirst({
-      where: { baseCurrency: 'GBP', quoteCurrency: 'CNY' },
+      where: { baseCurrency: 'USD', quoteCurrency: 'GBP' },
     });
-    // 7.2 / 0.8 = 9，落库为直接对
-    expect(row?.rate.toString()).toBe('9');
+    expect(row?.rate.toString()).toBe('0.8');
     expect(row?.source).toBe('provider');
+
+    // 不应出现非 USD 基准的自动行
+    expect(
+      await app.prisma.exchangeRate.count({
+        where: { baseCurrency: { not: 'USD' }, source: 'provider' },
+      }),
+    ).toBe(0);
   });
 
-  it('同日已有人工录入时跳过，人工值不变', async () => {
+  it('同日已有 USD→X 人工录入时跳过，人工值不变', async () => {
     await createAccount('GBP');
     await app.prisma.exchangeRate.create({
       data: {
-        baseCurrency: 'GBP',
-        quoteCurrency: 'CNY',
-        rate: '7.777',
+        baseCurrency: 'USD',
+        quoteCurrency: 'GBP',
+        rate: '0.777',
         rateDate: new Date(`${TODAY}T00:00:00.000Z`),
         source: 'manual',
       },
@@ -124,9 +133,9 @@ describe('同步落库', () => {
     expect(summary.writtenRows).toBe(0);
 
     const row = await app.prisma.exchangeRate.findFirst({
-      where: { baseCurrency: 'GBP', quoteCurrency: 'CNY' },
+      where: { baseCurrency: 'USD', quoteCurrency: 'GBP' },
     });
-    expect(row?.rate.toString()).toBe('7.777');
+    expect(row?.rate.toString()).toBe('0.777');
     expect(row?.source).toBe('manual');
   });
 
@@ -134,9 +143,9 @@ describe('同步落库', () => {
     await createAccount('GBP');
     const manual = await app.prisma.exchangeRate.create({
       data: {
-        baseCurrency: 'GBP',
-        quoteCurrency: 'CNY',
-        rate: '7.777',
+        baseCurrency: 'USD',
+        quoteCurrency: 'GBP',
+        rate: '0.777',
         rateDate: new Date(`${TODAY}T00:00:00.000Z`),
         source: 'manual',
       },
@@ -153,9 +162,9 @@ describe('同步落库', () => {
     await runRateSync(app.prisma, settings);
 
     const row = await app.prisma.exchangeRate.findFirst({
-      where: { baseCurrency: 'GBP', quoteCurrency: 'CNY' },
+      where: { baseCurrency: 'USD', quoteCurrency: 'GBP' },
     });
-    expect(row?.rate.toString()).toBe('9');
+    expect(row?.rate.toString()).toBe('0.8');
     expect(row?.source).toBe('provider');
   });
 
@@ -200,20 +209,18 @@ describe('同步落库', () => {
     expect(summary.failures.some((item) => item.code === 'RATE_INVALID')).toBe(true);
   });
 
-  it('基准币不是锚定币时也能落库（抓取集合必须包含基准币报价）', async () => {
-    // 用户基准币是 CNY，供应商锚定 USD：换算 GBP→CNY 需要 USD→CNY 作分母。
-    // 供应商只回被请求的币种，因此若抓取集合漏了基准币，整批会被
-    // ANCHOR_TO_BASE_MISSING 拒绝，一行都写不进去。
+  it('供应商锚定币不是 USD 时换算到 USD 口径落库', async () => {
+    // 供应商以 EUR 为锚，返回 EUR→GBP。存储锁定 USD，需要 EUR→USD 才能换算。
     await createAccount('GBP');
 
     const available = new Map([
-      ['CNY', q('CNY', '7.2')],
-      ['GBP', q('GBP', '0.8')],
+      ['USD', { base: 'EUR', quote: 'USD', rate: new Decimal('1.1'), date: TODAY }],
+      ['GBP', { base: 'EUR', quote: 'GBP', rate: new Decimal('0.88'), date: TODAY }],
     ]);
     const requested: string[] = [];
-    const strictProvider: RateProvider = {
+    const eurProvider: RateProvider = {
       name: 'fake',
-      anchorCurrency: 'USD',
+      anchorCurrency: 'EUR',
       fetch: async (_asOf, quotes) => {
         requested.push(...quotes);
         return quotes.flatMap((code) => (available.has(code) ? [available.get(code)!] : []));
@@ -222,18 +229,21 @@ describe('同步落库', () => {
 
     const summary = await runRateSync(app.prisma, {
       trigger: 'manual',
-      provider: strictProvider,
+      provider: eurProvider,
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
       demand: demandFor('GBP'),
     });
 
-    expect(requested).toContain('CNY');
+    expect(requested).toContain('USD');
     expect(summary.status).toBe('succeeded');
-    expect(summary.writtenRows).toBe(1);
-    expect(summary.failures).toEqual([]);
+    // EUR→GBP / EUR→USD = 0.88 / 1.1 = 0.8 ⇒ USD→GBP
+    const row = await app.prisma.exchangeRate.findFirst({
+      where: { baseCurrency: 'USD', quoteCurrency: 'GBP' },
+    });
+    expect(Number(row?.rate.toString())).toBeCloseTo(0.8, 6);
   });
 
-  it('两个用户看到同一个币种对的值与来源', async () => {
+  it('两个用户通过套算看到同一个交叉对的值', async () => {
     await createAccount('GBP');
     const other = await createUser(app, DOMAIN, 'other');
 
@@ -241,9 +251,10 @@ describe('同步落库', () => {
       trigger: 'manual',
       provider: fakeProvider([q('CNY', '7.2'), q('GBP', '0.8')]),
       now: () => new Date(`${TODAY}T08:00:00.000Z`),
-      demand: demandFor('GBP'),
+      demand: demandFor('GBP', 'CNY'),
     });
 
+    // GBP→CNY 没有直接行，靠 (USD→CNY)/(USD→GBP) = 7.2/0.8 = 9 套算
     const lookups = await Promise.all(
       [token, other.token].map((t) =>
         app.inject({ method: 'GET', url: '/api/exchange-rates?from=GBP&to=CNY', headers: auth(t) }),
